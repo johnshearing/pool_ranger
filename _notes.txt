@@ -1,2 +1,5 @@
 # Create a prompt
 export PS1="\w> "
+
+# Before pushing to github to pass tests
+aiken fmt
