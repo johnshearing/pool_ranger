@@ -110,17 +110,76 @@ By pooling our delegation, small ADA holders can have big influence on stake poo
 
 ## How It Works (Overview)
 
-1. **Join:** Generate your personal cooperative address — a standard Cardano address that uses
-    **your own spending key** (so you keep full control over spending) paired with the cooperative
-    stake script (so the administrator can delegate your stake to the best pool). Then send your ADA
-    to this new address. This is the only way Cardano allows a third party to control delegation on
-    your behalf: the staking credential of your address must be the cooperative script. Your ADA never
-    goes to a shared pool — it lives at an address that only you can spend from.
-2. **Delegate:** The administrator delegates your unique stake address to a chosen pool.
-3. **Earn:** Rewards accumulate at your stake address.
-4. **Withdraw:** The administrator pushes rewards to you (keeping 1%), or you withdraw 100%
-   yourself after the admin's 1-epoch window expires.
-5. **Leave:** Deregister your cooperative stake credential at any time — admin or member can do this.
+### Understanding Your Cooperative Address
+
+Every Cardano address has two parts:
+- A **spending credential** — controls who can send your ADA. Only the holder of your private key can do this.
+- A **staking credential** — controls which stake pool earns rewards on your behalf.
+
+Normally both parts come from the same wallet. Pool Ranger creates a special address for you where:
+- The **spending credential** is still your own key — only you can ever send your ADA.
+- The **staking credential** is the cooperative script — this lets the administrator delegate your stake to the best pools on your behalf.
+
+This is the only way Cardano allows a third party to manage delegation for you.  
+Because the staking credential must be part of your address, you do need to send your ADA to your new cooperative member address.  
+But your ADA never enters cooperative custody — no one else can spend it.
+
+---
+
+### Step-by-Step Member Flow
+
+**1. Join**  
+Pool Ranger generates a unique **cooperative member address** for you. It is a standard Cardano address built from your own wallet's payment key (your spending control) combined with the cooperative stake script (the administrator's delegation control). You send your ADA to this address. It is exclusively yours to spend — the administrator cannot touch it.
+
+**2. Register**  
+The cooperative stake credential is registered on-chain. This requires a refundable 2 ADA deposit, which is returned to you when you leave the cooperative. Registration is what ties your address into the cooperative's delegation system.
+
+**3. Delegate**  
+The administrator delegates your stake to the best available pool. Each member's stake is delegated independently, so you may be assigned to a different pool than other members. This prevents any one pool from becoming over-saturated, which would reduce returns for everyone.
+
+**4. Earn**  
+Staking rewards accumulate at your **stake address** — a separate on-chain account linked to your cooperative stake credential. Rewards do not appear in your ADA balance; they live at the stake address until they are withdrawn. See *Viewing Your Rewards* below.
+
+**5. Withdraw**  
+- The administrator withdraws accumulated rewards and routes ≥ 99% to your cooperative member address, keeping 1% as a management fee. The administrator has one epoch (approximately 5 days) to do this after each reward distribution.
+- If the administrator does not distribute within that window, you may withdraw 100% yourself — the administrator forfeits their fee entirely.
+- The smart contract enforces these rules. No trust is required.
+
+**6. Leave**  
+Either you or the administrator can deregister the cooperative stake credential at any time. Your 2 ADA deposit is returned to you. Your ADA stays at your cooperative member address and remains yours to spend whenever you like.
+
+---
+
+### Spending Your ADA While Staked
+
+You never lose access to your ADA. Spending a UTxO only requires satisfying the **spending credential** — your private key. The cooperative stake script plays absolutely no role in spending transactions. As far as Cardano is concerned, sending ADA from your cooperative address is identical to sending from any other address you own.
+
+- **Phase 1 (current):** Use Pool Ranger's CLI scripts to build and sign spending transactions. If you use a Ledger hardware wallet, the device signs exactly as it would for any ordinary Cardano address — it sees a normal transaction that requires your payment key, nothing more.
+- **Phase 2 (planned):** The Pool Ranger web UI will let you connect your CIP-30 wallet (e.g. Eternl) and spend directly from your cooperative address in the browser.
+
+> **Important note for hardware wallet users:** Most hardware wallet companion apps (such as Ledger Live) derive and display only addresses where both the spending key *and* the staking key come from your device's seed phrase. Your cooperative address uses a script for the staking credential instead of your device's staking key, so it will not appear in your hardware wallet's normal address list or balance display. You will use Pool Ranger's interface — CLI in Phase 1, web dashboard in Phase 2 — to view your balance and initiate transactions.
+
+---
+
+### Viewing Your ADA Balance
+
+Your ADA balance is the total ADA sitting in UTxOs at your cooperative member address. It does not include unclaimed staking rewards (those are at a separate stake address — see below).
+
+- **CLI (Phase 1):** Run `node _view_wallet_balances.mjs` — this queries your cooperative address via Blockfrost and prints your current ADA balance.
+- **Web UI (Phase 2):** Your balance will be shown on your member dashboard whenever you log in.
+- **Cardano explorer:** You can look up your cooperative member address directly on [cardanoscan.io](https://cardanoscan.io) (use Preview testnet for testing) to see every UTxO it holds.
+
+---
+
+### Viewing Staking Rewards Not Yet Distributed
+
+Cardano holds accumulated staking rewards in a **rewards account** linked to your stake credential. This is entirely separate from your ADA balance — rewards do not appear in your wallet until they are explicitly withdrawn to your address.
+
+To see rewards that have built up but not yet been sent to you:
+
+- **CLI (Phase 1):** `node _view_wallet_balances.mjs` queries your stake address reward balance via Blockfrost and displays it alongside your ADA balance.
+- **Web UI (Phase 2):** Your pending rewards will appear on your member dashboard next to your wallet balance.
+- **Cardano explorer:** Look up your **stake address** (it begins with `stake_test1...` on Preview testnet) on [cardanoscan.io](https://cardanoscan.io). The explorer shows the full reward balance that has accumulated but not yet been withdrawn. Pool Ranger's CLI prints your stake address when you run `_view_wallet_balances.mjs` so you always know where to look.
 
 ---
 
