@@ -96,3 +96,7 @@ fn member_lovelace_received(
     },
   )
 }
+
+test dummy_check() {
+  1 + 1 == 2
+}
