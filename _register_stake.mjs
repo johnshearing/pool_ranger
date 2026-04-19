@@ -102,7 +102,7 @@ async function main() {
   const txBuilder = getTxBuilder();
   await txBuilder
     .registerStakeCertificate(stakeAddress)
-    .certificateScript(scriptCbor)
+    .certificateScript(scriptCbor, 'V3')
     .certificateRedeemerValue('')
     .txInCollateral(
       collateral.input.txHash,

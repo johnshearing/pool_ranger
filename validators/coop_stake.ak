@@ -97,6 +97,8 @@ fn member_lovelace_received(
   )
 }
 
+// The github validator needs to see a test. 
+// The following is just to supress an error when pushing to github.
 test dummy_check() {
   1 + 1 == 2
 }
