@@ -79,12 +79,21 @@ All scripts go in `ranger/`. Use `vesting/` as the code and workflow model.
 
 All scripts that require a signature support two modes, following the same pattern:
 
-**Hardware wallet (default):** reads the signer's address from an `.addr` file, fetches UTxOs
-via Blockfrost, builds the transaction, and prints the unsigned tx hex. Sign externally with
-`cardano-hw-cli` or a web tool, then submit separately.
+**Hardware wallet (default — current active workflow):** reads the signer's address from an
+`.addr` file, fetches UTxOs via Blockfrost, builds the transaction, and prints the unsigned tx
+hex. The unsigned hex is then signed externally on the Ledger device (via `cardano-hw-cli` or a
+web tool such as eternl.io). The resulting signed tx hex is submitted using `_submit_tx.mjs`:
 
-**Software wallet (testing):** uncomment the `SOFTWARE WALLET` block in the script. The wallet
-loads from a `.sk` root key file and auto-signs and submits in one step.
+```
+node _submit_tx.mjs <signed-tx-hex>
+```
+
+Both admin and member wallets use Ledger hardware wallets. Neither has a `.sk` file.
+
+**Software wallet (future testing only):** each script contains a commented `SOFTWARE WALLET`
+block. When uncommented, the wallet loads from a `.sk` root key file and auto-signs and submits
+in one step. These blocks exist for automated testing scenarios only and are not used in the
+current workflow.
 
 This applies equally to admin scripts and member scripts.
 
@@ -95,6 +104,7 @@ This applies equally to admin scripts and member scripts.
 - [x] `_view_wallet_balances.mjs` — inspect ADA and reward balances
 - [x] `_register_stake.mjs` — member registers their coop stake credential on-chain (pays 2 ADA deposit); hardware and software wallet signing
 - [x] `_delegate.mjs` — admin delegates each member's stake to a chosen pool (per-member granular control); hardware and software wallet signing
+- [x] `_submit_tx.mjs` — submits a signed tx hex to the network via Blockfrost; used after Ledger signing to replace `cardano-cli transaction submit`
 - [ ] `_push_rewards.mjs` — admin withdraws rewards and routes 99% to member, keeps 1%
 - [ ] `_member_withdraw.mjs` — member withdraws 100% after the 1-epoch admin window expires; will support hardware and software wallet signing
 - [ ] `_revoke_membership.mjs` — member (or admin) deregisters the coop stake credential; will support hardware and software wallet signing
@@ -105,7 +115,16 @@ This applies equally to admin scripts and member scripts.
 
 The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview testnet).
 - Address is in `0_admin.addr`. There is **no `0_admin.sk`**.
-- Use hardware wallet signing mode (default) for production; uncomment the software wallet block for testing.
+- Hardware wallet signing mode (default) is the active workflow. The software wallet block in
+  each script is commented out and used only for automated testing.
+
+### Member wallets
+
+Member wallets are also **Ledger hardware wallets**. Each member has a `0_member_N.addr` file
+and **no `0_member_N.sk`**.
+- Scripts read the member address from the `.addr` file, build an unsigned tx, and print the
+  unsigned hex for the member to sign on their Ledger device.
+- After signing, the member (or admin on their behalf) submits with `_submit_tx.mjs`.
 
 ---
 
@@ -165,7 +184,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 | Directory / filenames | `ranger` |
 | Script prefix | `_` (matches vesting pattern) |
 | Word separator in filenames | `_` (underscores, not dashes) |
-| Wallet files | `0_admin.addr` (Ledger hardware wallet — no .sk file) |
+| Wallet files | `0_admin.addr`, `0_member_N.addr` — Ledger hardware wallets, no .sk files |
 | Config | `common/common.mjs` |
 | Tests | inline in `.ak` files, run with `aiken check` |
 
@@ -176,7 +195,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 | # | Decision | Status |
 |---|----------|--------|
 | 1 | Smart contract language: Aiken (Plutus V3) | Decided |
-| 2 | Hardware wallet for admin: Ledger, no .sk file | Decided |
+| 2 | Hardware wallet for admin AND members: Ledger, no .sk files | Decided |
 | 3 | Oversaturation prevention: parameterized script per member → each member has a unique stake address → admin can delegate each independently | Decided |
 | 4 | Member identity: proven by `member_pkh` baked into their script instance; admin identity proven by `admin_pkh` | Decided |
 | 5 | Member registry: implicit — the set of registered coop stake credentials on-chain is the registry; no separate registry UTxO needed | Decided |
