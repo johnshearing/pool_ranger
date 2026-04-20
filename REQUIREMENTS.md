@@ -114,7 +114,7 @@ This applies equally to admin scripts and member scripts.
 ### Admin wallet
 
 The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview testnet).
-- Address is in `0_admin.addr`. There is **no `0_admin.sk`**.
+- Address is in `0_admin_0.addr`. There is **no `0_admin_0.sk`**.
 - Hardware wallet signing mode (default) is the active workflow. The software wallet block in
   each script is commented out and used only for automated testing.
 
@@ -170,7 +170,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 2. `npm install` in `ranger/` — installs `@meshsdk/core`, `@meshsdk/core-csl`, `dotenv`
 3. Install Aiken CLI v1.1.21
 4. Create `.env` with `BLOCKFROST_API=previewXXXXX`
-5. Admin address is already in `0_admin.addr`. Run `_generate_credentials.mjs` only
+5. Admin address is already in `0_admin_0.addr`. Run `_generate_credentials.mjs` only
    to create additional software wallets for testing.
 6. Run `aiken build` after any change to `.ak` files to regenerate `plutus.json`.
 
@@ -184,7 +184,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 | Directory / filenames | `ranger` |
 | Script prefix | `_` (matches vesting pattern) |
 | Word separator in filenames | `_` (underscores, not dashes) |
-| Wallet files | `0_admin.addr`, `0_member_N.addr` — Ledger hardware wallets, no .sk files |
+| Wallet files | `0_admin_0.addr`, `0_member_N.addr` — Ledger hardware wallets, no .sk files |
 | Config | `common/common.mjs` |
 | Tests | inline in `.ak` files, run with `aiken check` |
 

@@ -20,8 +20,8 @@ Working directory: **`ranger/`** only. Model workflow from: **`vesting/`**.
 ## Admin Wallet
 
 The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview testnet).
-- Address: `0_admin.addr` — read this file to get the admin address.
-- There is **no `0_admin.sk`** — the private key never leaves the device.
+- Address: `0_admin_0.addr` — read this file to get the admin address.
+- There is **no `0_admin_0.sk`** — the private key never leaves the device.
 - Any script that needs to act as admin must use a Ledger signing flow (CIP-30 in-browser
   or HID in CLI), not a software key. Scripts that only read admin balance use the address directly.
 

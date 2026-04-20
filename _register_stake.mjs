@@ -18,7 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Usage (from ranger/):
-//   node _register_stake.mjs
+//   Run the following command:
 //   MEMBER_ADDR_PATH=./0_member_2.addr node _register_stake.mjs
 //
 // Software wallet usage:
@@ -36,10 +36,10 @@ import {
 } from './common/common.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────
-const ADMIN_ADDR_PATH = './0_admin.addr';
+const ADMIN_ADDR_PATH = './0_admin_0.addr';
 
 // ── HARDWARE WALLET (default) ─────────────────────────────────────────────
-const MEMBER_ADDR_PATH = process.env.MEMBER_ADDR_PATH || './0_member_1.addr';
+const MEMBER_ADDR_PATH = process.env.MEMBER_ADDR_PATH || './0_admin_0.addr';
 
 // ── SOFTWARE WALLET (Phase 1 testing) — uncomment both lines to enable ────
 // const MEMBER_SK_PATH = process.env.MEMBER_SK_PATH || './0_member_1.sk';
@@ -83,33 +83,13 @@ async function main() {
     process.exit(1);
   }
 
-  // Find a pure-ADA UTxO for collateral.
-  // Plutus script witnesses in Conway era require collateral even for certificates.
-  const collateral = memberUtxos.find(
-    u => u.output.amount.length === 1 && u.output.amount[0].unit === 'lovelace',
-  );
-  if (!collateral) {
-    console.error('\nNo pure-ADA UTxO for collateral. Send a small separate UTxO to the member wallet first.');
-    process.exit(1);
-  }
-
   console.log('\nBuilding registration transaction...');
 
-  // Build the registration transaction.
-  // registerStakeCertificate adds a RegisterCredential certificate.
-  // For a script stake credential, certificateScript provides the Plutus witness.
-  // certificateRedeemerValue('') passes an empty redeemer (_redeemer: Data unused).
+  // Stake registration does NOT execute the script — it only pays the 2 ADA deposit.
+  // Script execution happens during withdrawal and deregistration, not here.
   const txBuilder = getTxBuilder();
   await txBuilder
     .registerStakeCertificate(stakeAddress)
-    .certificateScript(scriptCbor, 'V3')
-    .certificateRedeemerValue('')
-    .txInCollateral(
-      collateral.input.txHash,
-      collateral.input.outputIndex,
-      collateral.output.amount,
-      collateral.output.address,
-    )
     .changeAddress(memberAddress)
     .selectUtxosFrom(memberUtxos)
     .complete();

@@ -2,8 +2,8 @@
 // Run this once to generate the admin's root key and save the address.
 //
 // Output files (written to the current directory):
-//   0_admin.sk   — root private key (BIP32 bech32) — KEEP SECRET, never share
-//   0_admin.addr — first unused address for the admin wallet
+//   0_admin_0.sk   — root private key (BIP32 bech32) — KEEP SECRET, never share
+//   0_admin_0.addr — first unused address for the admin wallet
 //
 // Hardware wallet support is scaffolded at the bottom of this file.
 // Members will use a hardware wallet (Ledger / Trezor) for their staking key
@@ -21,7 +21,7 @@ import {
 const admin_secret_key = MeshWallet.brew(true);
 
 // Save secret key to file — keep this file private, back it up securely
-fs.writeFileSync('0_admin.sk', admin_secret_key);
+fs.writeFileSync('0_admin_0.sk', admin_secret_key);
 
 const admin_wallet = new MeshWallet({
   networkId: 0,  // 0 = testnet (Preview), 1 = mainnet
@@ -33,12 +33,12 @@ const admin_wallet = new MeshWallet({
 
 // Save first unused address to file
 const admin_address = (await admin_wallet.getUnusedAddresses())[0];
-fs.writeFileSync('0_admin.addr', admin_address);
+fs.writeFileSync('0_admin_0.addr', admin_address);
 
 console.log('Admin wallet created successfully.');
 console.log('Address :', admin_address);
-console.log('Key file : 0_admin.sk  (keep secret)');
-console.log('Addr file: 0_admin.addr');
+console.log('Key file : 0_admin_0.sk  (keep secret)');
+console.log('Addr file: 0_admin_0.addr');
 
 
 // --- Hardware wallet scaffold (not yet implemented) ---

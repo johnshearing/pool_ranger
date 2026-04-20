@@ -30,7 +30,7 @@ import {
 } from './common/common.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────
-const ADMIN_ADDR_PATH = './0_admin.addr';
+const ADMIN_ADDR_PATH = './0_admin_0.addr';
 const CONFIG_FILE = process.argv[2] || './delegation_config.json';
 
 // ── SOFTWARE WALLET (Phase 1 testing only) ───────────────────────────────

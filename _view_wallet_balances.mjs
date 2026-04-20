@@ -14,7 +14,7 @@ dotenv.config(); // Loads BLOCKFROST_API from .env
 // ==================== CONFIG ====================
 const WALLETS = [
   { name: "Original (hello-world)", skPath: "../hello-world/me.sk" },
-  { name: "Admin (Ledger)",         addrPath: "./0_admin.addr" },
+  { name: "Admin (Ledger)",         addrPath: "./0_admin_0.addr" },
   { name: "Member_1 (Ledger)",         addrPath: "./0_member_1.addr" },
   { name: "Member_2 (Ledger)",         addrPath: "./0_member_2.addr" }   
 ];
