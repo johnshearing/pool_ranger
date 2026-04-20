@@ -81,8 +81,9 @@ All scripts that require a signature support two modes, following the same patte
 
 **Hardware wallet (default — current active workflow):** reads the signer's address from an
 `.addr` file, fetches UTxOs via Blockfrost, builds the transaction, and prints the unsigned tx
-hex. The unsigned hex is then signed externally on the Ledger device (via `cardano-hw-cli` or a
-web tool such as eternl.io). The resulting signed tx hex is submitted using `_submit_tx.mjs`:
+hex. The unsigned hex is signed using the custom web tool at `web/dist/sign_tx.html` (open
+in Chrome with the Eternl extension installed). The resulting signed tx hex is submitted using
+`_submit_tx.mjs`:
 
 ```
 node _submit_tx.mjs <signed-tx-hex>
@@ -99,17 +100,33 @@ This applies equally to admin scripts and member scripts.
 
 ### Script checklist
 
+**Node.js scripts:**
 - [x] `_generate_credentials.mjs` — creates software wallets; scaffolds Ledger support
 - [x] `_transfer_funds.mjs` — sends ADA between wallets for testing
 - [x] `_view_wallet_balances.mjs` — inspect ADA and reward balances
 - [x] `_register_stake.mjs` — member registers their coop stake credential on-chain (pays 2 ADA deposit); hardware and software wallet signing
 - [x] `_delegate.mjs` — admin delegates each member's stake to a chosen pool (per-member granular control); hardware and software wallet signing
-- [x] `_submit_tx.mjs` — submits a signed tx hex to the network via Blockfrost; used after Ledger signing to replace `cardano-cli transaction submit`
-- [ ] `_push_rewards.mjs` — admin withdraws rewards and routes 99% to member, keeps 1%
-- [ ] `_member_withdraw.mjs` — member withdraws 100% after the 1-epoch admin window expires; will support hardware and software wallet signing
-- [ ] `_revoke_membership.mjs` — member (or admin) deregisters the coop stake credential; will support hardware and software wallet signing
-- [ ] `_view_members.mjs` — list registered coop stake addresses and their delegation status
-- [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent rewards
+- [x] `_submit_tx.mjs` — submits a signed tx hex to the network via Blockfrost; used after Ledger signing
+- [ ] `_push_rewards.mjs` — admin withdraws rewards and routes 99% to member, keeps 1% fee
+- [ ] `_member_withdraw.mjs` — member withdraws 100% after the 1-epoch admin window expires
+- [ ] `_revoke_membership.mjs` — member (or admin) deregisters the coop stake credential; returns 2 ADA deposit
+- [ ] `_view_members.mjs` — list all registered coop stake addresses, delegation status, and pending rewards
+- [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
+
+**Web signing tool (`web/`) — Phase 1 bridge for Ledger signing:**
+- [x] `web/package.json` — browser build dependencies (MeshJS + Vite + Node.js polyfills)
+- [x] `web/vite.config.js` — Vite bundler config; aliases `crypto`/`stream`/`buffer`/`events` to browser polyfills so MeshJS builds for the browser
+- [x] `web/sign_tx.html` — source HTML for the signing page
+- [x] `web/sign_tx.js` — source JS; uses `BrowserWallet.enable('eternl')` and `wallet.signTx()` to sign via CIP-30 and return the complete signed tx hex
+- [x] `web/dist/sign_tx.html` — **built output** — this is the file opened in the browser (run `npm run build` inside `web/` to regenerate)
+
+**Future web pages (Phase 2 WebUI — not yet built):**
+- [ ] `web/register.html` — member self-service: register stake, view coop base address
+- [ ] `web/withdraw.html` — member withdraws 100% rewards after epoch window
+- [ ] `web/revoke.html` — member revokes membership and recovers 2 ADA deposit
+- [ ] `web/admin_delegate.html` — admin assigns each member to a pool
+- [ ] `web/admin_push_rewards.html` — admin pushes reward distribution (collects 1% fee)
+- [ ] `web/admin_dashboard.html` — admin view of all members, pools, saturation, rewards
 
 ### Admin wallet
 
@@ -125,6 +142,88 @@ and **no `0_member_N.sk`**.
 - Scripts read the member address from the `.addr` file, build an unsigned tx, and print the
   unsigned hex for the member to sign on their Ledger device.
 - After signing, the member (or admin on their behalf) submits with `_submit_tx.mjs`.
+
+---
+
+## Member Workflow (End-to-End)
+
+This is the step-by-step process a cooperative member follows, from joining to withdrawing rewards.
+
+### One-time setup
+1. Get a Ledger hardware wallet. Install the **Cardano app** on it.
+2. Install the **Eternl browser extension** in Chrome or Edge. Connect your Ledger to Eternl.
+3. In Eternl: switch the network to **Preview testnet** (Settings → General → Network).
+4. Send your wallet address (from your `0_member_N.addr` file) to the admin so they know your
+   public key hash and can parameterize your cooperative stake script.
+
+### Joining the cooperative
+5. Run `_register_stake.mjs` to build the stake registration transaction:
+   ```
+   MEMBER_ADDR_PATH=./0_member_N.addr node _register_stake.mjs
+   ```
+   This prints your unique **coop base address** and an **unsigned tx hex**.
+6. Open `web/dist/sign_tx.html` in Chrome. Paste the unsigned tx hex. Click
+   "Sign with Eternl (Ledger)". Approve on your Ledger device. Copy the signed tx hex.
+7. Submit:
+   ```
+   node _submit_tx.mjs <signed-tx-hex>
+   ```
+8. Move your ADA to your **coop base address** (printed in step 5). This is the address where
+   your ADA lives inside the cooperative. Your spending key still controls the funds — the
+   cooperative cannot take them.
+
+### Ongoing participation
+- The admin will delegate your stake to a pool each epoch and push reward distributions.
+- You receive 99% of your staking rewards automatically. No action required on your part.
+- You can check balances and rewards at any time with `_view_wallet_balances.mjs`.
+
+### Withdrawing rewards yourself (after 1-epoch admin window)
+9. If the admin has not pushed rewards within 1 epoch, run `_member_withdraw.mjs` to claim
+   100% of your rewards yourself. *(Script not yet built.)*
+
+### Leaving the cooperative
+10. Run `_revoke_membership.mjs` to deregister your coop stake credential and recover your
+    2 ADA deposit. *(Script not yet built.)* Move your ADA back to a plain address.
+
+---
+
+## Administrator Workflow (End-to-End)
+
+This is the step-by-step process the cooperative administrator follows.
+
+### One-time setup
+1. Admin wallet is a **Ledger hardware wallet**. Address is in `0_admin_0.addr`. No `.sk` file.
+2. Admin installs **Eternl** in Chrome with the Ledger connected, Preview testnet selected.
+3. Fund the admin wallet with enough preview ADA to pay delegation transaction fees.
+
+### Onboarding a new member
+4. Receive the member's `.addr` file (or the address string from their file).
+5. The member runs `_register_stake.mjs` themselves (they pay the 2 ADA deposit and sign).
+6. Once confirmed, the member moves their ADA to their printed **coop base address**.
+
+### Delegating stake to a pool
+7. Prepare (or update) `delegation_config.json` — a JSON file listing `{ memberPkh, poolId }`
+   assignments. *(File format defined in `_delegate.mjs` header comments.)*
+8. Run `_delegate.mjs` to build a delegation transaction for each member:
+   ```
+   node _delegate.mjs
+   ```
+   This prints unsigned tx hex for each delegation.
+9. For each unsigned tx, open `web/dist/sign_tx.html`, sign with the admin Ledger, submit with
+   `_submit_tx.mjs`. *(One delegation tx per member.)*
+
+### Distributing rewards (each epoch)
+10. At each epoch boundary, run `_push_rewards.mjs` *(not yet built)* to:
+    - Withdraw all accumulated rewards from each member's coop stake address.
+    - Route 99% back to the member's coop base address.
+    - Keep 1% as the admin fee.
+    - Sign each withdrawal tx with the admin Ledger via the web signing tool.
+11. This must be done within **1 epoch** of the rewards becoming available. After that window,
+    the member can claim 100% themselves using `_member_withdraw.mjs`.
+
+### Monitoring
+12. Use `_view_members.mjs` *(not yet built)* to see all registered members and their reward balances.
+13. Use `_view_pool_info.mjs` *(not yet built)* to track pool saturation and choose pools wisely.
 
 ---
 
@@ -168,11 +267,15 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 
 1. Install Node.js (LTS) in WSL
 2. `npm install` in `ranger/` — installs `@meshsdk/core`, `@meshsdk/core-csl`, `dotenv`
-3. Install Aiken CLI v1.1.21
-4. Create `.env` with `BLOCKFROST_API=previewXXXXX`
-5. Admin address is already in `0_admin_0.addr`. Run `_generate_credentials.mjs` only
+3. `npm install` in `ranger/web/` — installs MeshJS + Vite + browser polyfills
+4. `npm run build` in `ranger/web/` — produces `ranger/web/dist/sign_tx.html`
+5. Install Aiken CLI v1.1.21
+6. Create `.env` with `BLOCKFROST_API=previewXXXXX`
+7. Admin address is already in `0_admin_0.addr`. Run `_generate_credentials.mjs` only
    to create additional software wallets for testing.
-6. Run `aiken build` after any change to `.ak` files to regenerate `plutus.json`.
+8. Run `aiken build` after any change to `.ak` files to regenerate `plutus.json`.
+9. Install **Eternl** browser extension in Chrome or Edge. Connect Ledger. Set network to
+   Preview testnet. Open `web/dist/sign_tx.html` via `\\wsl$\Ubuntu\home\js\aiken\ranger\web\dist\sign_tx.html`.
 
 ---
 
