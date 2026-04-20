@@ -35,17 +35,14 @@ validator coop_stake(
 
   // Controls reward withdrawal from this member's coop stake account.
   //
-  // Phase 1 rule (1-epoch window enforced socially off-chain):
-  //   admin signs  → admin keeps 1%, member must receive ≥ 99%
-  //   only member  → member receives 100%
+  // Either admin or member may initiate. Admin always earns 1%.
+  // The transaction fee is paid from the rewards (deducted from member's 99% floor).
   //
-  // Phase 2 will add a validity_range check against the epoch boundary
-  // to enforce the window on-chain.
+  //   admin or member signs → admin gets ≤ 1%, member gets ≥ 99% minus tx.fee
   withdraw(_redeemer: Data, account: Credential, tx: Transaction) {
     let signed_by_admin = list.has(tx.extra_signatories, admin_pkh)
     let signed_by_member = list.has(tx.extra_signatories, member_pkh)
 
-    // Find how much is being withdrawn for this credential.
     expect Some(withdrawal_amount) =
       list.find_map(
         tx.withdrawals,
@@ -58,15 +55,10 @@ validator coop_stake(
         },
       )
 
-    let member_received = member_lovelace_received(tx.outputs, member_pkh)
+    let admin_received = lovelace_received_by(tx.outputs, admin_pkh)
+    let member_received = lovelace_received_by(tx.outputs, member_pkh)
 
-    if signed_by_admin {
-      // Admin window: admin keeps 1%, member must receive at least 99%.
-      member_received >= withdrawal_amount * 99 / 100
-    } else {
-      // Member self-withdrawal: 100% must reach the member.
-      signed_by_member && member_received >= withdrawal_amount
-    }
+    (signed_by_admin || signed_by_member) && admin_received <= withdrawal_amount * 1 / 100 && member_received >= withdrawal_amount * 99 / 100 - tx.fee
   }
 
   // Reject all other script purposes (spend, mint, vote, propose).
@@ -75,8 +67,8 @@ validator coop_stake(
   }
 }
 
-// Sum all lovelace in outputs whose payment credential matches the member's key.
-fn member_lovelace_received(
+// Sum all lovelace in outputs whose payment credential matches the given key.
+fn lovelace_received_by(
   outputs: List<Output>,
   pkh: VerificationKeyHash,
 ) -> Int {

@@ -47,11 +47,16 @@ validator coop_stake(admin_pkh: VerificationKeyHash, member_pkh: VerificationKey
 
 ### `withdraw` handler — reward distribution rules
 
-- **Admin signs:** Admin keeps 1% of the withdrawal; member must receive ≥ 99%.
-- **Only member signs:** Member receives 100% (no admin fee).
-- The 1-epoch timing window (admin fee window opens at epoch end, closes after 1 epoch) is
-  enforced socially in Phase 1. Phase 2 will add a `validity_range` check against the epoch
-  boundary to enforce the window on-chain.
+- **Either admin or member may initiate.** The rule is the same regardless of who signs.
+- **Admin receives ≤ 1%** of the withdrawal amount.
+- **Member receives ≥ 99% minus the transaction fee.** The fee is read from `tx.fee` and
+  deducted from the member's floor, so neither party needs extra ADA on hand — the rewards
+  are self-funding (the initiator provides a small "fee carrier" UTxO that is returned as
+  change; the actual fee comes from the reward balance).
+- The 1-epoch timing window mechanic has been removed. Admin always earns 1%; there is no
+  escape hatch for the member to withdraw 100%.
+- Phase 2 may add an optional `validity_range` check to prevent same-epoch withdrawals
+  (hardening only — not required for the fee rule).
 
 ### Security properties
 
@@ -302,6 +307,6 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 | 3 | Oversaturation prevention: parameterized script per member → each member has a unique stake address → admin can delegate each independently | Decided |
 | 4 | Member identity: proven by `member_pkh` baked into their script instance; admin identity proven by `admin_pkh` | Decided |
 | 5 | Member registry: implicit — the set of registered coop stake credentials on-chain is the registry; no separate registry UTxO needed | Decided |
-| 6 | Reward fee enforcement: Phase 1 social; Phase 2 adds on-chain `validity_range` check against epoch boundary | In progress |
+| 6 | Reward fee enforcement: admin always gets 1%, fee comes from rewards (`tx.fee` deducted from member floor); no timing window | Decided |
 | 7 | Last-minute delegation timing mechanism | To design |
 | 8 | Tax reporting format for administrator's 1% | To design |
