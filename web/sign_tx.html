@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pool Ranger — Sign Transaction</title>
+  <style>
+    body { font-family: monospace; max-width: 720px; margin: 40px auto; padding: 0 20px; }
+    h2 { margin-bottom: 4px; }
+    p { margin-top: 4px; color: #555; }
+    label { display: block; font-weight: bold; margin: 16px 0 4px; }
+    textarea { width: 100%; height: 120px; font-size: 12px; box-sizing: border-box; }
+    button { padding: 10px 22px; font-size: 15px; cursor: pointer; margin-right: 8px; }
+    #status { margin-top: 14px; font-size: 14px; min-height: 1.4em; }
+  </style>
+</head>
+<body>
+  <h2>Pool Ranger — Sign Transaction</h2>
+  <p>Signs an unsigned transaction with your Ledger via Eternl. Does not submit.</p>
+
+  <label for="tx-hex">1. Paste unsigned tx hex (from <code>_register_stake.mjs</code>):</label>
+  <textarea id="tx-hex" placeholder="84a500d9..."></textarea>
+
+  <button id="btn-sign">Sign with Eternl (Ledger)</button>
+
+  <div id="status"></div>
+
+  <label for="signed-hex">2. Signed tx hex — copy and run <code>node _submit_tx.mjs &lt;hex&gt;</code>:</label>
+  <textarea id="signed-hex" readonly placeholder="Signed hex will appear here..."></textarea>
+  <button id="btn-copy">Copy</button>
+
+  <script type="module" src="./sign_tx.js"></script>
+</body>
+</html>
