@@ -49,14 +49,11 @@ validator coop_stake(admin_pkh: VerificationKeyHash, member_pkh: VerificationKey
 
 - **Either admin or member may initiate.** The rule is the same regardless of who signs.
 - **Admin receives ≤ 1%** of the withdrawal amount.
-- **Member receives ≥ 99% minus the transaction fee.** The fee is read from `tx.fee` and
-  deducted from the member's floor, so neither party needs extra ADA on hand — the rewards
-  are self-funding (the initiator provides a small "fee carrier" UTxO that is returned as
-  change; the actual fee comes from the reward balance).
-- The 1-epoch timing window mechanic has been removed. Admin always earns 1%; there is no
-  escape hatch for the member to withdraw 100%.
-- Phase 2 may add an optional `validity_range` check to prevent same-epoch withdrawals
-  (hardening only — not required for the fee rule).
+- **Member receives ≥ 99% minus the transaction fee.**  
+  - The fee is read from `tx.fee` and deducted from the member's floor.  
+   So neither party needs extra ADA on hand — the rewards are self-funding.   
+   The initiator provides a small "fee carrier" UTxO that is returned as change.  
+   The actual fee comes from the reward balance.  
 
 ### Security properties
 
@@ -69,7 +66,8 @@ validator coop_stake(admin_pkh: VerificationKeyHash, member_pkh: VerificationKey
 
 ## Off-chain Scripts (Phase 1 — .mjs scripts)
 
-All scripts go in `ranger/`. Use `vesting/` as the code and workflow model.
+All scripts go in `ranger/`.  
+Use `vesting/` as the code and workflow model.  
 
 ### Shared Config (`common/common.mjs`) — Implemented
 
@@ -78,7 +76,8 @@ All scripts go in `ranger/`. Use `vesting/` as the code and workflow model.
 - `loadSoftwareWallet(skPath)` — loads a wallet from a `.sk` root key file
 - `loadAddressOnly(addrPath)` — reads an address file (for Ledger; no signing)
 - `getCoopStakeScript(adminPkh, memberPkh)` — central factory that applies parameters to
-  the compiled script and returns `{ scriptCbor, scriptHash, stakeAddress, memberCoopBaseAddress }`
+  the compiled script  
+  - Returns `{ scriptCbor, scriptHash, stakeAddress, memberCoopBaseAddress }`
 
 ### Signing modes
 
@@ -137,8 +136,8 @@ This applies equally to admin scripts and member scripts.
 
 The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview testnet).
 - Address is in `0_admin_0.addr`. There is **no `0_admin_0.sk`**.
-- Hardware wallet signing mode (default) is the active workflow. The software wallet block in
-  each script is commented out and used only for automated testing.
+- Hardware wallet signing mode (default) is the active workflow. 
+- The software wallet block in each script is commented out and used only for automated testing.
 
 ### Member wallets
 
@@ -178,17 +177,20 @@ This is the step-by-step process a cooperative member follows, from joining to w
    cooperative cannot take them.
 
 ### Ongoing participation
-- The admin will delegate your stake to a pool each epoch and push reward distributions.
+- The admin will delegate your stake to a pool each epoch and push reward distributions after each epoch.
 - You receive 99% of your staking rewards automatically. No action required on your part.
 - You can check balances and rewards at any time with `_view_wallet_balances.mjs`.
 
-### Withdrawing rewards yourself (after 1-epoch admin window)
-9. If the admin has not pushed rewards within 1 epoch, run `_member_withdraw.mjs` to claim
-   100% of your rewards yourself. *(Script not yet built.)*
+### Withdrawing rewards yourself
+9. You can run `_member_withdraw.mjs` to claim your rewards.  
+99% is sent to you, the member. 1% is sent to the administrator.  
+*(Script not yet built.)*
 
 ### Leaving the cooperative
 10. Run `_revoke_membership.mjs` to deregister your coop stake credential and recover your
-    2 ADA deposit. *(Script not yet built.)* Move your ADA back to a plain address.
+    2 ADA deposit.  
+   Move your ADA back to a plain address.  
+   *(Script not yet built.)* 
 
 ---
 
@@ -223,8 +225,6 @@ This is the step-by-step process the cooperative administrator follows.
     - Route 99% back to the member's coop base address.
     - Keep 1% as the admin fee.
     - Sign each withdrawal tx with the admin Ledger via the web signing tool.
-11. This must be done within **1 epoch** of the rewards becoming available. After that window,
-    the member can claim 100% themselves using `_member_withdraw.mjs`.
 
 ### Monitoring
 12. Use `_view_members.mjs` *(not yet built)* to see all registered members and their reward balances.
@@ -240,7 +240,7 @@ This is the step-by-step process the cooperative administrator follows.
 - Join cooperative: generate coop base address, move ADA to it
 - View staking rewards
 - Revoke membership
-- Withdraw rewards (100% after 1-epoch window)
+- Withdraw rewards. 99% goes to member and 1% goes to the administrator
 
 ### Admin WebUI (Phase 2b)
 
@@ -307,6 +307,6 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 | 3 | Oversaturation prevention: parameterized script per member → each member has a unique stake address → admin can delegate each independently | Decided |
 | 4 | Member identity: proven by `member_pkh` baked into their script instance; admin identity proven by `admin_pkh` | Decided |
 | 5 | Member registry: implicit — the set of registered coop stake credentials on-chain is the registry; no separate registry UTxO needed | Decided |
-| 6 | Reward fee enforcement: admin always gets 1%, fee comes from rewards (`tx.fee` deducted from member floor); no timing window | Decided |
+| 6 | Reward fee enforcement: admin always gets 1%, fee comes from rewards (`tx.fee` deducted from member floor) | Decided |
 | 7 | Last-minute delegation timing mechanism | To design |
 | 8 | Tax reporting format for administrator's 1% | To design |
