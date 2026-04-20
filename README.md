@@ -69,13 +69,13 @@ The `publish` handler lets **either** the admin **or** the member deregister the
 You never need the administrator's permission to leave.  
 You can withdraw your delegation and leave the cooperative at any time.**
 
-### 4. Staking Rewards Are Distributed Weekly 
+### 4. Staking Rewards Are Distributed Automatically 
 
 **Pool Ranger's withdraw handler enforces the fee split on-chain:**
-- Admin-initiated withdrawal: admin keeps 1%, member receives ≥ 99%.  
-  - Admin has one epoch to distribute staking rewards and collect the 1% manangement fee.  
-- Member self-withdrawal: member receives 100% — no admin fee at all.  
-  - After one epoch, if the rewards have not been distrubuted then the delegator can claim 100% of the staking rewards and the admin forfits the 1% fee.  
+- Either the admin **or** the member can initiate a reward withdrawal at any time.  
+- Admin always receives ≤ 1% of the withdrawal amount as a management fee.  
+- Member always receives ≥ 99% of the withdrawal minus the transaction fee.  
+- The transaction fee is paid from the rewards themselves — neither party needs extra ADA on hand to run a distribution.  
 
 **No trust required. The smart contract enforces the rules.**
 
@@ -141,8 +141,9 @@ The administrator delegates your stake to the best available pool. Each member's
 Staking rewards accumulate at your **stake address** — a separate on-chain account linked to your cooperative stake credential. Rewards do not appear in your ADA balance; they live at the stake address until they are withdrawn. See *Viewing Your Rewards* below.
 
 **5. Withdraw**  
-- The administrator withdraws accumulated rewards and routes ≥ 99% to your cooperative member address, keeping 1% as a management fee. The administrator has one epoch (approximately 5 days) to do this after each reward distribution.
-- If the administrator does not distribute within that window, you may withdraw 100% yourself — the administrator forfeits their fee entirely.
+- Either you or the administrator can withdraw accumulated rewards at any time.  
+- The administrator always receives ≤ 1% as a management fee; you always receive ≥ 99% minus the small transaction fee.  
+- The transaction fee is paid from the rewards themselves — you do not need extra ADA in your wallet to initiate a withdrawal.  
 - The smart contract enforces these rules. No trust is required.
 
 **6. Leave**  
