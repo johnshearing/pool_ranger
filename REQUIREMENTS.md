@@ -266,6 +266,17 @@ All code should be built with this in mind:
 
 ---
 
+## Decentralized Governance (Phase 4)
+
+[Beemocracy](https://github.com/johnshearing/beemocracy/blob/main/Beemocracy2.0.md) - Decentralized Governance By Jury For Cardano Modeled After The Democracy Which Evolved In Honey Bee Society:
+- This will be the governance model used to guide Pool Ranger's policy, values, and actions.  
+
+[Midnight](https://midnight.network/) - A Zero Knowledge Proof Partner Chain for Cardano
+- Midnight's selective disclosure privacy model is perfect for voting systems. 
+- Beemocracy for Pool Ranger will be hosted on Midnight.
+
+---
+
 ## Development Environment Setup (fresh machine)
 
 Assumed starting point: Windows 10 + WSL2 (Ubuntu).

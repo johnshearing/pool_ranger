@@ -196,6 +196,7 @@ To see rewards that have built up but not yet been sent to you:
 
 ## Resources
 
+- [The Pool Ranger Specification, Roadmap, and ToDo List](https://github.com/johnshearing/pool_ranger/blob/main/REQUIREMENTS.md)
 - [Aiken language](https://aiken-lang.org)
 - [MeshJS SDK](https://meshjs.dev/)
 - [Cardano staking documentation](https://docs.cardano.org/about-cardano/evolution/staking-and-delegating)
