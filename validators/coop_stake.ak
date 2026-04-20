@@ -58,7 +58,7 @@ validator coop_stake(
     let admin_received = lovelace_received_by(tx.outputs, admin_pkh)
     let member_received = lovelace_received_by(tx.outputs, member_pkh)
 
-    (signed_by_admin || signed_by_member) && admin_received <= withdrawal_amount * 1 / 100 && member_received >= withdrawal_amount * 99 / 100 - tx.fee
+    ( signed_by_admin || signed_by_member ) && admin_received <= withdrawal_amount * 1 / 100 && member_received >= withdrawal_amount * 99 / 100 - tx.fee
   }
 
   // Reject all other script purposes (spend, mint, vote, propose).
@@ -68,10 +68,7 @@ validator coop_stake(
 }
 
 // Sum all lovelace in outputs whose payment credential matches the given key.
-fn lovelace_received_by(
-  outputs: List<Output>,
-  pkh: VerificationKeyHash,
-) -> Int {
+fn lovelace_received_by(outputs: List<Output>, pkh: VerificationKeyHash) -> Int {
   list.foldl(
     outputs,
     0,
