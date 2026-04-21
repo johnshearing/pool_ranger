@@ -21,13 +21,12 @@
   <textarea id="tx-hex" placeholder="84a500d9..."></textarea>
 
   <button id="btn-sign">Sign with Eternl (Ledger)</button>
-
   <div id="status"></div>
 
-  <label for="signed-hex">2. Signed tx hex — copy and run <code>node _submit_tx.mjs &lt;hex&gt;</code>:</label>
-  <textarea id="signed-hex" readonly placeholder="Signed hex will appear here..."></textarea>
-  <button id="btn-copy">Copy</button>
+  <label>2. Copy this command and run it from <code>ranger/</code> to submit:</label>
+  <textarea id="cmd-out" readonly placeholder="node _submit_tx.mjs ... will appear here after signing"></textarea>
+  <button id="btn-copy">Copy Command</button>
 
-  <script type="module" src="./sign_tx.js"></script>
+  <script src="./sign_tx.js"></script>
 </body>
 </html>
