@@ -241,7 +241,45 @@ cooperative and sustainable.
 
 ---
 
-## 11. Caveats and Limitations
+## 11. Interactive Chart
+
+> **GitHub rendering note:** GitHub's Markdown renderer strips all JavaScript, so interactive
+> sliders cannot be embedded in a `.md` file. The static Mermaid charts above are rendered by
+> GitHub, but the interactive version requires opening the standalone HTML file below.
+
+**Open [`SPO_REWARD_ANALYSIS_chart.html`](SPO_REWARD_ANALYSIS_chart.html) in a browser** for
+a live, interactive version of the analysis above.
+
+### What the interactive chart includes
+
+| Slider | Range |
+|--------|-------|
+| Margin (m) | 0 % → 100 % |
+| Pledge (P) | 0 → 70 M ADA |
+| Fixed Fee (F) | 340 → 2,000 ADA / epoch |
+| Epoch Rate (r) | 0.0003 → 0.0008 |
+| Current delegation cursor | 0 → 70 M ADA (moves a red cursor line on the chart) |
+
+The chart plots **SPO income (ADA/epoch)** on the left y-axis and
+**delegator annual ROA (%)** on the right y-axis, both against external delegation
+from 0 to 70 M ADA. An orange dashed line marks the approximate saturation point,
+and the cursor dots show exact values at any delegation level you choose.
+
+The metric cards above the chart display the live pledge bonus **A**, minimum safe
+margin **m_min**, delegation safety status (✅ SAFE / ❌ AVOID), SPO income, and
+delegator ROA at the cursor position.
+
+### How to use it
+
+- **Locally:** clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_chart.html` in any
+  modern browser. No server required.
+- **GitHub Pages:** if this repo has Pages enabled (Settings → Pages → Deploy from branch),
+  the file is served live at
+  `https://<your-github-username>.github.io/<repo>/ranger/SPO_REWARD_ANALYSIS_chart.html`
+
+---
+
+## 12. Caveats and Limitations
 
 | Item | Detail |
 |------|--------|

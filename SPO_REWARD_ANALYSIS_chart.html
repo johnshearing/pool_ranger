@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPO Reward Analysis — Pool Ranger</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #30363d;
+  --text:    #c9d1d9;
+  --muted:   #8b949e;
+  --accent:  #58a6ff;
+  --green:   #3fb950;
+  --orange:  #d29922;
+  --red:     #f85149;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+  padding: 1.5rem;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+h1   { color: var(--accent); font-size: 1.4rem; margin-bottom: 0.2rem; }
+.sub { color: var(--muted);  font-size: 0.88rem; margin-bottom: 1.4rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.1rem 1.4rem;
+  margin-bottom: 1.1rem;
+}
+.panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 0.9rem;
+}
+
+/* ── sliders ─────────────────────────────────────────── */
+.sliders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.1rem;
+}
+.slider-row label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.83rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+.slider-row label span { color: var(--accent); font-weight: 600; font-family: monospace; }
+input[type=range] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ── metrics row ─────────────────────────────────────── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.1rem;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  text-align: center;
+}
+.metric-lbl  { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.45rem; }
+.metric-val  { font-size: 1.35rem; font-weight: 700; font-family: monospace; line-height: 1; }
+.metric-unit { font-size: 0.67rem; color: var(--muted); margin-top: 0.25rem; }
+.green  { color: var(--green);  }
+.orange { color: var(--orange); }
+.blue   { color: var(--accent); }
+
+.safe-pill {
+  display: inline-block;
+  padding: 0.28rem 0.7rem;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+.safe-pill.safe   { background: rgba(63,185,80,0.12);  color: var(--green);  border: 1px solid var(--green);  }
+.safe-pill.unsafe { background: rgba(248,81,73,0.12);  color: var(--red);    border: 1px solid var(--red);    }
+
+/* ── chart ───────────────────────────────────────────── */
+.chart-wrap { position: relative; height: 430px; }
+
+/* ── formula box ─────────────────────────────────────── */
+.formula {
+  font-family: monospace;
+  font-size: 0.77rem;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.formula .hl { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>SPO Reward Analysis — Pool Ranger</h1>
+<p class="sub">Adjust parameters with the sliders to explore how delegation affects SPO income and delegator ROA in real time.</p>
+
+<!-- ── Pool parameters ──────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Pool Parameters</div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <label>Margin (m) <span id="lbl-m">5.0%</span></label>
+      <input type="range" id="sl-m" min="0" max="100" step="0.5" value="5">
+    </div>
+    <div class="slider-row">
+      <label>Pledge (P) <span id="lbl-p">5.0 M ADA</span></label>
+      <input type="range" id="sl-p" min="0" max="70" step="0.5" value="5">
+    </div>
+    <div class="slider-row">
+      <label>Fixed Fee (F) <span id="lbl-f">340 ADA/epoch</span></label>
+      <input type="range" id="sl-f" min="340" max="2000" step="10" value="340">
+    </div>
+    <div class="slider-row">
+      <label>Epoch Rate (r) <span id="lbl-r">0.000548</span></label>
+      <input type="range" id="sl-r" min="0.0003" max="0.0008" step="0.000001" value="0.000548">
+    </div>
+  </div>
+</div>
+
+<!-- ── Metrics ───────────────────────────────────────── -->
+<div class="metrics-row">
+  <div class="metric-card">
+    <div class="metric-lbl">Pledge Bonus A</div>
+    <div class="metric-val blue" id="m-A">—</div>
+    <div class="metric-unit">ADA / epoch</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Min Safe Margin m<sub>min</sub></div>
+    <div class="metric-val orange" id="m-mmin">—</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Delegation Safety</div>
+    <div style="margin-top:0.45rem" id="m-safe">—</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">SPO Income (at cursor)</div>
+    <div class="metric-val green" id="m-spo">—</div>
+    <div class="metric-unit">ADA / epoch</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Delegator ROA (at cursor)</div>
+    <div class="metric-val blue" id="m-roa">—</div>
+    <div class="metric-unit">% per year</div>
+  </div>
+</div>
+
+<!-- ── Cursor / current delegation ──────────────────── -->
+<div class="panel">
+  <div class="panel-title">Chart Cursor — Current Delegation Level</div>
+  <div class="slider-row">
+    <label>
+      External Delegation &nbsp;<span id="lbl-d">10.0 M ADA</span>
+      &nbsp;→ Total Stake S =&nbsp;<span id="lbl-S">15.0 M ADA</span>
+    </label>
+    <input type="range" id="sl-d" min="0" max="70" step="0.5" value="10">
+  </div>
+</div>
+
+<!-- ── Chart ─────────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">
+    SPO Income (green, left axis) &amp; Delegator Annual ROA (blue, right axis)
+    vs External Delegation 0 → 70 M ADA &nbsp;|&nbsp; dashed orange = ≈ saturation point
+  </div>
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
+
+<!-- ── Formulas ──────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Reference Formulas</div>
+  <div class="formula">
+    <span class="hl">gross(S, P)</span>
+      = r × (S + a₀·P) / (1 + a₀)
+      &nbsp;|&nbsp; a₀ = 0.3 (protocol constant)
+      &nbsp;|&nbsp; S = P + external delegation<br>
+
+    <span class="hl">SPO income</span>
+      = F + m·(gross − F) + (P/S)·(1−m)·(gross − F)
+      &nbsp;&nbsp; [when gross &gt; F; otherwise SPO takes all of gross]<br>
+
+    <span class="hl">Delegator ROA/yr</span>
+      = (1−m)·(gross − F) / S × 73 epochs × 100%<br>
+
+    <span class="hl">A</span> = r·a₀·P / (1+a₀)
+      &nbsp;|&nbsp;
+    <span class="hl">m<sub>min</sub></span> = (A − F) / (r·P − F) &nbsp; when A &gt; F, else 0%
+      &nbsp;|&nbsp; Ceiling: a₀/(1+a₀) ≈ 23.1%<br>
+
+    <span class="hl">r</span> = <span id="formula-r">0.000548</span> (epoch rate — slowly declining as ADA reserve depletes)
+      &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 68 M ADA (2025)
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────
+const A0             = 0.3;
+const S_SAT          = 68e6;
+const EPOCHS_PER_YR  = 73;
+const STEPS          = 141;          // 0 to 70 M in 0.5 M increments
+const X_LABELS       = Array.from({ length: STEPS }, (_, i) => (i * 0.5).toFixed(1));
+
+// ── Math ───────────────────────────────────────────────
+function getParams() {
+  return {
+    m  : parseFloat(document.getElementById('sl-m').value) / 100,
+    P  : parseFloat(document.getElementById('sl-p').value) * 1e6,
+    F  : parseFloat(document.getElementById('sl-f').value),
+    r  : parseFloat(document.getElementById('sl-r').value),
+    dM : parseFloat(document.getElementById('sl-d').value),
+  };
+}
+
+function gross(S, P, r) {
+  return r * (S + A0 * P) / (1 + A0);
+}
+
+function spoIncome(S, P, F, m, r) {
+  if (S <= 0) return 0;
+  const g   = gross(S, P, r);
+  if (g <= F) return g;
+  const net = g - F;
+  return F + m * net + (P / S) * (1 - m) * net;
+}
+
+function delegROA(S, P, F, m, r) {
+  if (S <= 0) return 0;
+  const g = gross(S, P, r);
+  if (g <= F) return 0;
+  return (1 - m) * (g - F) / S * EPOCHS_PER_YR * 100;
+}
+
+function pledgeBonus(P, r) {
+  return r * A0 * P / (1 + A0);
+}
+
+function mMin(P, F, r) {
+  const A    = pledgeBonus(P, r);
+  if (A <= F) return 0;
+  const denom = r * P - F;
+  if (denom <= 0) return 0;
+  return Math.min((A - F) / denom, 1);
+}
+
+// ── Chart.js local plugins ─────────────────────────────
+// Draws dashed orange line at ≈ saturation point
+const satPlugin = {
+  id: 'satLine',
+  afterDraw(ch) {
+    const { P } = getParams();
+    const extAtSat = S_SAT - P;
+    if (extAtSat < 0 || extAtSat > 70e6) return;
+
+    const idx   = Math.round(extAtSat / 0.5e6);
+    if (idx < 0 || idx >= STEPS) return;
+
+    const { ctx, chartArea: ca, scales: { x } } = ch;
+    const px = x.getPixelForValue(idx);
+    if (px < ca.left || px > ca.right) return;
+
+    ctx.save();
+    ctx.strokeStyle = '#d29922';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(px, ca.top);
+    ctx.lineTo(px, ca.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle  = '#d29922';
+    ctx.font       = '11px monospace';
+    ctx.textAlign  = 'left';
+    ctx.fillText('≈ saturation', px + 4, ca.top + 14);
+    ctx.restore();
+  }
+};
+
+// Draws a red cursor line + colored dots at the current delegation level
+const cursorPlugin = {
+  id: 'cursorLine',
+  afterDraw(ch) {
+    const { dM } = getParams();
+    const idx = Math.round(dM / 0.5);
+    if (idx < 0 || idx >= STEPS) return;
+
+    const { ctx, chartArea: ca, scales } = ch;
+    const px = scales.x.getPixelForValue(idx);
+    if (px < ca.left || px > ca.right) return;
+
+    // Vertical cursor
+    ctx.save();
+    ctx.strokeStyle = 'rgba(248,81,73,0.7)';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(px, ca.top);
+    ctx.lineTo(px, ca.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Green dot on SPO line
+    const spoVal = ch.data.datasets[0].data[idx];
+    if (spoVal != null && scales.ySPO) {
+      const py = scales.ySPO.getPixelForValue(spoVal);
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#3fb950';
+      ctx.fill();
+    }
+
+    // Blue dot on ROA line
+    const roaVal = ch.data.datasets[1].data[idx];
+    if (roaVal != null && scales.yROA) {
+      const py = scales.yROA.getPixelForValue(roaVal);
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#58a6ff';
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+};
+
+// ── Initialize Chart ───────────────────────────────────
+const ctx = document.getElementById('chart').getContext('2d');
+const myChart = new Chart(ctx, {
+  type: 'line',
+  plugins: [satPlugin, cursorPlugin],
+  data: {
+    labels: X_LABELS,
+    datasets: [
+      {
+        label: 'SPO Income (ADA/epoch)',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#3fb950',
+        backgroundColor: 'rgba(63,185,80,0.07)',
+        yAxisID: 'ySPO',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        fill: true,
+      },
+      {
+        label: 'Delegator ROA (% / year)',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#58a6ff',
+        backgroundColor: 'rgba(88,166,255,0.07)',
+        yAxisID: 'yROA',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        fill: true,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        labels: { color: '#c9d1d9', font: { size: 13 } }
+      },
+      tooltip: {
+        backgroundColor: '#161b22',
+        borderColor: '#30363d',
+        borderWidth: 1,
+        titleColor: '#c9d1d9',
+        bodyColor: '#8b949e',
+        callbacks: {
+          title(items) {
+            return `External Delegation: ${items[0].label} M ADA`;
+          },
+          label(item) {
+            if (item.datasetIndex === 0)
+              return ` SPO Income: ${item.raw.toFixed(0)} ADA / epoch`;
+            return ` Delegator ROA: ${item.raw.toFixed(4)}% / year`;
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: 'External Delegation (M ADA)',
+          color: '#8b949e',
+        },
+        ticks: {
+          color: '#8b949e',
+          maxTicksLimit: 15,
+          callback(value) {
+            const label = X_LABELS[value];
+            return parseFloat(label) % 10 === 0 ? label : '';
+          }
+        },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+      },
+      ySPO: {
+        type: 'linear',
+        position: 'left',
+        title: { display: true, text: 'SPO Income (ADA / epoch)', color: '#3fb950' },
+        ticks: { color: '#3fb950' },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+        beginAtZero: true,
+      },
+      yROA: {
+        type: 'linear',
+        position: 'right',
+        title: { display: true, text: 'Delegator ROA (% / year)', color: '#58a6ff' },
+        ticks: { color: '#58a6ff' },
+        grid: { drawOnChartArea: false },
+        beginAtZero: true,
+      },
+    }
+  }
+});
+
+// ── Main update function ───────────────────────────────
+function update() {
+  const { m, P, F, r, dM } = getParams();
+  const S = P + dM * 1e6;
+
+  // Update slider labels
+  document.getElementById('lbl-m').textContent  = (m * 100).toFixed(1) + '%';
+  document.getElementById('lbl-p').textContent  = (P / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('lbl-f').textContent  = F + ' ADA/epoch';
+  document.getElementById('lbl-r').textContent  = r.toFixed(6);
+  document.getElementById('lbl-d').textContent  = dM.toFixed(1) + ' M ADA';
+  document.getElementById('lbl-S').textContent  = (S / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('formula-r').textContent = r.toFixed(6);
+
+  // Compute and display metrics
+  const A    = pledgeBonus(P, r);
+  const mm   = mMin(P, F, r);
+  const safe = m >= mm;
+
+  document.getElementById('m-A').textContent    = A.toFixed(1);
+  document.getElementById('m-mmin').textContent =
+    mm === 0 ? '0%' : (mm * 100).toFixed(2) + '%';
+  document.getElementById('m-safe').innerHTML   = safe
+    ? '<span class="safe-pill safe">✅ SAFE</span>'
+    : '<span class="safe-pill unsafe">❌ AVOID</span>';
+
+  document.getElementById('m-spo').textContent = spoIncome(S, P, F, m, r).toFixed(0);
+  document.getElementById('m-roa').textContent = delegROA(S, P, F, m, r).toFixed(3);
+
+  // Rebuild both chart series
+  const spoData = [];
+  const roaData = [];
+  for (let i = 0; i < STEPS; i++) {
+    const Si = P + i * 0.5e6;
+    spoData.push(spoIncome(Si, P, F, m, r));
+    roaData.push(delegROA(Si, P, F, m, r));
+  }
+  myChart.data.datasets[0].data = spoData;
+  myChart.data.datasets[1].data = roaData;
+  myChart.update();
+}
+
+// ── Wire up all sliders ────────────────────────────────
+['sl-m', 'sl-p', 'sl-f', 'sl-r', 'sl-d'].forEach(id =>
+  document.getElementById(id).addEventListener('input', update)
+);
+
+update(); // initial render
+</script>
+</body>
+</html>
