@@ -12,7 +12,7 @@ Ranger only delegates to pools where adding delegation never hurts the SPO.
 | `r` | Per-epoch reward rate | ≈ 0.000548 (≈ 4 % / 73 epochs/yr) |
 | `a₀` | Pledge influence factor | 0.3 (protocol parameter) |
 | `k` | Target number of pools | 500 (protocol parameter) |
-| `F` | Fixed fee (ADA / epoch) | ≥ 340 ADA (SPO-set, min enforced) |
+| `F` | Fixed fee (ADA / epoch) | 170 to 340 ADA (SPO-set, min enforced) |
 | `m` | Margin (0–1) | SPO-set |
 | `P` | Pledge (ADA) | SPO-set |
 | `S` | Total pool stake = P + external delegation | varies |
@@ -256,7 +256,7 @@ a live, interactive version of the analysis above.
 |--------|-------|
 | Margin (m) | 0 % → 100 % |
 | Pledge (P) | 0 → 70 M ADA |
-| Fixed Fee (F) | 340 → 2,000 ADA / epoch |
+| Fixed Fee (F) | 170 → 340 ADA / epoch |
 | Epoch Rate (r) | 0.0003 → 0.0008 |
 | Current delegation cursor | 0 → 70 M ADA (moves a red cursor line on the chart) |
 
@@ -273,9 +273,9 @@ delegator ROA at the cursor position.
 
 - **Locally:** clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_chart.html` in any
   modern browser. No server required.
-- **GitHub Pages:** if this repo has Pages enabled (Settings → Pages → Deploy from branch),
-  the file is served live at
-  `https://<your-github-username>.github.io/<repo>/ranger/SPO_REWARD_ANALYSIS_chart.html`
+- **GitHub Pages:** This repo has Pages enabled (Settings → Pages → Deploy from branch),  
+  The file is served live at:  
+  [https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html)
 
 ---
 
