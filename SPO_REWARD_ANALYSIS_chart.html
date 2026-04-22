@@ -127,7 +127,7 @@ input[type=range] {
     </div>
     <div class="slider-row">
       <label>Fixed Fee (F) <span id="lbl-f">170 ADA/epoch</span></label>
-      <input type="range" id="sl-f" min="170" max="340" step="10" value="340">
+      <input type="range" id="sl-f" min="170" max="1000" step="10" value="340">
     </div>
     <div class="slider-row">
       <label>Epoch Rate (r) <span id="lbl-r">0.000548</span></label>
@@ -208,14 +208,14 @@ input[type=range] {
       &nbsp;|&nbsp; Ceiling: a₀/(1+a₀) ≈ 23.1%<br>
 
     <span class="hl">r</span> = <span id="formula-r">0.000548</span> (epoch rate — slowly declining as ADA reserve depletes)
-      &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 68 M ADA (2025)
+      &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 75 M ADA (2025)
   </div>
 </div>
 
 <script>
 // ── Constants ──────────────────────────────────────────
 const A0             = 0.3;
-const S_SAT          = 68e6;
+const S_SAT          = 75e6;
 const EPOCHS_PER_YR  = 73;
 const STEPS          = 141;          // 0 to 70 M in 0.5 M increments
 const X_LABELS       = Array.from({ length: STEPS }, (_, i) => (i * 0.5).toFixed(1));

@@ -217,6 +217,53 @@ flowchart TD
 
 ---
 
+## 8.1 The Delegation Safety Banner — Plain-English Guide
+
+The interactive chart shows a **✅ SAFE** or **❌ AVOID** pill in the "Delegation Safety"
+metric card. The banner answers a single question at the **pool level** (not at the cursor
+position):
+
+> *Is this pool's margin high enough that the SPO always benefits from receiving more
+> delegation — from zero external delegation all the way up to saturation?*
+
+### What each state means
+
+| State | Meaning |
+|-------|---------|
+| ✅ SAFE | The SPO's income strictly increases with every additional delegator. Delegating is cooperative and sustainable — no delegation level harms the SPO. |
+| ❌ AVOID | At low delegation levels, more delegation **reduces** the SPO's income. The cooperative would be economically harming the SPO by arriving, creating an adversarial relationship that may incentivize lower performance or pool closure. |
+
+### The intuition behind m_min
+
+When a pool carries a large pledge, the **pledge bonus A** is substantial — the SPO earns
+well even with no external delegators at all. As delegators arrive, the SPO's proportional
+stake share `P/S` shrinks. If the margin `m` is too small, the margin cut of new delegator
+rewards does not compensate for that shrinking pledge fraction, and the SPO is actually
+worse off with each new delegation.
+
+`m_min` is the minimum margin at which the margin term exactly compensates for the
+pledge-dilution effect, guaranteeing that delegation always helps the SPO. It is computed
+entirely from pool-level parameters — it does not depend on how much delegation has
+arrived so far.
+
+The banner checks `m ≥ m_min` and flips the moment the two cross. Because a high fixed fee
+absorbs less of the gross reward into overhead, **higher F pools have a lower m_min** and
+are generally safer to delegate to.
+
+### Why the banner is global, not cursor-specific
+
+The cursor slider reads off SPO income and delegator ROA at a single chosen delegation
+level. The safety banner is different — it asks whether the SPO income curve is
+**non-decreasing across the entire range** from S = P (pledge only, no external delegation)
+up to saturation. A pool can look fine at a particular cursor position yet still have a dip
+at smaller delegation levels early in its history; the banner catches that dip.
+
+Practically: if the banner shows ❌ AVOID, you will typically see the green SPO-income line
+drop to a local minimum before recovering. The banner turns ✅ SAFE the moment you raise the
+margin slider past m_min, because the income curve flattens out and then rises monotonically.
+
+---
+
 ## 9. Quick Checklist for Each Candidate Pool
 
 - [ ] Look up pledge `P`, fixed fee `F`, and margin `m` (Blockfrost, pool.pm, adapools.org)
