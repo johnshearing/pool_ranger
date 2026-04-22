@@ -13,10 +13,10 @@ Ranger only delegates to pools where adding delegation never hurts the SPO.
 | `a₀` | Pledge influence factor | 0.3 (protocol parameter) |
 | `k` | Target number of pools | 500 (protocol parameter) |
 | `F` | Fixed fee (ADA / epoch) | 170 to 340 ADA (SPO-set, min enforced) |
-| `m` | Margin (0–1) | SPO-set |
+| `m` | Margin (0% to 100%) | SPO-set |
 | `P` | Pledge (ADA) | SPO-set |
 | `S` | Total pool stake = P + external delegation | varies |
-| `S_sat` | Saturation point ≈ active_stake / k | ≈ 50–75 M ADA (2025) |
+| `S_sat` | Saturation point ≈ active_stake / k | ≈ 65–75 M ADA (2026) |
 | `A` | Pledge bonus per epoch (defined below) | derived |
 
 > **Note:** `r` drifts downward over time as the reserve depletes. Recompute periodically
@@ -247,7 +247,7 @@ cooperative and sustainable.
 > sliders cannot be embedded in a `.md` file. The static Mermaid charts above are rendered by
 > GitHub, but the interactive version requires opening the standalone HTML file below.
 
-**Open [`SPO_REWARD_ANALYSIS_chart.html`](SPO_REWARD_ANALYSIS_chart.html) in a browser** for
+**Open [SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html) in a browser** for
 a live, interactive version of the analysis above.
 
 ### What the interactive chart includes
@@ -271,11 +271,12 @@ delegator ROA at the cursor position.
 
 ### How to use it
 
-- **Locally:** clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_chart.html` in any
-  modern browser. No server required.
-- **GitHub Pages:** This repo has Pages enabled (Settings → Pages → Deploy from branch),  
-  The file is served live at:  
-  [https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html)
+- **Locally:**   
+Clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_chart.html` in any modern browser.  
+- **GitHub Pages:**  
+This repo has Pages enabled (Settings → Pages → Deploy from branch)    
+The file is served live at:  
+[https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html)
 
 ---
 
