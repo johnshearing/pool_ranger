@@ -84,6 +84,93 @@ This happens when:
 
 ---
 
+## 4.1 When Does Delegation Reduce Delegator ROA?
+
+The previous section showed that SPO income can fall with more delegation. Equally
+surprising: **delegator ROA can also fall with more delegation**, and the condition is
+identical — it depends entirely on whether the pledge bonus `A` exceeds the fixed fee `F`.
+
+### Deriving the direction of ROA change
+
+Expanding the ROA formula:
+
+```
+ROA  =  (1 − m) × (gross − F) / S × 73 × 100%
+
+     =  (1 − m) × [ r/(1+a₀) + (A − F)/S ] × 73 × 100%
+```
+
+Taking the derivative with respect to S (holding all pool parameters fixed):
+
+```
+dROA/dS  =  (1 − m) × [ −(A − F) / S² ] × 73 × 100%
+```
+
+The sign of this derivative is determined entirely by whether `A > F`:
+
+| Condition | `dROA/dS` | Effect on ROA as delegation grows |
+|-----------|-----------|----------------------------------|
+| `A ≤ F`   | ≥ 0       | ROA **increases** — more delegators always help |
+| `A > F`   | < 0       | ROA **decreases** — every new delegator dilutes the pledge bonus |
+| `A = F`   | = 0       | ROA is constant regardless of delegation level |
+
+Unlike SPO income (which has a U-shape when `0 < m < m_min`), delegator ROA has **no
+U-shape** — it is strictly monotone in one direction for the life of the pool.
+
+### Why the pledge bonus dilutes
+
+When `A > F`, a large fraction of the pool's gross reward is concentrated pledge bonus.
+That bonus is a fixed ADA amount per epoch that is then split pro-rata across all stakers.
+When only the SPO's own pledge is in the pool, the SPO captures the entire bonus; as
+external delegators arrive, each one claims a slice, reducing every other staker's share.
+The per-ADA return for any individual delegator therefore falls — they are each dividing the
+same fixed bonus pie into more pieces.
+
+The asymptotic limit of ROA as delegation grows very large is:
+
+```
+ROA∞  =  (1 − m) × r / (1 + a₀) × 73 × 100%
+       ≈  (1 − 0.05) × 0.000548 / 1.3 × 73 × 100%
+       ≈  2.92 %  (at m = 5 %)
+```
+
+A high-pledge pool (e.g. P = 5 M ADA) starts at around 3.3 % ROA for the very first
+delegator and converges toward 2.9 % as it fills up toward saturation.
+
+### The corollary — low-pledge pools reward later delegators more
+
+When `A ≤ F`, the fixed fee overhead dominates. Early delegators carry a disproportionate
+share of the fixed fee cost; as more people join, the fee is spread thinner and per-ADA ROA
+improves for everyone. Being the sole delegator in a small, low-pledge pool is actually the
+worst position for ROA.
+
+### Interaction with the Delegation Safety banner
+
+This produces a subtle split outcome:
+
+| Banner | A vs F | SPO income as delegation grows | Delegator ROA as delegation grows |
+|--------|--------|-------------------------------|----------------------------------|
+| ✅ SAFE | A ≤ F | Increases | Increases |
+| ✅ SAFE | A > F, m ≥ m_min | Increases | **Decreases** |
+| ❌ AVOID | A > F, m < m_min | U-shape (dips then rises) | Decreases |
+
+The middle row is the most counterintuitive: a pool can show ✅ SAFE (meaning the SPO
+is never harmed by delegation) while every new delegator simultaneously erodes the
+per-ADA ROA for all existing delegators. The cooperative relationship with the SPO is
+intact, but delegators are in mild competition with each other for the fixed pledge bonus.
+
+### What to look for in the interactive chart
+
+Set **Pledge = 5 M ADA**, **Fixed Fee = 340**, **Margin = 12 %** (≈ m_min, so banner is
+✅ SAFE). The **green** SPO income curve rises monotonically. The **blue** delegator ROA
+curve slopes gently downward from left to right. Both curves are always present
+simultaneously; the safety banner tells you only about the green curve's direction.
+
+To see both curves rise together, reduce Pledge below **2.7 M ADA** (A ≤ F threshold):
+the blue curve will now slope upward, confirming that each new delegator helps everyone.
+
+---
+
 ## 5. SPO Income vs. Delegation — Worked Example
 
 Pool parameters: **P = 5 M ADA**, **F = 340 ADA**
