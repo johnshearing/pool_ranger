@@ -94,15 +94,6 @@ input[type=range] {
 .orange { color: var(--orange); }
 .blue   { color: var(--accent); }
 
-.safe-pill {
-  display: inline-block;
-  padding: 0.28rem 0.7rem;
-  border-radius: 20px;
-  font-size: 0.82rem;
-  font-weight: 600;
-}
-.safe-pill.safe   { background: rgba(63,185,80,0.12);  color: var(--green);  border: 1px solid var(--green);  }
-.safe-pill.unsafe { background: rgba(248,81,73,0.12);  color: var(--red);    border: 1px solid var(--red);    }
 
 /* ── chart ───────────────────────────────────────────── */
 .chart-wrap { position: relative; height: 430px; }
@@ -157,10 +148,6 @@ input[type=range] {
     <div class="metric-val orange" id="m-mmin">—</div>
   </div>
   <div class="metric-card">
-    <div class="metric-lbl">Delegation Safety</div>
-    <div style="margin-top:0.45rem" id="m-safe">—</div>
-  </div>
-  <div class="metric-card">
     <div class="metric-lbl">SPO Income (at cursor)</div>
     <div class="metric-val green" id="m-spo">—</div>
     <div class="metric-unit">ADA / epoch</div>
@@ -187,7 +174,7 @@ input[type=range] {
 <!-- ── Chart ─────────────────────────────────────────── -->
 <div class="panel">
   <div class="panel-title">
-    SPO Income (green, left axis) &amp; Delegator Annual ROA (blue, right axis)
+    SPO Income (left axis, green = income rises with delegation / red = income falls with delegation) &amp; Delegator Annual ROA (blue, right axis)
     vs External Delegation 0 → 70 M ADA &nbsp;|&nbsp; dashed orange = ≈ saturation point
   </div>
   <div class="chart-wrap">
@@ -271,6 +258,24 @@ function mMin(P, F, r) {
   return Math.min((A - F) / denom, 1);
 }
 
+// Cached x-index of the trough (-1 = no red zone; ≥ STEPS = entire curve is red)
+let currentTroughIndex = -1;
+
+// Returns the index at which the SPO income slope flips from negative to positive.
+// Indices strictly less than this value are in the red zone.
+function troughExtDelegIndex(P, F, m, r) {
+  const A = pledgeBonus(P, r);
+  if (A <= F) return -1;      // no negative zone
+  if (m <= 0) return STEPS;   // entire curve slopes down
+  const mm = mMin(P, F, r);
+  if (m >= mm) return -1;     // margin is high enough — no negative zone
+  // Finite trough: S*² = P·(1−m)·(A−F) / (m·r/(1+a₀))
+  const Sstar = Math.sqrt(P * (1 - m) * (A - F) / (m * r / (1 + A0)));
+  const extAtTrough = Sstar - P;
+  if (extAtTrough <= 0) return 0;
+  return Math.min(Math.round(extAtTrough / 0.5e6), STEPS - 1);
+}
+
 // ── Chart.js local plugins ─────────────────────────────
 // Draws dashed orange line at ≈ saturation point
 const satPlugin = {
@@ -327,13 +332,13 @@ const cursorPlugin = {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Green dot on SPO line
+    // Dot on SPO line — red if cursor is in the negative-slope zone, green otherwise
     const spoVal = ch.data.datasets[0].data[idx];
     if (spoVal != null && scales.ySPO) {
       const py = scales.ySPO.getPixelForValue(spoVal);
       ctx.beginPath();
       ctx.arc(px, py, 5, 0, Math.PI * 2);
-      ctx.fillStyle = '#3fb950';
+      ctx.fillStyle = (currentTroughIndex >= 0 && idx < currentTroughIndex) ? '#f85149' : '#3fb950';
       ctx.fill();
     }
 
@@ -360,7 +365,7 @@ const myChart = new Chart(ctx, {
     labels: X_LABELS,
     datasets: [
       {
-        label: 'SPO Income (ADA/epoch)',
+        label: 'SPO Income (ADA/epoch) — red = income falls with more delegation',
         data: new Array(STEPS).fill(0),
         borderColor: '#3fb950',
         backgroundColor: 'rgba(63,185,80,0.07)',
@@ -369,6 +374,12 @@ const myChart = new Chart(ctx, {
         pointRadius: 0,
         borderWidth: 2.5,
         fill: true,
+        segment: {
+          borderColor: ctx => currentTroughIndex >= 0 && ctx.p0Index < currentTroughIndex
+            ? '#f85149' : '#3fb950',
+          backgroundColor: ctx => currentTroughIndex >= 0 && ctx.p0Index < currentTroughIndex
+            ? 'rgba(248,81,73,0.07)' : 'rgba(63,185,80,0.07)',
+        },
       },
       {
         label: 'Delegator ROA (% / year)',
@@ -462,19 +473,18 @@ function update() {
   document.getElementById('formula-r').textContent = r.toFixed(6);
 
   // Compute and display metrics
-  const A    = pledgeBonus(P, r);
-  const mm   = mMin(P, F, r);
-  const safe = m >= mm;
+  const A  = pledgeBonus(P, r);
+  const mm = mMin(P, F, r);
 
   document.getElementById('m-A').textContent    = A.toFixed(1);
   document.getElementById('m-mmin').textContent =
     mm === 0 ? '0%' : (mm * 100).toFixed(2) + '%';
-  document.getElementById('m-safe').innerHTML   = safe
-    ? '<span class="safe-pill safe">✅ SAFE</span>'
-    : '<span class="safe-pill unsafe">❌ AVOID</span>';
 
   document.getElementById('m-spo').textContent = spoIncome(S, P, F, m, r).toFixed(0);
   document.getElementById('m-roa').textContent = delegROA(S, P, F, m, r).toFixed(3);
+
+  // Update trough index so segment callbacks pick up the new value
+  currentTroughIndex = troughExtDelegIndex(P, F, m, r);
 
   // Rebuild both chart series
   const spoData = [];

@@ -19,28 +19,30 @@ When you open the chart you will see four areas, top to bottom:
 | Area | What it is |
 |------|-----------|
 | **Pool Parameters** panel | Four sliders: Margin, Pledge, Fixed Fee, Epoch Rate |
-| **Metric cards** row | Five live readouts that update with every slider move |
+| **Metric cards** row | Four live readouts that update with every slider move |
 | **Chart Cursor** panel | One slider that moves a red vertical line across the chart |
-| **Chart** panel | Green curve = SPO income (left axis). Blue curve = Delegator ROA (right axis). Orange dashed line = saturation. |
+| **Chart** panel | Green/red curve = SPO income (left axis). Blue curve = Delegator ROA (right axis). Orange dashed line = saturation. |
 
-### The five metric cards
+### The four metric cards
 
 | Card | What it shows |
 |------|--------------|
 | **Pledge Bonus A** (blue) | The fixed ADA the SPO earns per epoch from their own pledge alone |
-| **Min Safe Margin m_min** (orange) | The minimum margin the pool must charge for delegation to always help the SPO |
-| **Delegation Safety** | ✅ SAFE or ❌ AVOID — whether the current margin clears m_min |
+| **Min Safe Margin m_min** (orange) | The minimum margin at which the SPO income curve becomes fully green (no red zone) |
 | **SPO Income (at cursor)** (green) | ADA/epoch the SPO earns at the red cursor position |
 | **Delegator ROA (at cursor)** (blue) | Annual % return for delegators at the red cursor position |
 
 ### The two chart curves
 
-- The **green curve** traces SPO income as external delegation grows from 0 to 70 M ADA.
-  The left y-axis belongs to it.
+- The **SPO income curve** traces SPO income as external delegation grows from 0 to 70 M ADA.
+  The left y-axis belongs to it. The line is **green** where additional delegation increases SPO
+  income and **red** where additional delegation decreases it. If any red portion is visible,
+  a range of delegation levels exists where the SPO is economically harmed by each new delegator.
 - The **blue curve** traces delegator annual ROA over the same range.
   The right y-axis belongs to it.
 - The **red dashed cursor** marks the delegation level you choose with the bottom slider.
-  Green and blue dots on the curves show the exact values at that position.
+  The dot on the SPO income curve matches the curve color at that position — green if the cursor
+  is in the safe zone, red if it is in the harmful zone.
 
 ### Parameter Reference
 
@@ -92,14 +94,15 @@ Move the **Cursor** slider all the way left (External Delegation = 0). The SPO I
 will show a small number — around 423 ADA. This is `gross(S=P)` when the pool has only the
 SPO's own pledge staked.
 
-Now read **Pledge Bonus A** — it shows roughly 127 ADA. Since A (127) < F (340), the pool
-crosses the important threshold: **A ≤ F**. The banner reads ✅ SAFE.
+Now read **Pledge Bonus A** — it shows roughly 127 ADA. Since A (127) < F (340), the SPO
+income curve is entirely green. There is no red zone at any delegation level.
 
-Increase **Fixed Fee** above 340 and watch how quickly A < F holds. Increase **Pledge**
-past about 2.7 M ADA and watch A cross above F.
+Increase **Fixed Fee** above 340 and watch how the all-green condition holds easily.
+Increase **Pledge** past about 2.7 M ADA and watch A cross above F — the curve may now
+develop a red zone depending on margin.
 
-**The 2.7 M ADA boundary:** Below this pledge, A ≤ F always holds and the banner is always
-✅ SAFE at any margin. This threshold is:
+**The 2.7 M ADA boundary:** Below this pledge, A ≤ F always holds and the curve is always
+entirely green at any margin. This threshold is:
 
 ```
 P_safe  =  F × (1 + a₀) / (r × a₀)
@@ -109,7 +112,7 @@ P_safe  =  F × (1 + a₀) / (r × a₀)
 
 ---
 
-## Step 3 — When Delegation Hurts the SPO (the U-shaped income curve)
+## Step 3 — When Delegation Hurts the SPO (the red zone)
 
 This is the first major counterintuitive result: **more delegation can make the SPO worse
 off**, not better.
@@ -122,20 +125,24 @@ Set these sliders:
 - **Epoch Rate = 0.000548**
 - **Margin = 0 %**
 
-The banner immediately shows **❌ AVOID**. Now look at the green SPO-income curve — it
-slopes steadily *downward* from left to right. Move the cursor from 0 to 70 M ADA and
-watch the SPO Income card fall from about 2,740 ADA/epoch down toward 2,469 ADA/epoch.
-Every new delegator makes the SPO worse off.
+The SPO income curve immediately turns **entirely red** and slopes steadily downward from
+left to right. Move the cursor from 0 to 70 M ADA and watch the SPO Income card fall from
+about 2,740 ADA/epoch down toward 2,469 ADA/epoch. Every new delegator makes the SPO worse
+off across the entire range.
 
-### Raise the margin to see the U-shape
+### Raise the margin to see the U-shape and the trough
 
-Change **Margin to 5 %**. The banner still shows ❌ AVOID. But now the green curve has a
-different shape — it dips to a minimum around 3 M external delegation, then climbs. This
-is the U-shape: early delegation hurts, but eventually the margin income from a large pool
-outweighs the pledge dilution.
+Change **Margin to 5 %**. A red zone still appears on the left side of the curve — it dips
+to a minimum around 3 M external delegation, then the curve turns green and climbs. This is
+the U-shape: early delegation hurts (red), but eventually the margin income from a large pool
+outweighs the pledge dilution (green).
 
-Move the cursor left to 0 M: SPO income ≈ 2,740. Move it right to 3 M: SPO income dips
-to about 2,700. Move further right to 70 M: SPO income climbs to about 3,810.
+Move the cursor left to 0 M: SPO income ≈ 2,740. Move it right to 3 M (red zone, dot turns
+red): SPO income dips to about 2,700. Move further right to 70 M (green zone, dot turns
+green): SPO income climbs to about 3,810.
+
+The point where the curve transitions from red to green is called the **trough**. It is the
+delegation level at which SPO income reaches its minimum and begins recovering.
 
 ### Why this happens
 
@@ -151,14 +158,14 @@ d(SPO)/dS  =  m × r/(1+a₀)          [margin term — always positive]
             + P × (1−m) × (F − A)/S² [pledge-dilution term — sign depends on A vs F]
 ```
 
-When `A > F`, the pledge-dilution term is negative. If the margin is too small to overcome
-it, the total derivative goes negative — more delegation, less SPO income.
+When `A > F`, the pledge-dilution term is negative. If the margin term is too small to
+overcome it, the total derivative goes negative — the curve is red at that point.
 
 ---
 
 ## Step 4 — Finding the Safe Margin (m_min)
 
-The minimum margin that keeps SPO income non-decreasing for all delegation levels is:
+The minimum margin that eliminates the red zone entirely is:
 
 ```
 m_min  =  (A − F) / (r × P − F)     [only when A > F; otherwise m_min = 0]
@@ -166,24 +173,25 @@ m_min  =  (A − F) / (r × P − F)     [only when A > F; otherwise m_min = 0]
 
 The chart computes this live and shows it in the **Min Safe Margin** card.
 
-### Watching the banner flip
+### Watching the red zone disappear
 
 With **Pledge = 5 M ADA**, **Fixed Fee = 340**, **Epoch Rate = 0.000548**:
 
 - The **m_min card** will show approximately **12.22 %**.
-- With **Margin = 5 %**: banner = ❌ AVOID, green curve has a dip.
-- Slowly drag **Margin** upward. Watch the green curve flatten and the dip disappear.
+- With **Margin = 5 %**: red zone visible on the left side of the green curve.
+- Slowly drag **Margin** upward. Watch the red zone shrink leftward and the trough move
+  toward the y-axis.
 - The moment you cross **Margin = 12.5 %** (the nearest slider step above 12.22 %):
-  banner flips to **✅ SAFE**, and the green curve rises monotonically from left to right.
+  the red zone vanishes entirely and the curve is all green from left to right.
 
-The banner checks exactly `m ≥ m_min`. It evaluates the entire curve from zero external
-delegation to saturation — not just at the cursor position.
+When `m ≥ m_min` the SPO income curve is monotonically non-decreasing — green all the way.
+When `m < m_min` a red zone exists at low delegation levels.
 
 ### The 23.1 % universal ceiling
 
 Set **Pledge = 70 M ADA** (maximum). Note m_min — it is around 22.6 %. No matter how high
-the pledge, m_min never reaches 23.1 %. Setting **Margin ≥ 23 %** guarantees ✅ SAFE for
-any pool that exists:
+the pledge, m_min never reaches 23.1 %. Setting **Margin ≥ 23 %** guarantees an all-green
+curve for any pool that exists:
 
 ```
 Ceiling  =  a₀ / (1 + a₀)  =  0.3 / 1.3  ≈  23.08 %
@@ -206,27 +214,28 @@ Use the chart as a lookup table. Set **Fixed Fee = 340**, **Epoch Rate = 0.00054
 | 20 M ADA | ≈ 2,529 | Yes | ≈ 20.6 % |
 | 50 M ADA | ≈ 6,323 | Yes | ≈ 22.1 % |
 
-**Notice:** each time you raise Pledge the green curve becomes more dramatically U-shaped
-at low margins. Set **Margin = 5 %** and sweep **Pledge** from 3 M to 50 M to watch the
-dip in the green curve grow deeper and the minimum shift rightward.
+**Notice:** each time you raise Pledge the red zone grows deeper and the trough shifts
+rightward. Set **Margin = 5 %** and sweep **Pledge** from 3 M to 50 M to watch the red dip
+in the curve grow larger and move further to the right.
 
 ---
 
 ## Step 6 — When Delegation Reduces Delegator ROA (the blue curve)
 
 This is the second major counterintuitive result: **delegator ROA can also fall as
-delegation grows**, and this can happen even on a pool that shows ✅ SAFE.
+delegation grows**, and this can happen even on a pool whose SPO income curve is entirely
+green.
 
 ### Reproducing the effect
 
 Set:
 - **Pledge = 5 M ADA**
 - **Fixed Fee = 340**
-- **Margin = 12.5 %** (banner = ✅ SAFE)
+- **Margin = 12.5 %** (SPO income curve is all green)
 - **Epoch Rate = 0.000548**
 
-The green SPO-income curve rises left to right — the pool is safe for the SPO. But now
-look at the **blue delegator ROA curve** — it slopes gently *downward* from left to right.
+The green SPO income curve rises left to right — no red zone. But now look at the **blue
+delegator ROA curve** — it slopes gently *downward* from left to right.
 
 Move the cursor from 0 to 70 M external delegation and watch the Delegator ROA card fall
 from about 3.3 % at low delegation to about 2.9 % near saturation.
@@ -261,78 +270,110 @@ position for a delegator.
 
 ### The full picture across all cases
 
-| Banner | Pledge vs threshold | Green (SPO income) | Blue (Delegator ROA) |
-|--------|--------------------|--------------------|----------------------|
-| ✅ SAFE | P ≤ 2.7 M (A ≤ F) | Rises | Rises |
-| ✅ SAFE | P > 2.7 M, m ≥ m_min | Rises | **Falls** |
-| ❌ AVOID | P > 2.7 M, m < m_min | Dips then rises | Falls |
+| Red zone on curve? | Pledge vs threshold | Green/Red (SPO income) | Blue (Delegator ROA) |
+|---|--------------------|--------------------|----------------------|
+| No red zone | P ≤ 2.7 M (A ≤ F) | All green — rises | Rises |
+| No red zone | P > 2.7 M, m ≥ m_min | All green — rises | **Falls** |
+| Red zone exists | P > 2.7 M, m < m_min | Red dip then green rise | Falls |
 
 To see each row live:
 
-**Row 1:** Pledge = 1 M, Margin = 5 %. Both curves rise.
-**Row 2:** Pledge = 5 M, Margin = 12.5 %. Green rises, blue falls.
-**Row 3:** Pledge = 5 M, Margin = 5 %. Green dips; blue falls throughout.
+**Row 1:** Pledge = 1 M, Margin = 5 %. Both curves rise. No red.  
+**Row 2:** Pledge = 5 M, Margin = 12.5 %. SPO income all green, ROA curve falls.  
+**Row 3:** Pledge = 5 M, Margin = 5 %. Red zone on SPO income; ROA falls throughout.
 
 ---
 
-## Step 7 — The Delegation Safety Banner in Full
+## Step 7 — Understanding the Red Zone
 
-The ✅ SAFE / ❌ AVOID banner answers one question:
+The red portion of the SPO income curve answers one question at the **pool level** (not at
+the cursor position):
 
-> *Does this pool's margin guarantee that the SPO's income never decreases as delegation
-> grows — from zero external delegation all the way to saturation?*
+> *At this delegation level, does adding one more delegator reduce the SPO's income?*
 
-It evaluates the **entire green curve**, not just the cursor point. A pool that looks fine
-at a large delegation level can still have damaged the SPO earlier in its life if the curve
-dipped at low delegation. The banner catches that.
+Every x-position on the curve where the line is red means that if the pool is currently at
+that delegation level, adding more stake makes the SPO worse off. The trough — where red
+transitions to green — is the delegation level at which SPO income hits its minimum and
+begins to recover.
 
-### Decision logic replicated in the chart
+### What the colors mean
 
-1. Read **Pledge Bonus A** from the blue metric card.
-2. Compare to your **Fixed Fee** slider value.
-3. If A ≤ F: banner = ✅ SAFE regardless of Margin. Done.
-4. If A > F: read **m_min** from the orange card. Set Margin ≥ m_min → ✅ SAFE.
-5. Conservative rule: set **Margin ≥ 23 %** — covers every possible pledge level.
+| Curve color at a given x-position | Meaning |
+|---|---|
+| **Green** | At this delegation level, more delegation increases SPO income. Delegating is cooperative. |
+| **Red** | At this delegation level, more delegation decreases SPO income. The SPO is harmed by each arriving delegator. |
 
-### What the chart looks like at each state
+### The trough — where red becomes green
 
-**✅ SAFE:** Green curve starts at the left, levels off briefly or rises immediately, and
-continues up to the saturation line. No dip anywhere.
+The trough x-position is calculable from pool parameters. For a pool with a margin between
+0 % and m_min, the trough occurs at:
 
-**❌ AVOID:** Green curve starts at the left and immediately drops — you can see a valley
-before it recovers. The cursor dots let you measure exactly how deep the income loss is at
-any delegation level.
+```
+S_trough  =  √[ P·(1−m)·(A−F) / (m·r/(1+a₀)) ]
+
+External delegation at trough  =  S_trough − P
+```
+
+This is the point at which the margin term and the pledge-dilution term exactly cancel.
+To the left of the trough the curve is red; to the right it is green.
+
+### Why the red zone matters for Pool Ranger
+
+A red zone on the curve is not automatically fatal to a delegation decision. What matters
+is **where the cursor is relative to the trough**:
+
+- If the pool's current delegation is already **past the trough** (cursor in the green zone),
+  Pool Ranger adding more stake moves the SPO further right and upward — clearly beneficial.
+- If the pool's current delegation is **before the trough** (cursor in the red zone),
+  every delegator arriving — including Pool Ranger — reduces the SPO's income.
+- If Pool Ranger controls enough stake to **push the pool past the trough in a single move**,
+  the net effect is still positive: the SPO passes through the dip but ends up in better shape.
+- If Pool Ranger can only push the pool deeper into the red zone without clearing the trough,
+  it is better to withhold delegation entirely and let the pool's current parameters speak
+  for themselves.
+
+### Decision logic for Pool Ranger
+
+1. Read `m_min` from the orange card.
+2. If the SPO income curve is all green (m ≥ m_min): delegation is cooperative at any level.
+3. If a red zone exists: move the cursor to the pool's current delegation level.
+4. If cursor is in the **green zone** (past the trough): safe to add delegation.
+5. If cursor is in the **red zone** (before the trough): check whether Pool Ranger's stake
+   can push the pool past the trough. If yes, the move is net-positive. If no, do not delegate.
 
 ---
 
 ## Step 8 — Effect of Fixed Fee on Safety
 
-Higher fixed fees make pools easier to delegate to safely.
+Higher fixed fees eliminate or shrink the red zone.
 
 **Experiment:** Set **Pledge = 5 M ADA**, **Margin = 5 %**.
 
-- **Fixed Fee = 170:** m_min card shows ≈ 13.5 %. Banner = ❌ AVOID.
-- **Fixed Fee = 340:** m_min card shows ≈ 12.2 %. Banner = ❌ AVOID (but closer).
-- **Fixed Fee = 630:** m_min card drops below 5 %. Banner flips to ✅ SAFE.
-- **Fixed Fee = 1000:** m_min drops further. Even a very low margin is safe.
+- **Fixed Fee = 170:** m_min ≈ 13.5 %. Red zone is large — trough is far to the right.
+- **Fixed Fee = 340:** m_min ≈ 12.2 %. Red zone still present but slightly smaller.
+- **Fixed Fee = 630:** m_min drops below 5 %. Red zone disappears — the curve turns all green.
+- **Fixed Fee = 1000:** m_min drops further. Even a very low margin produces an all-green curve.
 
 The intuition: a high fixed fee means the SPO already takes a large first cut before the
 pledge-dilution effect can dominate. The margin only needs to compensate for a smaller gap.
 
 Note that in practice the SPO cannot set F above what delegators will tolerate — a 1000 ADA
 fixed fee per epoch is unusually high. But when evaluating a real pool, a fixed fee above
-the protocol minimum (340 ADA as of 2025) is actually a signal that the pool *needs less
-margin* to be safe, not more.
+the protocol minimum (340 ADA as of 2025) is actually a signal that the pool *needs a lower
+margin* to eliminate the red zone, not a higher one.
 
 ---
 
 ## Step 9 — Using the Cursor for Point-in-Time Analysis
 
-The cursor (red dashed line) is separate from the safety evaluation. It answers: "Given that
-the pool is already at this specific delegation level, what are the exact values right now?"
+The cursor (red dashed line) is separate from the red-zone evaluation. It answers: "Given
+that the pool is already at this specific delegation level, what are the exact values right now?"
 
 **SPO Income (at cursor)** and **Delegator ROA (at cursor)** are snapshot values for a pool
 that has already accumulated that much external delegation.
+
+The cursor dot on the SPO income curve changes color to match the zone: green when the
+cursor is past the trough, red when it is before it.
 
 ### Example: evaluating a pool you are considering
 
@@ -340,7 +381,7 @@ Suppose a pool has P = 5 M ADA, F = 340, m = 15 %, and currently holds 12 M ADA 
 external delegation.
 
 1. Set **Pledge = 5**, **Fixed Fee = 340**, **Margin = 15**, **Epoch Rate = 0.000548**.
-2. Banner = ✅ SAFE (15 % > m_min ≈ 12.2 %). Good.
+2. The SPO income curve is entirely green (15 % > m_min ≈ 12.2 %). No red zone.
 3. Set **Cursor to 12 M ADA**.
 4. Read **SPO Income ≈ 2,985 ADA/epoch** and **Delegator ROA ≈ 3.07 %/year**.
 5. Note that the blue curve slopes downward — ROA was slightly higher when the pool was
@@ -359,8 +400,8 @@ epoch. It declines slowly over years as the reserve depletes.
 (higher, earlier in Cardano's life) down to 0.0003 (lower, far future). Watch:
 - Both curves compress downward (lower absolute rewards).
 - The m_min card changes (lower r means a smaller pledge bonus A, which can push some
-  pools from A > F to A ≤ F, flipping their banner to ✅ SAFE automatically).
-- The saturation line shifts (lower r slightly affects the saturation point calculation).
+  pools from A > F to A ≤ F, eliminating their red zone automatically).
+- The red zone, if any, shifts in size as A changes.
 
 ### Saturation (orange dashed line)
 
@@ -379,9 +420,15 @@ chart — the pool is already near-saturated by pledge alone.
 For any candidate pool, look up P, F, m on pool.pm or adapools.org, then:
 
 - [ ] Set **Pledge**, **Fixed Fee**, **Margin**, and **Epoch Rate** sliders to match the pool.
-- [ ] Read the **Delegation Safety** banner. If ✅ SAFE, proceed.
-- [ ] If ❌ AVOID, read **m_min**. The pool's margin is below this — delegation may harm the SPO.
+- [ ] Check the SPO income curve. Is any portion **red**?
+  - If **no red**: delegation is cooperative at any level. Proceed to ROA analysis.
+  - If **red zone exists**: continue below.
 - [ ] Move the **Cursor** to the pool's current external delegation level (from Blockfrost/pool.pm).
+- [ ] Is the cursor dot **green** (past the trough) or **red** (before the trough)?
+  - **Green dot:** more delegation helps the SPO. Safe to add.
+  - **Red dot:** delegation is currently harming the SPO. Check whether Pool Ranger's stake
+    can push the pool past the trough in one move. If yes, the net effect is still positive.
+    If no, do not delegate.
 - [ ] Read **Delegator ROA (at cursor)** — this is your expected annual yield at current pool size.
 - [ ] Check whether the blue ROA curve slopes up or down from the cursor — if down, ROA will
   erode slightly as more people join.
@@ -392,15 +439,16 @@ For any candidate pool, look up P, F, m on pool.pm or adapools.org, then:
 
 Pool Ranger delegates member stake to carefully chosen pools. Two things must both be true:
 
-1. **SPO safety (green curve):** The cooperative must not harm the SPO economically by
-   arriving. A pool whose income falls with delegation has an incentive to reduce performance
-   or exit — directly hurting member rewards.
+1. **SPO welfare (SPO income curve):** The cooperative must not harm the SPO economically by
+   arriving. A pool in the red zone at its current delegation level has an SPO whose income is
+   falling with each new delegator — an adversarial relationship that may incentivize lower
+   performance or pool closure, directly hurting member rewards.
 
-2. **Delegator ROA awareness (blue curve):** Members should understand that even on a safe
-   pool, joining a high-pledge pool dilutes the pledge bonus slightly. This is not a reason
-   to avoid the pool — it is a normal property of how Cardano rewards work. But it means
-   that pools closer to the A ≤ F boundary tend to offer more stable per-ADA ROA as
-   membership grows.
+2. **Delegator ROA awareness (blue curve):** Members should understand that even on a pool
+   with an all-green income curve, joining a high-pledge pool dilutes the pledge bonus
+   slightly. This is not a reason to avoid the pool — it is a normal property of how Cardano
+   rewards work. But it means that pools closer to the A ≤ F boundary tend to offer more
+   stable per-ADA ROA as membership grows.
 
 The interactive chart makes both of these dynamics visible in real time, for any real pool
 whose parameters you can look up.
@@ -411,7 +459,7 @@ whose parameters you can look up.
 
 | Item | What to watch for in the chart |
 |------|-------------------------------|
-| **r varies over time** | Re-enter the current epoch rate (from Cardano staking calculators) periodically. Even a small change in r can flip a pool's banner. |
+| **r varies over time** | Re-enter the current epoch rate (from Cardano staking calculators) periodically. Even a small change in r can eliminate or create a red zone. |
 | **a₀ = 0.3 is governable** | If Cardano governance changes a₀, the 2.7 M threshold and 23.1 % ceiling both shift. Recheck any saved pool evaluations. |
 | **Saturation cap** | The chart does not cap rewards at saturation — drag the cursor past the orange line to see idealized values, but know that real rewards are capped there. |
 | **100 % performance assumed** | A pool that misses blocks earns less; the direction of the curves is unchanged but absolute values will be lower. |
@@ -434,6 +482,8 @@ m_min         = (A − F) / (r·P − F)    when A > F, else 0
 Ceiling       = a₀/(1+a₀) ≈ 23.1 %
 
 P_safe        = F·(1+a₀) / (r·a₀) ≈ 2.7 M ADA   (pools below this are always safe)
+
+S_trough      = √[ P·(1−m)·(A−F) / (m·r/(1+a₀)) ]   (trough where red zone ends)
 ```
 
 
@@ -450,4 +500,4 @@ P_safe        = F·(1+a₀) / (r·a₀) ≈ 2.7 M ADA   (pools below this are al
 | `S` | Total pool stake = P + external delegation | varies |
 | `S_sat` | Saturation point ≈ active_stake / k | ≈ 65–75 M ADA (2026) |
 | `A` | Pledge bonus per epoch (defined below) | derived |
-
+| `S_trough` | Total stake at trough (where red zone ends) | derived |
