@@ -408,11 +408,11 @@ delegator ROA at the cursor position.
 ### How to use it
 
 - **Locally:**   
-Clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_CHART.html` in any modern browser.  
+Clone this repo, then open (ranger/SPO_REWARD_ANALYSIS_CHART.html) in any modern browser.  
 - **GitHub Pages:**  
 This repo has Pages enabled (Settings → Pages → Deploy from branch)    
 The file is served live at:  
-[https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
+<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank">SPO_REWARD_ANALYSIS_CHART.html</a>
 
 ---
 
