@@ -7,7 +7,8 @@ Right click on the link above to open the chart in a new tab and keep it alongsi
 
 This document that you are reading now is the hands-on companion to the chart.  
 
-The full mathematical derivations live in [SPO_REWARD_ANALYSIS.md](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS.md)  
+The full mathematical derivations live in [SPO_REWARD_ANALYSIS.md](https://github.com/johnshearing/pool_ranger/blob/main/SPO_REWARD_ANALYSIS.md)  
+
  
 ---
 
