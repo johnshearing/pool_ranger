@@ -2,7 +2,7 @@
 
 **Purpose:** Learn how delegation affects SPO income and delegator ROA by exploring the interactive chart directly.  
 Every concept in this document can be verified live by adjusting the sliders in  
-<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html" target="_blank">SPO_REWARD_ANALYSIS_chart.html</a>
+<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank">SPO_REWARD_ANALYSIS_CHART.html</a>
 
 
 > Click on the link above to open the chart and keep it alongside this document.  

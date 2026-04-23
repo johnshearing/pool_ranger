@@ -381,8 +381,10 @@ cooperative and sustainable.
 > sliders cannot be embedded in a `.md` file. The static Mermaid charts above are rendered by
 > GitHub, but the interactive version requires opening the standalone HTML file below.
 
-**Open [SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html) in a browser** for
+**Open <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank">SPO_REWARD_ANALYSIS_CHART.html</a> in a browser** for
 a live, interactive version of the analysis above.
+
+The <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART_COMPANION.html" target="_blank">SPO_REWARD_ANALYSIS_CHART_COMPANION.html</a> is found here.  
 
 ### What the interactive chart includes
 
@@ -406,11 +408,11 @@ delegator ROA at the cursor position.
 ### How to use it
 
 - **Locally:**   
-Clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_chart.html` in any modern browser.  
+Clone this repo, then open `ranger/SPO_REWARD_ANALYSIS_CHART.html` in any modern browser.  
 - **GitHub Pages:**  
 This repo has Pages enabled (Settings → Pages → Deploy from branch)    
 The file is served live at:  
-[https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html)
+[https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
 
 ---
 
