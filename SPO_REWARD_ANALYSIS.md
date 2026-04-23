@@ -411,7 +411,9 @@ Clone this repo, then open (ranger/SPO_REWARD_ANALYSIS_CHART.html) in any modern
 - **GitHub Pages:**  
 This repo has Pages enabled (Settings → Pages → Deploy from branch)    
 The file is served live at:  
-<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank" rel="noopener noreferrer">SPO_REWARD_ANALYSIS_CHART.html</a>
+<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank" rel="noopener noreferrer">SPO_REWARD_ANALYSIS_CHART.html</a>  
+
+[Follow this link for the Chart Companion](https://github.com/johnshearing/pool_ranger/blob/main/SPO_REWARD_ANALYSIS_CHART_COMPANION.md)
 
 ---
 
