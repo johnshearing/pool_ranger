@@ -1,13 +1,13 @@
 # SPO Reward Analysis — Interactive Chart Guide
 
-**Purpose:** Learn how delegation affects SPO income and delegator ROA by exploring the
-interactive chart directly. Every concept in this document can be verified live by
-adjusting the sliders in
-[SPO_REWARD_ANALYSIS_chart.html](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html).
+**Purpose:** Learn how delegation affects SPO income and delegator ROA by exploring the interactive chart directly.  
+Every concept in this document can be verified live by adjusting the sliders in  
+<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_chart.html" target="_blank">SPO_REWARD_ANALYSIS_chart.html</a>
 
-> Open that file in a browser now and keep it alongside this document.
-> The full mathematical derivations live in `SPO_REWARD_ANALYSIS.md`.
-> This document is the hands-on companion.
+
+> Click on the link above to open the chart and keep it alongside this document.  
+> The full mathematical derivations live in `SPO_REWARD_ANALYSIS.md`.  
+> This document is the hands-on companion to the chart.  
 
 ---
 
@@ -41,14 +41,34 @@ When you open the chart you will see four areas, top to bottom:
 - The **red dashed cursor** marks the delegation level you choose with the bottom slider.
   Green and blue dots on the curves show the exact values at that position.
 
+### Parameter Reference
+
+| Symbol | Meaning | Current value |
+|--------|---------|---------------|
+| `r` | Per-epoch reward rate | ≈ 0.000548 (≈ 4 % / 73 epochs/yr) |
+| `a₀` | Pledge influence factor | 0.3 (protocol parameter) |
+| `k` | Target number of pools | 500 (protocol parameter) |
+| `F` | Fixed fee (ADA / epoch) | 170 to 340 ADA (SPO-set, min enforced) |
+| `m` | Margin (0% to 100%) | SPO-set |
+| `P` | Pledge (ADA) | SPO-set |
+| `S` | Total pool stake = P + external delegation | varies |
+| `S_sat` | Saturation point ≈ active_stake / k | ≈ 65–75 M ADA (2026) |
+| `A` | Pledge bonus per epoch (defined below) | derived |
+
+> **Note:** `r` drifts downward over time as the reserve depletes. Recompute periodically
+> from recent epoch data or use the current Cardano staking calculator rate.
+
 ---
 
 ## Step 1 — The Pledge Bonus
 
-**What to do:** Set **Pledge = 0 M ADA**. Note the Pledge Bonus A card — it reads 0.
-Now slowly drag **Pledge** to the right toward 70 M ADA. Watch A climb.
+**What to do:**  
+Set **Pledge = 0 M ADA**.  
+Note the Pledge Bonus A card — it reads 0.  
+Now slowly drag **Pledge** to the right toward 70 M ADA. Watch A climb.  
 
-**What you are seeing:** The pledge bonus formula is:
+**What you are seeing:** 
+The pledge bonus formula is:
 
 ```
 A  =  r × a₀ × P / (1 + a₀)     (a₀ = 0.3, protocol constant)
@@ -414,3 +434,18 @@ Ceiling       = a₀/(1+a₀) ≈ 23.1 %
 
 P_safe        = F·(1+a₀) / (r·a₀) ≈ 2.7 M ADA   (pools below this are always safe)
 ```
+
+
+## Parameter Reference Repeated For Convenience
+
+| Symbol | Meaning | Current value |
+|--------|---------|---------------|
+| `r` | Per-epoch reward rate | ≈ 0.000548 (≈ 4 % / 73 epochs/yr) |
+| `a₀` | Pledge influence factor | 0.3 (protocol parameter) |
+| `k` | Target number of pools | 500 (protocol parameter) |
+| `F` | Fixed fee (ADA / epoch) | 170 to 340 ADA (SPO-set, min enforced) |
+| `m` | Margin (0% to 100%) | SPO-set |
+| `P` | Pledge (ADA) | SPO-set |
+| `S` | Total pool stake = P + external delegation | varies |
+| `S_sat` | Saturation point ≈ active_stake / k | ≈ 65–75 M ADA (2026) |
+| `A` | Pledge bonus per epoch (defined below) | derived |
