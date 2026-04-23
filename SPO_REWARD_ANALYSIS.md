@@ -381,9 +381,9 @@ cooperative and sustainable.
 > sliders cannot be embedded in a `.md` file. The static Mermaid charts above are rendered by
 > GitHub, but the interactive version requires opening the standalone HTML file below.
 
-**Open <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank" rel="noopener noreferrer">SPO_REWARD_ANALYSIS_CHART</a> in a browser** for a live, interactive version of the analysis above.
+**Open <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html">SPO_REWARD_ANALYSIS_CHART</a> in a browser** for a live, interactive version of the analysis above.
 
-The <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART_COMPANION.md" target="_blank" rel="noopener noreferrer">SPO_REWARD_ANALYSIS_CHART_COMPANION</a> is found here.  
+The <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART_COMPANION.md">SPO_REWARD_ANALYSIS_CHART_COMPANION</a> is found here.  
 
 ### What the interactive chart includes
 
@@ -424,22 +424,3 @@ The file is served live at:
 | Saturation | All analysis assumes the pool stays below saturation. An over-saturated pool's gross rewards are capped at the saturation level, but the SPO income direction analysis still holds within the capped range. |
 | Pool performance | The formula assumes 100 % block-production performance. A pool that misses blocks earns proportionally less; the income direction analysis is unchanged. |
 | Cross-term ignored | The full Cardano reward formula includes a small cross-term `−a₀·s²·(z₀−σ')/z₀`. For pools well below saturation this term is negligible; at high pledge and near-saturation it would slightly increase `m_min` estimates above. |
-
-
-
-
-
-<script>
-  document.querySelectorAll('a[href*="SPO_REWARD_ANALYSIS_CHART.html"]').forEach(link => {
-    link.setAttribute('target', '_blank');
-    // This adds the security layer even if the HTML source is stripped
-    link.setAttribute('rel', 'noopener noreferrer'); 
-  });
-
-  document.querySelectorAll('a[href*="SPO_REWARD_ANALYSIS_CHART_COMPANION.md"]').forEach(link => {
-    link.setAttribute('target', '_blank');
-    // This adds the security layer even if the HTML source is stripped
-    link.setAttribute('rel', 'noopener noreferrer'); 
-  });
-
-</script>

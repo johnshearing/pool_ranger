@@ -2,12 +2,13 @@
 
 **Purpose:** Learn how delegation affects SPO income and delegator ROA by exploring the interactive chart directly.  
 Every concept in this document can be verified live by adjusting the sliders in  
-<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html" target="_blank" rel="noopener noreferrer">SPO_REWARD_ANALYSIS_CHART.html</a>
+<a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html">SPO_REWARD_ANALYSIS_CHART.html</a>  
+Right click on the link above to open the chart in a new tab and keep it alongside this document.  
 
+This document that you are reading now is the hands-on companion to the chart.  
 
-> Click on the link above to open the chart and keep it alongside this document.  
-> The full mathematical derivations live in <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS.md" target="_blank" rel="noopener noreferrer">SPO_REWARD_ANALYSIS.md</a>.
-> This document is the hands-on companion to the chart.  
+The full mathematical derivations live in <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS.md">SPO_REWARD_ANALYSIS.md</a>.  
+ 
 
 ---
 
@@ -450,21 +451,3 @@ P_safe        = F·(1+a₀) / (r·a₀) ≈ 2.7 M ADA   (pools below this are al
 | `S_sat` | Saturation point ≈ active_stake / k | ≈ 65–75 M ADA (2026) |
 | `A` | Pledge bonus per epoch (defined below) | derived |
 
-
-
-
-
-<script>
-  document.querySelectorAll('a[href*="SPO_REWARD_ANALYSIS_CHART.html"]').forEach(link => {
-    link.setAttribute('target', '_blank');
-    // This adds the security layer even if the HTML source is stripped
-    link.setAttribute('rel', 'noopener noreferrer'); 
-  });
-
-  document.querySelectorAll('a[href*="SPO_REWARD_ANALYSIS.md"]').forEach(link => {
-    link.setAttribute('target', '_blank');
-    // This adds the security layer even if the HTML source is stripped
-    link.setAttribute('rel', 'noopener noreferrer'); 
-  });
-
-</script>
