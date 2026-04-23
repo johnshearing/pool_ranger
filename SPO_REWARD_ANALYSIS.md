@@ -383,7 +383,7 @@ cooperative and sustainable.
 
 **Open <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html">SPO_REWARD_ANALYSIS_CHART</a> in a browser** for a live, interactive version of the analysis above.
 
-The <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART_COMPANION.md">SPO_REWARD_ANALYSIS_CHART_COMPANION</a> is found here.  
+The [SPO_REWARD_ANALYSIS_CHART_COMPANION](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART_COMPANION.md) is found here.  
 
 ### What the interactive chart includes
 
