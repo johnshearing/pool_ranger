@@ -14,14 +14,42 @@ The full mathematical derivations live in [SPO_REWARD_ANALYSIS.md](https://githu
 
 ## Step 0 — Tour of the Interface
 
-When you open the chart you will see four areas, top to bottom:
+When you open the chart you will see five areas, top to bottom:
 
 | Area | What it is |
 |------|-----------|
+| **Pool Lookup** panel | Text box + Load Pool button — type a mainnet ticker to auto-fill the sliders |
 | **Pool Parameters** panel | Four sliders: Margin, Pledge, Fixed Fee, Epoch Rate |
 | **Metric cards** row | Four live readouts that update with every slider move |
 | **Chart Cursor** panel | One slider that moves a red vertical line across the chart |
 | **Chart** panel | Green/red curve = SPO income (left axis). Blue curve = Delegator ROA (right axis). Orange dashed line = saturation. |
+
+### The Pool Lookup panel
+
+Type any mainnet stake pool ticker (e.g. `IOHK`, `GENS`, `COSD`) and press **Enter** or
+click **Load Pool**. The chart fetches live data from the Cardano blockchain via the
+[Koios](https://koios.rest) public API and sets the sliders automatically:
+
+| Slider set | Source |
+|---|---|
+| **Margin (m)** | Pool's on-chain registration certificate |
+| **Fixed Fee (F)** | Pool's on-chain registration certificate |
+| **Pledge (P)** | Pool's declared pledge (on-chain) |
+| **Cursor (external delegation)** | live\_stake − pledge for the current epoch |
+
+**What is not set automatically:** The **Epoch Rate (r)** slider is a network-wide
+parameter — not specific to any pool — so it is left at whatever value you have it set to.
+The default (0.000548) is a reasonable approximation for 2025/2026; see Step 10 for how to
+think about it.
+
+**Caveats:**
+- Tickers are mainnet only. Preview/preprod testnet pools will not be found.
+- If a pool's pledge or current delegation exceeds 70 M ADA (the slider maximum), the value
+  is clamped and a warning appears in the status line.
+- The declared pledge (used for the reward formula) may differ from the live pledge (actual
+  ADA held by the operator). The chart uses declared pledge, which matches how the Cardano
+  protocol calculates rewards.
+- After loading, you can still move any slider freely to explore "what if" scenarios.
 
 ### The three metric cards
 
@@ -424,7 +452,13 @@ chart — the pool is already near-saturated by pledge alone.
 
 ## Step 11 — Quick Evaluation Checklist (Chart-Assisted)
 
-For any candidate pool, look up P, F, m on pool.pm or adapools.org, then:
+For any candidate pool, type its ticker into the **Pool Lookup** panel and click
+**Load Pool** — this sets the Margin, Fixed Fee, Pledge, and Cursor sliders automatically
+from live on-chain data. Then set the **Epoch Rate** slider to the current network value
+(default 0.000548 is fine for 2025/2026). If the pool is not on mainnet or you prefer to
+enter values manually, look up P, F, m on pool.pm or adapools.org and set the sliders by hand.
+
+Then:
 
 - [ ] Set **Pledge**, **Fixed Fee**, **Margin**, and **Epoch Rate** sliders to match the pool.
 - [ ] Check the SPO income curve. Is any portion **red**?
