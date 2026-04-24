@@ -3,9 +3,9 @@
 <head>
 
 
-<!--  
+<!--
   To experiment with this live chart go to the following webpage.
-  https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html 
+  https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html
 -->
 
 
@@ -92,6 +92,7 @@ input[type=range] {
 .metric-unit { font-size: 0.67rem; color: var(--muted); margin-top: 0.25rem; }
 .green  { color: var(--green);  }
 .orange { color: var(--orange); }
+.red    { color: var(--red);    }
 .blue   { color: var(--accent); }
 
 
@@ -164,7 +165,7 @@ input[type=range] {
     <button id="load-btn">Load Pool</button>
     <span style="font-size:0.75rem;color:var(--muted)">
       Type a mainnet pool ticker and press Enter or click Load Pool.
-      Sliders for margin, fee, pledge, and current delegation will be set automatically.
+      Sliders for margin, fee, pledge, current delegation, and performance will be set automatically.
     </span>
   </div>
   <div id="lookup-status"></div>
@@ -193,10 +194,28 @@ input[type=range] {
   </div>
 </div>
 
+<!-- ── Performance Analysis ──────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Performance Analysis — actual vs expected blocks, auto-fetched from Koios on Load Pool</div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <label>Epoch Window <span id="lbl-epoch-window">20 epochs ≈ 100 days</span></label>
+      <input type="range" id="sl-epoch-window" min="1" max="73" step="1" value="20">
+    </div>
+    <div class="slider-row">
+      <label>Performance Factor (p) <span id="lbl-perf">100%</span></label>
+      <input type="range" id="sl-perf" min="0" max="100" step="1" value="100">
+    </div>
+  </div>
+  <div id="perf-status" style="font-size:0.78rem;color:var(--muted);margin-top:0.7rem;font-family:monospace;min-height:1.1rem;">
+    Load a pool above to auto-compute performance. Epochs with fewer than 0.5 expected blocks are excluded. Adjust the window or the factor manually for what-if analysis.
+  </div>
+</div>
+
 <!-- ── Metrics ───────────────────────────────────────── -->
 <div class="metrics-row">
   <div class="metric-card">
-    <div class="metric-lbl">Pledge Bonus A</div>
+    <div class="metric-lbl">Pledge Bonus (A·p)</div>
     <div class="metric-val blue" id="m-A">—</div>
     <div class="metric-unit">ADA / epoch</div>
   </div>
@@ -209,6 +228,11 @@ input[type=range] {
     <div class="metric-lbl">Delegator ROA (at cursor)</div>
     <div class="metric-val blue" id="m-roa">—</div>
     <div class="metric-unit">% per year</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Performance Factor</div>
+    <div class="metric-val green" id="m-perf">100.0%</div>
+    <div class="metric-unit">actual / expected blocks</div>
   </div>
 </div>
 
@@ -256,25 +280,29 @@ input[type=range] {
 <div class="panel">
   <div class="panel-title">Reference Formulas</div>
   <div class="formula">
-    <span class="hl">gross(S, P)</span>
-      = r × (S + a₀·P) / (1 + a₀)
-      &nbsp;|&nbsp; a₀ = 0.3 (protocol constant)
-      &nbsp;|&nbsp; S = P + external delegation<br>
+    <span class="hl">gross_eff(S, P, p)</span>
+      = p × r × (S + a₀·P) / (1 + a₀)
+      &nbsp;|&nbsp; p = performance factor (0–1)
+      &nbsp;|&nbsp; a₀ = 0.3 (protocol constant)<br>
 
     <span class="hl">SPO income</span>
-      = F + m·(gross − F) + (P/S)·(1−m)·(gross − F)
-      &nbsp;&nbsp; [when gross &gt; F; otherwise SPO takes all of gross]<br>
+      = F + m·(gross_eff − F) + (P/S)·(1−m)·(gross_eff − F)
+      &nbsp;&nbsp; [when gross_eff &gt; F; otherwise SPO takes all of gross_eff]<br>
 
     <span class="hl">Delegator ROA/yr</span>
-      = (1−m)·(gross − F) / S × 73 epochs × 100%<br>
+      = (1−m)·(gross_eff − F) / S × 73 epochs × 100%<br>
 
-    <span class="hl">A</span> = r·a₀·P / (1+a₀)
+    <span class="hl">A_eff</span> = p·r·a₀·P / (1+a₀)
       &nbsp;|&nbsp;
-    <span class="hl">m<sub>min</sub></span> = (A − F) / (r·P − F) &nbsp; when A &gt; F, else 0%
+    <span class="hl">m<sub>min</sub></span> = (A_eff − F) / (p·r·P − F) &nbsp; when A_eff &gt; F, else 0%
       &nbsp;|&nbsp; Ceiling: a₀/(1+a₀) ≈ 23.1%<br>
 
     <span class="hl">r</span> = <span id="formula-r">0.000548</span> (epoch rate — slowly declining as ADA reserve depletes)
-      &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 75 M ADA (2025)
+      &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 75 M ADA (2025)<br>
+
+    <span class="hl">Performance p</span>
+      = actual blocks / expected blocks (averaged over chosen epoch window)
+      &nbsp;|&nbsp; expected = (pool active stake / network active stake) × total epoch blocks
   </div>
 </div>
 
@@ -286,14 +314,19 @@ const EPOCHS_PER_YR  = 73;
 const STEPS          = 141;          // 0 to 70 M in 0.5 M increments
 const X_LABELS       = Array.from({ length: STEPS }, (_, i) => (i * 0.5).toFixed(1));
 
+// ── Performance history state ──────────────────────────
+let poolHistoryData = [];  // [{epoch_no, active_stake, block_cnt}] sorted descending
+let epochInfoData   = {};  // { epoch_no: {blk_count, active_stake} }
+
 // ── Math ───────────────────────────────────────────────
 function getParams() {
   return {
-    m  : parseFloat(document.getElementById('sl-m').value) / 100,
-    P  : parseFloat(document.getElementById('sl-p').value) * 1e6,
-    F  : parseFloat(document.getElementById('sl-f').value),
-    r  : parseFloat(document.getElementById('sl-r').value),
-    dM : parseFloat(document.getElementById('sl-d').value),
+    m    : parseFloat(document.getElementById('sl-m').value) / 100,
+    P    : parseFloat(document.getElementById('sl-p').value) * 1e6,
+    F    : parseFloat(document.getElementById('sl-f').value),
+    r    : parseFloat(document.getElementById('sl-r').value),
+    dM   : parseFloat(document.getElementById('sl-d').value),
+    perf : parseFloat(document.getElementById('sl-perf').value) / 100,
   };
 }
 
@@ -301,51 +334,107 @@ function gross(S, P, r) {
   return r * (S + A0 * P) / (1 + A0);
 }
 
-function spoIncome(S, P, F, m, r) {
+// perf scales the effective rewards; when perf = 1 results are identical to original
+function spoIncome(S, P, F, m, r, perf) {
   if (S <= 0) return 0;
-  const g   = gross(S, P, r);
+  const g   = gross(S, P, r) * perf;
   if (g <= F) return g;
   const net = g - F;
   return F + m * net + (P / S) * (1 - m) * net;
 }
 
-function delegROA(S, P, F, m, r) {
+function delegROA(S, P, F, m, r, perf) {
   if (S <= 0) return 0;
-  const g = gross(S, P, r);
+  const g = gross(S, P, r) * perf;
   if (g <= F) return 0;
   return (1 - m) * (g - F) / S * EPOCHS_PER_YR * 100;
 }
 
-function pledgeBonus(P, r) {
-  return r * A0 * P / (1 + A0);
+// Returns the performance-adjusted pledge bonus: p × r × a₀ × P / (1 + a₀)
+function pledgeBonus(P, r, perf) {
+  return perf * r * A0 * P / (1 + A0);
 }
 
-function mMin(P, F, r) {
-  const A    = pledgeBonus(P, r);
+// mMin with performance: (A_eff − F) / (p·r·P − F)
+function mMin(P, F, r, perf) {
+  const A    = pledgeBonus(P, r, perf);
   if (A <= F) return 0;
-  const denom = r * P - F;
+  const denom = perf * r * P - F;
   if (denom <= 0) return 0;
   return Math.min((A - F) / denom, 1);
 }
 
 // Cached x-index of the trough (-1 = no red zone; ≥ STEPS = entire curve is red)
 let currentTroughIndex = -1;
-// True when A > F — ROA falls monotonically with more delegation
+// True when effective A > F — ROA falls monotonically with more delegation
 let currentROAFalling = false;
 
-// Returns the index at which the SPO income slope flips from negative to positive.
-// Indices strictly less than this value are in the red zone.
-function troughExtDelegIndex(P, F, m, r) {
-  const A = pledgeBonus(P, r);
-  if (A <= F) return -1;      // no negative zone
-  if (m <= 0) return STEPS;   // entire curve slopes down
-  const mm = mMin(P, F, r);
-  if (m >= mm) return -1;     // margin is high enough — no negative zone
-  // Finite trough: S*² = P·(1−m)·(A−F) / (m·r/(1+a₀))
-  const Sstar = Math.sqrt(P * (1 - m) * (A - F) / (m * r / (1 + A0)));
+// Trough with performance: S*² = P·(1−m)·(A_eff−F) / (m·p·r/(1+a₀))
+function troughExtDelegIndex(P, F, m, r, perf) {
+  const A = pledgeBonus(P, r, perf);
+  if (A <= F) return -1;
+  if (m <= 0) return STEPS;
+  const mm = mMin(P, F, r, perf);
+  if (m >= mm) return -1;
+  const Sstar = Math.sqrt(P * (1 - m) * (A - F) / (m * perf * r / (1 + A0)));
   const extAtTrough = Sstar - P;
   if (extAtTrough <= 0) return 0;
   return Math.min(Math.round(extAtTrough / 0.5e6), STEPS - 1);
+}
+
+// ── Performance Computation ────────────────────────────
+function computePerformance(windowEpochs) {
+  const slice = poolHistoryData.slice(0, windowEpochs);
+  let totalExpected = 0;
+  let totalActual   = 0;
+  let validEpochs   = 0;
+
+  for (const epoch of slice) {
+    const netInfo = epochInfoData[epoch.epoch_no];
+    if (!netInfo) continue;
+
+    const netStake  = Number(netInfo.active_stake);
+    const netBlocks = Number(netInfo.blk_count);
+    const poolStake = Number(epoch.active_stake);
+    const blockCnt  = Number(epoch.block_cnt ?? 0);
+
+    if (netStake <= 0 || netBlocks <= 0 || poolStake <= 0) continue;
+
+    const expected = (poolStake / netStake) * netBlocks;
+    // Skip epochs where pool was too small to distinguish luck from skill
+    if (expected < 0.5) continue;
+
+    totalExpected += expected;
+    totalActual   += blockCnt;
+    validEpochs++;
+  }
+
+  if (totalExpected === 0) {
+    return { perf: 1, validEpochs: 0, totalActual: 0, totalExpected: 0, epochsChecked: slice.length };
+  }
+  const perf = Math.min(1, totalActual / totalExpected);
+  return { perf, validEpochs, totalActual, totalExpected, epochsChecked: slice.length };
+}
+
+function autoSetPerformance() {
+  const windowEpochs = parseInt(document.getElementById('sl-epoch-window').value);
+  const result = computePerformance(windowEpochs);
+  clampSet('sl-perf', Math.round(result.perf * 100));
+
+  const statusEl = document.getElementById('perf-status');
+  if (result.validEpochs === 0) {
+    statusEl.textContent = `No valid epoch data in the ${windowEpochs}-epoch window. Performance left at 100%.`;
+    statusEl.style.color = 'var(--muted)';
+  } else {
+    statusEl.textContent =
+      `Auto-computed: ${(result.perf * 100).toFixed(1)}% — ` +
+      `${result.totalActual.toFixed(1)} actual / ${result.totalExpected.toFixed(1)} expected blocks ` +
+      `(${result.validEpochs} valid epochs of ${result.epochsChecked} checked)`;
+    statusEl.style.color = result.perf >= 0.95 ? 'var(--green)'
+                         : result.perf >= 0.80 ? 'var(--orange)'
+                         : 'var(--red)';
+  }
+  update();
 }
 
 // ── Chart.js local plugins ─────────────────────────────
@@ -423,7 +512,7 @@ const cursorPlugin = {
       }
     }
 
-    // Marker on ROA curve — X when ROA is falling (A > F), circle when rising
+    // Marker on ROA curve — X when ROA is falling (A_eff > F), circle when rising
     const roaVal = ch.data.datasets[2].data[idx];
     if (roaVal != null && scales.yROA) {
       const py = scales.yROA.getPixelForValue(roaVal);
@@ -539,27 +628,33 @@ const myChart = new Chart(ctx, {
 
 // ── Main update function ───────────────────────────────
 function update() {
-  const { m, P, F, r, dM } = getParams();
+  const { m, P, F, r, dM, perf } = getParams();
   const S = P + dM * 1e6;
 
   // Update slider labels
-  document.getElementById('lbl-m').textContent  = (m * 100).toFixed(1) + '%';
-  document.getElementById('lbl-p').textContent  = (P / 1e6).toFixed(1) + ' M ADA';
-  document.getElementById('lbl-f').textContent  = F + ' ADA/epoch';
-  document.getElementById('lbl-r').textContent  = r.toFixed(6);
-  document.getElementById('lbl-d').textContent  = dM.toFixed(1) + ' M ADA';
-  document.getElementById('lbl-S').textContent  = (S / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('lbl-m').textContent    = (m * 100).toFixed(1) + '%';
+  document.getElementById('lbl-p').textContent    = (P / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('lbl-f').textContent    = F + ' ADA/epoch';
+  document.getElementById('lbl-r').textContent    = r.toFixed(6);
+  document.getElementById('lbl-d').textContent    = dM.toFixed(1) + ' M ADA';
+  document.getElementById('lbl-S').textContent    = (S / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('lbl-perf').textContent = (perf * 100).toFixed(0) + '%';
   document.getElementById('formula-r').textContent = r.toFixed(6);
 
   // Compute and display metrics
-  const A = pledgeBonus(P, r);
+  const A = pledgeBonus(P, r, perf);
 
-  document.getElementById('m-A').textContent  = A.toFixed(1);
-  document.getElementById('m-spo').textContent = spoIncome(S, P, F, m, r).toFixed(0);
-  document.getElementById('m-roa').textContent = delegROA(S, P, F, m, r).toFixed(3);
+  document.getElementById('m-A').textContent   = A.toFixed(1);
+  document.getElementById('m-spo').textContent = spoIncome(S, P, F, m, r, perf).toFixed(0);
+  document.getElementById('m-roa').textContent = delegROA(S, P, F, m, r, perf).toFixed(3);
 
-  // Update cached state used by segment callbacks and cursor plugin
-  currentTroughIndex = troughExtDelegIndex(P, F, m, r);
+  // Performance metric card with color-coded value
+  const perfEl = document.getElementById('m-perf');
+  perfEl.textContent = (perf * 100).toFixed(1) + '%';
+  perfEl.className   = 'metric-val ' + (perf >= 0.95 ? 'green' : perf >= 0.80 ? 'orange' : 'red');
+
+  // Update cached state used by cursor plugin
+  currentTroughIndex = troughExtDelegIndex(P, F, m, r, perf);
   currentROAFalling  = A > F;
 
   // Rebuild three chart series: red SPO zone, green SPO zone, dashed ROA
@@ -568,13 +663,12 @@ function update() {
   const roaData      = [];
   for (let i = 0; i < STEPS; i++) {
     const Si  = P + i * 0.5e6;
-    const spo = spoIncome(Si, P, F, m, r);
-    // Share the trough point in both datasets for a seamless visual join
+    const spo = spoIncome(Si, P, F, m, r, perf);
     const inRed   = currentTroughIndex >= 0 && i <= currentTroughIndex;
     const inGreen = currentTroughIndex <  0 || i >= currentTroughIndex;
     spoRedData.push(inRed   ? spo : null);
     spoGreenData.push(inGreen ? spo : null);
-    roaData.push(delegROA(Si, P, F, m, r));
+    roaData.push(delegROA(Si, P, F, m, r, perf));
   }
   myChart.data.datasets[0].data = spoRedData;
   myChart.data.datasets[1].data = spoGreenData;
@@ -583,13 +677,21 @@ function update() {
 }
 
 // ── Wire up all sliders ────────────────────────────────
-['sl-m', 'sl-p', 'sl-f', 'sl-r', 'sl-d'].forEach(id =>
+['sl-m', 'sl-p', 'sl-f', 'sl-r', 'sl-d', 'sl-perf'].forEach(id =>
   document.getElementById(id).addEventListener('input', update)
 );
 
+// Epoch window slider: recalculate performance from cached history if available
+document.getElementById('sl-epoch-window').addEventListener('input', () => {
+  const val = parseInt(document.getElementById('sl-epoch-window').value);
+  document.getElementById('lbl-epoch-window').textContent =
+    `${val} epoch${val === 1 ? '' : 's'} ≈ ${Math.round(val * 5)} days`;
+  if (poolHistoryData.length > 0) {
+    autoSetPerformance();
+  }
+});
+
 // ── Pool Lookup via Koios (mainnet, routed through CORS proxy) ────
-// Koios now requires auth tokens for direct browser requests; corsproxy.io
-// forwards the request and adds the missing Access-Control-Allow-Origin header.
 const KOIOS = 'https://api.koios.rest/api/v1';
 const PROXY = 'https://corsproxy.io/?';
 function proxied(url) { return PROXY + encodeURIComponent(url); }
@@ -615,6 +717,14 @@ async function loadPool() {
 
   const btn = document.getElementById('load-btn');
   btn.disabled = true;
+
+  // Reset performance state before fetch
+  poolHistoryData = [];
+  epochInfoData   = {};
+  clampSet('sl-perf', 100);
+  document.getElementById('perf-status').textContent = 'Fetching performance history…';
+  document.getElementById('perf-status').style.color = 'var(--muted)';
+
   setStatus('Searching for ' + ticker + ' on mainnet…', 'muted');
 
   try {
@@ -627,6 +737,7 @@ async function loadPool() {
 
     if (!Array.isArray(pools) || pools.length === 0) {
       setStatus(`Pool "${ticker}" not found on mainnet. Check the ticker and try again.`, 'red');
+      document.getElementById('perf-status').textContent = 'Pool not found.';
       return;
     }
 
@@ -662,12 +773,49 @@ async function loadPool() {
     clampSet('sl-f', fixedADA);
     clampSet('sl-p', pledgeMADA);
     clampSet('sl-d', extDelegMADA);
-    update();
 
     const warnings = [];
     if (pledgeMADA   > 70) warnings.push('pledge clamped to 70 M ADA');
     if (extDelegMADA > 70) warnings.push('delegation clamped to 70 M ADA');
     const warn = warnings.length ? ' ⚠ ' + warnings.join(', ') : '';
+
+    setStatus(
+      `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
+      ` · r slider unchanged${warn} · fetching epoch history…`,
+      'accent'
+    );
+
+    // Step 3: fetch pool block history (up to 73 epochs, most recent first)
+    const histResp = await fetch(
+      proxied(
+        `${KOIOS}/pool_history?_pool_bech32=${encodeURIComponent(poolId)}` +
+        `&select=epoch_no,active_stake,block_cnt&order=epoch_no.desc&limit=73`
+      )
+    );
+    if (histResp.ok) {
+      const raw = await histResp.json();
+      if (Array.isArray(raw)) poolHistoryData = raw;
+    }
+
+    // Step 4: fetch network epoch info for those epochs (blk_count + active_stake)
+    if (poolHistoryData.length > 0) {
+      const epochNums = poolHistoryData.map(h => h.epoch_no).join(',');
+      const epochResp = await fetch(
+        proxied(
+          `${KOIOS}/epoch_info?epoch_no=in.(${epochNums})&select=epoch_no,blk_count,active_stake`
+        )
+      );
+      if (epochResp.ok) {
+        const epochArr = await epochResp.json();
+        if (Array.isArray(epochArr)) {
+          epochInfoData = {};
+          for (const e of epochArr) epochInfoData[e.epoch_no] = e;
+        }
+      }
+    }
+
+    // Auto-compute performance from fetched history then redraw
+    autoSetPerformance();
 
     setStatus(
       `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
@@ -677,6 +825,9 @@ async function loadPool() {
 
   } catch (err) {
     setStatus('Error: ' + err.message, 'red');
+    document.getElementById('perf-status').textContent = 'Could not fetch performance data — performance left at 100%.';
+    document.getElementById('perf-status').style.color = 'var(--red)';
+    update();
   } finally {
     btn.disabled = false;
   }
