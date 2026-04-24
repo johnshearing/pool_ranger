@@ -157,7 +157,7 @@ input[type=range] {
 
 <!-- ── Pool Lookup ───────────────────────────────────── -->
 <div class="panel">
-  <div class="panel-title">Pool Lookup — Mainnet via Koios (no API key needed)</div>
+  <div class="panel-title">Pool Lookup — Mainnet via Koios + corsproxy.io (no API key needed)</div>
   <div class="lookup-row">
     <input type="text" id="ticker-input" placeholder="e.g. IOHK" maxlength="5"
            autocomplete="off" spellcheck="false">
@@ -587,8 +587,12 @@ function update() {
   document.getElementById(id).addEventListener('input', update)
 );
 
-// ── Pool Lookup via Koios (mainnet, no API key) ────────
+// ── Pool Lookup via Koios (mainnet, routed through CORS proxy) ────
+// Koios now requires auth tokens for direct browser requests; corsproxy.io
+// forwards the request and adds the missing Access-Control-Allow-Origin header.
 const KOIOS = 'https://api.koios.rest/api/v1';
+const PROXY = 'https://corsproxy.io/?';
+function proxied(url) { return PROXY + encodeURIComponent(url); }
 
 function setStatus(msg, color) {
   const el = document.getElementById('lookup-status');
@@ -616,7 +620,7 @@ async function loadPool() {
   try {
     // Step 1: resolve ticker → pool_id_bech32
     const listResp = await fetch(
-      `${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`
+      proxied(`${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`)
     );
     if (!listResp.ok) throw new Error(`Koios pool_list HTTP ${listResp.status}`);
     const pools = await listResp.json();
@@ -630,7 +634,7 @@ async function loadPool() {
     setStatus('Found pool ID — fetching parameters…', 'muted');
 
     // Step 2: fetch pool financial parameters
-    const infoResp = await fetch(`${KOIOS}/pool_info`, {
+    const infoResp = await fetch(proxied(`${KOIOS}/pool_info`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({ _pool_bech32_ids: [poolId] }),
