@@ -23,12 +23,11 @@ When you open the chart you will see four areas, top to bottom:
 | **Chart Cursor** panel | One slider that moves a red vertical line across the chart |
 | **Chart** panel | Green/red curve = SPO income (left axis). Blue curve = Delegator ROA (right axis). Orange dashed line = saturation. |
 
-### The four metric cards
+### The three metric cards
 
 | Card | What it shows |
 |------|--------------|
 | **Pledge Bonus A** (blue) | The fixed ADA the SPO earns per epoch from their own pledge alone |
-| **Min Safe Margin m_min** (orange) | The minimum margin at which the SPO income curve becomes fully green (no red zone) |
 | **SPO Income (at cursor)** (green) | ADA/epoch the SPO earns at the red cursor position |
 | **Delegator ROA (at cursor)** (blue) | Annual % return for delegators at the red cursor position |
 
@@ -41,8 +40,12 @@ When you open the chart you will see four areas, top to bottom:
 - The **blue curve** traces delegator annual ROA over the same range.
   The right y-axis belongs to it.
 - The **red dashed cursor** marks the delegation level you choose with the bottom slider.
-  The dot on the SPO income curve matches the curve color at that position — green if the cursor
-  is in the safe zone, red if it is in the harmful zone.
+  Each curve shows a marker at the cursor position indicating the direction of the slope there:
+  a **green circle** means slope ≥ 0 (delegation helps at this level) and a **red ✕** means
+  slope < 0 (delegation hurts at this level). On the SPO income curve the marker changes as
+  you move the cursor across the trough. On the ROA curve the marker stays consistent for the
+  whole pool — green circle when A ≤ F (ROA rises with delegation) and red ✕ when A > F
+  (ROA falls with delegation regardless of delegation level).
 
 ### Parameter Reference
 
@@ -171,18 +174,19 @@ The minimum margin that eliminates the red zone entirely is:
 m_min  =  (A − F) / (r × P − F)     [only when A > F; otherwise m_min = 0]
 ```
 
-The chart computes this live and shows it in the **Min Safe Margin** card.
+The chart does not display m_min as a number, but it is visible directly on the curve:
+the red zone disappears the moment margin reaches m_min.
 
 ### Watching the red zone disappear
 
-With **Pledge = 5 M ADA**, **Fixed Fee = 340**, **Epoch Rate = 0.000548**:
+With **Pledge = 5 M ADA**, **Fixed Fee = 340**, **Epoch Rate = 0.000548**, m_min ≈ 12.22 %:
 
-- The **m_min card** will show approximately **12.22 %**.
-- With **Margin = 5 %**: red zone visible on the left side of the green curve.
+- With **Margin = 5 %**: red zone visible on the left side of the curve.
 - Slowly drag **Margin** upward. Watch the red zone shrink leftward and the trough move
   toward the y-axis.
 - The moment you cross **Margin = 12.5 %** (the nearest slider step above 12.22 %):
   the red zone vanishes entirely and the curve is all green from left to right.
+- To compute m_min exactly, use the reference formula at the bottom of the chart page.
 
 When `m ≥ m_min` the SPO income curve is monotonically non-decreasing — green all the way.
 When `m < m_min` a red zone exists at low delegation levels.
@@ -201,8 +205,9 @@ Ceiling  =  a₀ / (1 + a₀)  =  0.3 / 1.3  ≈  23.08 %
 
 ## Step 5 — m_min at Different Pledge Levels
 
-Use the chart as a lookup table. Set **Fixed Fee = 340**, **Epoch Rate = 0.000548**,
-**Margin = 0 %**, then adjust Pledge and read m_min from the orange card:
+Set **Fixed Fee = 340**, **Epoch Rate = 0.000548**, **Margin = 0 %**, then adjust Pledge
+and observe the red zone. The table below shows the corresponding m_min values (computed
+from the reference formula) and whether the red zone covers the full curve or has a trough:
 
 | Pledge | Pledge Bonus A | A > F? | m_min (card) |
 |-------:|---------------:|:------:|-------------:|
@@ -334,12 +339,12 @@ is **where the cursor is relative to the trough**:
 
 ### Decision logic for Pool Ranger
 
-1. Read `m_min` from the orange card.
-2. If the SPO income curve is all green (m ≥ m_min): delegation is cooperative at any level.
-3. If a red zone exists: move the cursor to the pool's current delegation level.
-4. If cursor is in the **green zone** (past the trough): safe to add delegation.
-5. If cursor is in the **red zone** (before the trough): check whether Pool Ranger's stake
-   can push the pool past the trough. If yes, the move is net-positive. If no, do not delegate.
+1. If the SPO income curve is all green: delegation is cooperative at any level.
+2. If a red zone exists: move the cursor to the pool's current delegation level.
+3. If the cursor marker is a **green circle** (past the trough): safe to add delegation.
+4. If the cursor marker is a **red ✕** (before the trough): check whether Pool Ranger's stake
+   can push the pool past the trough in one move. If yes, the move is net-positive. If no,
+   do not delegate.
 
 ---
 
@@ -349,10 +354,10 @@ Higher fixed fees eliminate or shrink the red zone.
 
 **Experiment:** Set **Pledge = 5 M ADA**, **Margin = 5 %**.
 
-- **Fixed Fee = 170:** m_min ≈ 13.5 %. Red zone is large — trough is far to the right.
-- **Fixed Fee = 340:** m_min ≈ 12.2 %. Red zone still present but slightly smaller.
-- **Fixed Fee = 630:** m_min drops below 5 %. Red zone disappears — the curve turns all green.
-- **Fixed Fee = 1000:** m_min drops further. Even a very low margin produces an all-green curve.
+- **Fixed Fee = 170:** Red zone is large — trough is far to the right (m_min ≈ 13.5 %).
+- **Fixed Fee = 340:** Red zone still present but slightly smaller (m_min ≈ 12.2 %).
+- **Fixed Fee = 630:** Red zone disappears — the curve turns all green (m_min drops below 5 %).
+- **Fixed Fee = 1000:** Even a very low margin produces an all-green curve.
 
 The intuition: a high fixed fee means the SPO already takes a large first cut before the
 pledge-dilution effect can dominate. The margin only needs to compensate for a smaller gap.
@@ -372,8 +377,10 @@ that the pool is already at this specific delegation level, what are the exact v
 **SPO Income (at cursor)** and **Delegator ROA (at cursor)** are snapshot values for a pool
 that has already accumulated that much external delegation.
 
-The cursor dot on the SPO income curve changes color to match the zone: green when the
-cursor is past the trough, red when it is before it.
+The cursor marker on the SPO income curve indicates the local slope: a green circle when
+past the trough (slope ≥ 0) and a red ✕ when before it (slope < 0). The ROA curve marker
+shows the same logic but for the whole pool at once — red ✕ if A > F (ROA always falls),
+green circle if A ≤ F (ROA always rises).
 
 ### Example: evaluating a pool you are considering
 
@@ -424,11 +431,13 @@ For any candidate pool, look up P, F, m on pool.pm or adapools.org, then:
   - If **no red**: delegation is cooperative at any level. Proceed to ROA analysis.
   - If **red zone exists**: continue below.
 - [ ] Move the **Cursor** to the pool's current external delegation level (from Blockfrost/pool.pm).
-- [ ] Is the cursor dot **green** (past the trough) or **red** (before the trough)?
-  - **Green dot:** more delegation helps the SPO. Safe to add.
-  - **Red dot:** delegation is currently harming the SPO. Check whether Pool Ranger's stake
+- [ ] Is the SPO income cursor marker a **green circle** (past the trough) or **red ✕** (before)?
+  - **Green circle:** more delegation helps the SPO. Safe to add.
+  - **Red ✕:** delegation is currently harming the SPO. Check whether Pool Ranger's stake
     can push the pool past the trough in one move. If yes, the net effect is still positive.
     If no, do not delegate.
+- [ ] Check the ROA curve cursor marker: **green circle** means ROA rises as the pool grows
+  (A ≤ F); **red ✕** means ROA falls as the pool grows (A > F) — informational, not a veto.
 - [ ] Read **Delegator ROA (at cursor)** — this is your expected annual yield at current pool size.
 - [ ] Check whether the blue ROA curve slopes up or down from the cursor — if down, ROA will
   erode slightly as more people join.

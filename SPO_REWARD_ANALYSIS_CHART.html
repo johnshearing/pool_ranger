@@ -144,10 +144,6 @@ input[type=range] {
     <div class="metric-unit">ADA / epoch</div>
   </div>
   <div class="metric-card">
-    <div class="metric-lbl">Min Safe Margin m<sub>min</sub></div>
-    <div class="metric-val orange" id="m-mmin">—</div>
-  </div>
-  <div class="metric-card">
     <div class="metric-lbl">SPO Income (at cursor)</div>
     <div class="metric-val green" id="m-spo">—</div>
     <div class="metric-unit">ADA / epoch</div>
@@ -174,8 +170,20 @@ input[type=range] {
 <!-- ── Chart ─────────────────────────────────────────── -->
 <div class="panel">
   <div class="panel-title">
-    SPO Income (left axis, green = income rises with delegation / red = income falls with delegation) &amp; Delegator Annual ROA (blue, right axis)
-    vs External Delegation 0 → 70 M ADA &nbsp;|&nbsp; dashed orange = ≈ saturation point
+    SPO Income (left axis) &amp; Delegator ROA %/yr (right axis, blue) — External Delegation 0 → 70 M ADA &nbsp;|&nbsp; dashed orange = saturation<br>
+    <span style="font-size:0.75rem;letter-spacing:0;text-transform:none;color:var(--muted)">
+      Cursor markers on each curve:&nbsp;
+      <svg width="11" height="11" viewBox="0 0 11 11" style="vertical-align:middle;display:inline-block">
+        <circle cx="5.5" cy="5.5" r="4.5" fill="#3fb950"/>
+      </svg>
+      &nbsp;slope ≥ 0 (delegation helps)
+      &nbsp;&nbsp;
+      <svg width="11" height="11" viewBox="0 0 11 11" style="vertical-align:middle;display:inline-block">
+        <line x1="1.5" y1="1.5" x2="9.5" y2="9.5" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="9.5" y1="1.5" x2="1.5" y2="9.5" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      &nbsp;slope &lt; 0 (delegation hurts)
+    </span>
   </div>
   <div class="chart-wrap">
     <canvas id="chart"></canvas>
@@ -260,6 +268,8 @@ function mMin(P, F, r) {
 
 // Cached x-index of the trough (-1 = no red zone; ≥ STEPS = entire curve is red)
 let currentTroughIndex = -1;
+// True when A > F — ROA falls monotonically with more delegation
+let currentROAFalling = false;
 
 // Returns the index at which the SPO income slope flips from negative to positive.
 // Indices strictly less than this value are in the red zone.
@@ -309,7 +319,7 @@ const satPlugin = {
   }
 };
 
-// Draws a red cursor line + colored dots at the current delegation level
+// Draws a dashed cursor line and X/circle markers on each curve
 const cursorPlugin = {
   id: 'cursorLine',
   afterDraw(ch) {
@@ -321,9 +331,10 @@ const cursorPlugin = {
     const px = scales.x.getPixelForValue(idx);
     if (px < ca.left || px > ca.right) return;
 
-    // Vertical cursor
     ctx.save();
-    ctx.strokeStyle = 'rgba(248,81,73,0.7)';
+
+    // Dashed vertical cursor line
+    ctx.strokeStyle = 'rgba(248,81,73,0.5)';
     ctx.lineWidth   = 1.5;
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
@@ -332,24 +343,38 @@ const cursorPlugin = {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Dot on SPO line — red if cursor is in the negative-slope zone, green otherwise
+    const R = 5; // marker half-size
+
+    // Marker on SPO income curve — X when in red zone, circle when green
     const spoVal = ch.data.datasets[0].data[idx];
     if (spoVal != null && scales.ySPO) {
       const py = scales.ySPO.getPixelForValue(spoVal);
-      ctx.beginPath();
-      ctx.arc(px, py, 5, 0, Math.PI * 2);
-      ctx.fillStyle = (currentTroughIndex >= 0 && idx < currentTroughIndex) ? '#f85149' : '#3fb950';
-      ctx.fill();
+      if (currentTroughIndex >= 0 && idx < currentTroughIndex) {
+        ctx.strokeStyle = '#f85149';
+        ctx.lineWidth   = 2.5;
+        ctx.lineCap     = 'round';
+        ctx.beginPath(); ctx.moveTo(px - R, py - R); ctx.lineTo(px + R, py + R); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px + R, py - R); ctx.lineTo(px - R, py + R); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#3fb950';
+        ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
-    // Blue dot on ROA line
+    // Marker on ROA curve — X when ROA is falling (A > F), circle when rising
     const roaVal = ch.data.datasets[1].data[idx];
     if (roaVal != null && scales.yROA) {
       const py = scales.yROA.getPixelForValue(roaVal);
-      ctx.beginPath();
-      ctx.arc(px, py, 5, 0, Math.PI * 2);
-      ctx.fillStyle = '#58a6ff';
-      ctx.fill();
+      if (currentROAFalling) {
+        ctx.strokeStyle = '#f85149';
+        ctx.lineWidth   = 2.5;
+        ctx.lineCap     = 'round';
+        ctx.beginPath(); ctx.moveTo(px - R, py - R); ctx.lineTo(px + R, py + R); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px + R, py - R); ctx.lineTo(px - R, py + R); ctx.stroke();
+      } else {
+        ctx.fillStyle = '#3fb950';
+        ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fill();
+      }
     }
 
     ctx.restore();
@@ -384,8 +409,8 @@ const myChart = new Chart(ctx, {
       {
         label: 'Delegator ROA (% / year)',
         data: new Array(STEPS).fill(0),
-        borderColor: '#58a6ff',
-        backgroundColor: 'rgba(88,166,255,0.07)',
+        borderColor: '#1c7ed6',
+        backgroundColor: 'rgba(28,126,214,0.07)',
         yAxisID: 'yROA',
         tension: 0.3,
         pointRadius: 0,
@@ -403,23 +428,7 @@ const myChart = new Chart(ctx, {
       legend: {
         labels: { color: '#c9d1d9', font: { size: 13 } }
       },
-      tooltip: {
-        backgroundColor: '#161b22',
-        borderColor: '#30363d',
-        borderWidth: 1,
-        titleColor: '#c9d1d9',
-        bodyColor: '#8b949e',
-        callbacks: {
-          title(items) {
-            return `External Delegation: ${items[0].label} M ADA`;
-          },
-          label(item) {
-            if (item.datasetIndex === 0)
-              return ` SPO Income: ${item.raw.toFixed(0)} ADA / epoch`;
-            return ` Delegator ROA: ${item.raw.toFixed(4)}% / year`;
-          }
-        }
-      }
+      tooltip: { enabled: false }
     },
     scales: {
       x: {
@@ -449,8 +458,8 @@ const myChart = new Chart(ctx, {
       yROA: {
         type: 'linear',
         position: 'right',
-        title: { display: true, text: 'Delegator ROA (% / year)', color: '#58a6ff' },
-        ticks: { color: '#58a6ff' },
+        title: { display: true, text: 'Delegator ROA (% / year)', color: '#1c7ed6' },
+        ticks: { color: '#1c7ed6' },
         grid: { drawOnChartArea: false },
         beginAtZero: true,
       },
@@ -473,18 +482,15 @@ function update() {
   document.getElementById('formula-r').textContent = r.toFixed(6);
 
   // Compute and display metrics
-  const A  = pledgeBonus(P, r);
-  const mm = mMin(P, F, r);
+  const A = pledgeBonus(P, r);
 
-  document.getElementById('m-A').textContent    = A.toFixed(1);
-  document.getElementById('m-mmin').textContent =
-    mm === 0 ? '0%' : (mm * 100).toFixed(2) + '%';
-
+  document.getElementById('m-A').textContent  = A.toFixed(1);
   document.getElementById('m-spo').textContent = spoIncome(S, P, F, m, r).toFixed(0);
   document.getElementById('m-roa').textContent = delegROA(S, P, F, m, r).toFixed(3);
 
-  // Update trough index so segment callbacks pick up the new value
+  // Update cached state used by segment callbacks and cursor plugin
   currentTroughIndex = troughExtDelegIndex(P, F, m, r);
+  currentROAFalling  = A > F;
 
   // Rebuild both chart series
   const spoData = [];
