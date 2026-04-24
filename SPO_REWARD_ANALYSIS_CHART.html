@@ -98,6 +98,48 @@ input[type=range] {
 /* ── chart ───────────────────────────────────────────── */
 .chart-wrap { position: relative; height: 430px; }
 
+/* ── pool lookup ─────────────────────────────────────── */
+.lookup-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#ticker-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.75rem;
+  width: 9rem;
+  text-transform: uppercase;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#ticker-input:focus { border-color: var(--accent); }
+#load-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #0d1117;
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  transition: opacity 0.15s;
+}
+#load-btn:hover  { opacity: 0.85; }
+#load-btn:active { opacity: 0.7;  }
+#load-btn:disabled { opacity: 0.4; cursor: default; }
+#lookup-status {
+  font-size: 0.8rem;
+  margin-top: 0.6rem;
+  font-family: monospace;
+  min-height: 1.1rem;
+}
+
 /* ── formula box ─────────────────────────────────────── */
 .formula {
   font-family: monospace;
@@ -112,6 +154,21 @@ input[type=range] {
 
 <h1>SPO Reward Analysis — Pool Ranger</h1>
 <p class="sub">Adjust parameters with the sliders to explore how delegation affects SPO income and delegator ROA in real time.</p>
+
+<!-- ── Pool Lookup ───────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Pool Lookup — Mainnet via Koios (no API key needed)</div>
+  <div class="lookup-row">
+    <input type="text" id="ticker-input" placeholder="e.g. IOHK" maxlength="5"
+           autocomplete="off" spellcheck="false">
+    <button id="load-btn">Load Pool</button>
+    <span style="font-size:0.75rem;color:var(--muted)">
+      Type a mainnet pool ticker and press Enter or click Load Pool.
+      Sliders for margin, fee, pledge, and current delegation will be set automatically.
+    </span>
+  </div>
+  <div id="lookup-status"></div>
+</div>
 
 <!-- ── Pool parameters ──────────────────────────────── -->
 <div class="panel">
@@ -529,6 +586,102 @@ function update() {
 ['sl-m', 'sl-p', 'sl-f', 'sl-r', 'sl-d'].forEach(id =>
   document.getElementById(id).addEventListener('input', update)
 );
+
+// ── Pool Lookup via Koios (mainnet, no API key) ────────
+const KOIOS = 'https://api.koios.rest/api/v1';
+
+function setStatus(msg, color) {
+  const el = document.getElementById('lookup-status');
+  el.textContent = msg;
+  el.style.color = color === 'green'  ? 'var(--green)'
+                 : color === 'red'    ? 'var(--red)'
+                 : color === 'accent' ? 'var(--accent)'
+                 : 'var(--muted)';
+}
+
+function clampSet(id, value) {
+  const el = document.getElementById(id);
+  const clamped = Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), value));
+  el.value = clamped;
+}
+
+async function loadPool() {
+  const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
+  if (!ticker) { setStatus('Please enter a ticker symbol.', 'muted'); return; }
+
+  const btn = document.getElementById('load-btn');
+  btn.disabled = true;
+  setStatus('Searching for ' + ticker + ' on mainnet…', 'muted');
+
+  try {
+    // Step 1: resolve ticker → pool_id_bech32
+    const listResp = await fetch(
+      `${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`
+    );
+    if (!listResp.ok) throw new Error(`Koios pool_list HTTP ${listResp.status}`);
+    const pools = await listResp.json();
+
+    if (!Array.isArray(pools) || pools.length === 0) {
+      setStatus(`Pool "${ticker}" not found on mainnet. Check the ticker and try again.`, 'red');
+      return;
+    }
+
+    const poolId = pools[0].pool_id_bech32;
+    setStatus('Found pool ID — fetching parameters…', 'muted');
+
+    // Step 2: fetch pool financial parameters
+    const infoResp = await fetch(`${KOIOS}/pool_info`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ _pool_bech32_ids: [poolId] }),
+    });
+    if (!infoResp.ok) throw new Error(`Koios pool_info HTTP ${infoResp.status}`);
+    const infos = await infoResp.json();
+
+    if (!Array.isArray(infos) || infos.length === 0) {
+      setStatus('Pool info not returned by Koios. Try again in a moment.', 'red');
+      return;
+    }
+
+    const info = infos[0];
+    const name         = info.meta_json?.name ?? ticker;
+    const marginPct    = (info.margin ?? 0) * 100;                          // % (0–100)
+    const fixedADA     = Number(info.fixed_cost ?? 340000000) / 1e6;        // lovelace → ADA
+    const pledgeMADA   = Number(info.pledge     ?? 0)         / 1e12;       // lovelace → M ADA
+    const liveStakeLov = Number(info.live_stake ?? info.pledge ?? 0);
+    const pledgeLov    = Number(info.pledge     ?? 0);
+    const extDelegMADA = Math.max(0, (liveStakeLov - pledgeLov) / 1e12);   // M ADA
+    const delegators   = info.live_delegators ?? '?';
+    const totalMADA    = (liveStakeLov / 1e12).toFixed(1);
+
+    clampSet('sl-m', marginPct);
+    clampSet('sl-f', fixedADA);
+    clampSet('sl-p', pledgeMADA);
+    clampSet('sl-d', extDelegMADA);
+    update();
+
+    const warnings = [];
+    if (pledgeMADA   > 70) warnings.push('pledge clamped to 70 M ADA');
+    if (extDelegMADA > 70) warnings.push('delegation clamped to 70 M ADA');
+    const warn = warnings.length ? ' ⚠ ' + warnings.join(', ') : '';
+
+    setStatus(
+      `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
+      ` · r slider unchanged (network-wide parameter)${warn}`,
+      'green'
+    );
+
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'red');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('load-btn').addEventListener('click', loadPool);
+document.getElementById('ticker-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadPool();
+});
 
 update(); // initial render
 </script>
