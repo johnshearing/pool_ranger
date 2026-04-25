@@ -1,6 +1,6 @@
 Pool Ranger Delegation Report — Epoch 627
 ============================================================
-Generated: 2026-04-25T01:43:42.923Z
+Generated: 2026-04-25T18:57:05.032Z
 r = 0.000310  |  S_sat ≈ 43.60 M ADA  |  Pool Ranger stake: 1.00 M ADA
 Available to deploy: 1.00 M ADA
 

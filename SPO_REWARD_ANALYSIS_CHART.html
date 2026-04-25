@@ -694,6 +694,8 @@ document.getElementById('sl-epoch-window').addEventListener('input', () => {
 // ── Pool Lookup via Koios (mainnet, routed through CORS proxy) ────
 const KOIOS = 'https://api.koios.rest/api/v1';
 const PROXY = 'https://corsproxy.io/?';
+const R_MIN  = 0.00010;
+const R_MAX  = 0.00100;
 function proxied(url) { return PROXY + encodeURIComponent(url); }
 
 function setStatus(msg, color) {
@@ -709,6 +711,34 @@ function clampSet(id, value) {
   const el = document.getElementById(id);
   const clamped = Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), value));
   el.value = clamped;
+}
+
+// Fetch live r averaged over the last numEpochs settled epochs.
+// Retries once after 1 s on failure. Returns null if both attempts fail.
+async function fetchLiveR(numEpochs = 5) {
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(res => setTimeout(res, 1000));
+      const resp = await fetch(
+        proxied(`${KOIOS}/epoch_info?order=epoch_no.desc&limit=9&select=epoch_no,total_rewards,active_stake`)
+      );
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const epochs = await resp.json();
+      if (!Array.isArray(epochs)) throw new Error('Unexpected response');
+      const rates = [];
+      for (const e of epochs) {
+        if (e.total_rewards == null) continue;
+        const r = Number(e.total_rewards) / Number(e.active_stake);
+        if (r >= R_MIN && r <= R_MAX) rates.push(r);
+        if (rates.length >= numEpochs) break;
+      }
+      if (rates.length === 0) throw new Error('No settled epoch data');
+      return rates.reduce((a, b) => a + b, 0) / rates.length;
+    } catch (err) {
+      if (attempt >= 1) return null;
+    }
+  }
+  return null;
 }
 
 async function loadPool() {
@@ -781,7 +811,7 @@ async function loadPool() {
 
     setStatus(
       `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
-      ` · r slider unchanged${warn} · fetching epoch history…`,
+      `${warn} · fetching epoch history and live r…`,
       'accent'
     );
 
@@ -814,13 +844,24 @@ async function loadPool() {
       }
     }
 
-    // Auto-compute performance from fetched history then redraw
+    // Step 5: fetch live r and update slider
+    let rNote;
+    const liveR = await fetchLiveR();
+    if (liveR !== null) {
+      clampSet('sl-r', liveR);
+      rNote = ` · r = ${liveR.toFixed(6)} (live from Koios)`;
+    } else {
+      const currentR = parseFloat(document.getElementById('sl-r').value);
+      rNote = ` · ⚠ r fetch failed — using ${currentR.toFixed(6)} (ROA may be inaccurate)`;
+    }
+
+    // Auto-compute performance from fetched history then redraw (reads updated r slider)
     autoSetPerformance();
 
     setStatus(
       `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
-      ` · r slider unchanged (network-wide parameter)${warn}`,
-      'green'
+      `${rNote}${warn}`,
+      liveR !== null ? 'green' : 'accent'
     );
 
   } catch (err) {
