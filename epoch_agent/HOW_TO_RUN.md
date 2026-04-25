@@ -1,8 +1,38 @@
-# Pool Ranger Epoch Agent — How to Run
+# Pool Ranger Epoch Agent — What It Is And How to Run
+This document is for humans and ai agents that need to make good decisions regarding how to delegate Pool Ranger's ADA to various stake pools. 
 
-Run this agent once per Cardano epoch (every ~5 days) to get a delegation recommendation
-report. The agent never executes changes — it only advises. A human reviews the report and
-decides whether to act.
+## Terms
+Epoch Agent - This is the collection of documents containing general instructions, computer scripts, and data files in this directory (ranger/epoch_agent) which together are used to accomplish the task of intelligent stake pool delegation for the benefit of Pool Ranger cooperative members, stake pool operators, and Cardano protocol health.  
+
+Agent - This is the ai or the human that is does the work of running the reports and creating the required unsigned transactions.
+
+Administrator - Reviews the reports and unsigned transactions and signs the transactions and posts these at his or her discretion.
+
+
+## How The Epoch Agent Is Supposed to work
+
+This is a work in progress. The following numbered items represent the plan.  
+Most of these requirements are already implemented by the scripts here in the ranger/epoch_agent directory.  
+The current implementation is only a start and may vary from the plan below.  
+As work proceeds, both the plan and the implementation will change as knowledge and experience are gained.  
+The goal is to find the optimal plan and the make the implementation match the plan.  
+Work will proceed step by step with small changes and evaluation until the goal is achived.  
+
+
+1. The Agent, using the Epoch Agent, creates a candidate list that contains every Cardano stake pool that has been running for at least 30 epochs.   
+2. The Agent, using the Epoch Agent, pulls ticker, bech32 pool IDs, current parameters and delegation levels for every pool in the candidate list via Koios.
+3. The Agent, using the Epoch Agent, works through the reward math on each pool to determine whether or not there is a red zone on either the SPOs or the delegators earning curve. A red zone on either curve would be those points where the slope of the curve is negative. More ADA delegation in a red zone reduces earnings until the red zone is passed. If there is a red zone then we need to know where the red zone is in relation to the current level of delegation. The intention is to determine if delegating more ADA to a pool will increase or decrease SPO earnings and increase or decrease Return ON ADA (ROA) for the delegators. If the current level of delegation already passes the red zone on a curve then the red zone is a non-issue and the pool is considered safe for delegation. If there is a red zone and the current level of delegation is on the left side of the red zone, then increased delegation will reduce earnings with more delegation until the red zone is passed. Delegating to these pools requires that we delegate enough ADA to bring overall delegation out of the red zone and at least back up to the level of earnings the SPO and the current pool delegators now enjoy. If increasing delegation would reduce earnings for either the SPO or for the current delegators then the pool will be dropped from the list of potential candidates for delegation but will be added to a list of pools for which we will ask its delegators to delegate with us under the condition that the slope of the curve for the SPOs and for the delegators is negative going all the way out to pool saturation. In other words, assuming that the Fixed Fee, the Margin, and the Pledge will remain unchanged and the slope of the curves are negative going all the way out to pool saturation, then we know that any amount of increased delegation will harm both the SPO and the delegator. Furthermore, we know that convincing current delegators to stake will us will actually increase the earnings for both the SPO and for the delegators. So there are two lists we are creating so far - a list of stake pools that we will consider for delegation and a list of stake pools from which we will try to convince delegators to stake with Pool Ranger. If there are any stake pools in the list which is being considered for delegation that do not have a performance factor of 99% for the last 20 epochs then the pool will be droped from the list.
+4. Next the agent, using the Epoch Agent, should sort both lists. The list of pools selected for delegation (the list of pools for which both SPOs and delegators will benefit from increased delegation) must be sorted from highest to lowest according to which pools will produce the highest ROA for delegators. The list of pools selected for solicitation of delegators must be sorted from lowest to highest according which delegators are receiving the lowest ROA. The intention is to reach out first to those delgators who will benefit the most by staking with Pool Ranger.
+5. Next the agent, using the Epoch Agent, determines the amount of ADA to be delegated to the stake pools such that maximum ROA is accomplished for Pool Ranger delegators and a report is provided to the administrator for approval. The Agent, using the Epoch Agent, produces a ranked recommendation list. The administrator reviews the list and approves execution. Then the Agent, using the Epoch Agent creates the unsigned transactions. It would be best if as many delegations as possible were bundled into as few transactions as possible.
+6. Next the agent, using the Epoch Agent, examines the stake pool delegation for those stake pools which are listed to solicit delegation. The staking address of the delegators is identifed and used to open a channel of communication and a solicitation is made by the Agent, using the Epoch Agent to stake with the Pool Ranger cooperative.
+
+
+Run this process once per Cardano epoch (every ~5 days).  
+Currently, the Agent never signes transactions — it only advises.  
+The human administrator reviews the report, decides whether to sign and post transactions, to move delegation.  
+In the future an ai agent will not only run the report but may also sign and post transactions.  
+
+The rest of this document explains how the Epoch Agent actually works in currently.
 
 ---
 
