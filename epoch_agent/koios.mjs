@@ -1,0 +1,147 @@
+// Koios mainnet API wrapper for Pool Ranger epoch agent.
+// Fetches pool parameters and epoch data needed for classification and ROA math.
+//
+// All monetary values returned in ADA (not lovelace).
+// margin is returned as a fraction (0.05 = 5%), already that way from Koios.
+//
+// API key: optional. Set KOIOS_API_KEY in ranger/.env for higher rate limits.
+// Without a key the public tier allows ~10 req/s which is sufficient.
+
+import 'dotenv/config';
+
+const KOIOS_BASE = 'https://api.koios.rest/api/v1';
+const R_FALLBACK = 0.000548;   // per-epoch rate fallback if Koios data is unavailable
+const R_MIN      = 0.00010;    // safety floor — r declines as reserve depletes
+const R_MAX      = 0.00100;
+
+function authHeaders() {
+  const key = process.env.KOIOS_API_KEY;
+  return key ? { Authorization: `Bearer ${key}` } : {};
+}
+
+// Internal fetch with retry on HTTP 429 (rate limit).
+async function koiosFetch(path, options = {}) {
+  const url = `${KOIOS_BASE}${path}`;
+  const headers = { 'Content-Type': 'application/json', ...authHeaders(), ...options.headers };
+  let delay = 1000;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 429) {
+      await new Promise(r => setTimeout(r, delay));
+      delay *= 2;
+      continue;
+    }
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`Koios ${res.status} ${res.statusText} for ${path}: ${body.slice(0, 200)}`);
+    }
+    return res.json();
+  }
+  throw new Error(`Koios rate limit persisted after retries for ${path}`);
+}
+
+// fetchPoolsInfo — fetch parameters for a list of pools in one POST call.
+// poolIds: string[] of bech32 pool IDs (pool1...)
+// Returns: PoolInfo[]
+//   { poolId, ticker, name, pledgeAda, fixedCostAda, margin, activeStakeAda }
+export async function fetchPoolsInfo(poolIds) {
+  if (poolIds.length === 0) return [];
+  const data = await koiosFetch('/pool_info', {
+    method: 'POST',
+    body: JSON.stringify({ _pool_bech32_ids: poolIds }),
+  });
+  return data.map(p => ({
+    poolId:         p.pool_id_bech32,
+    ticker:         p.meta_json?.ticker ?? null,
+    name:           p.meta_json?.name   ?? null,
+    pledgeAda:      Number(p.pledge)      / 1e6,
+    fixedCostAda:   Number(p.fixed_cost)  / 1e6,
+    margin:         Number(p.margin),
+    activeStakeAda: Number(p.active_stake ?? p.live_stake ?? 0) / 1e6,
+  }));
+}
+
+// fetchPoolHistory — block and stake history for a single pool.
+// Returns entries sorted descending by epoch (most recent first).
+// Returns: HistoryEntry[]
+//   { epochNo, activeStakeAda, blockCnt }
+export async function fetchPoolHistory(poolId, maxEpochs = 73) {
+  const data = await koiosFetch(
+    `/pool_history?_pool_bech32=${encodeURIComponent(poolId)}` +
+    `&select=epoch_no,active_stake,block_cnt` +
+    `&order=epoch_no.desc` +
+    `&limit=${maxEpochs}`,
+  );
+  return data.map(e => ({
+    epochNo:        Number(e.epoch_no),
+    activeStakeAda: Number(e.active_stake ?? 0) / 1e6,
+    blockCnt:       Number(e.block_cnt    ?? 0),
+  }));
+}
+
+// fetchEpochInfo — network-wide stats for a list of epoch numbers.
+// Returns: Map<epochNo, EpochInfoEntry>
+//   { activeStakeAda, blkCount, totalRewardsAda }
+// Note: total_rewards is null for the 2 most recent epochs (not yet distributed).
+export async function fetchEpochInfo(epochNos) {
+  if (epochNos.length === 0) return new Map();
+  const unique = [...new Set(epochNos)].sort((a, b) => a - b);
+  const list   = unique.join(',');
+  const data   = await koiosFetch(
+    `/epoch_info?epoch_no=in.(${list})&select=epoch_no,blk_count,active_stake,total_rewards`,
+  );
+  const map = new Map();
+  for (const e of data) {
+    map.set(Number(e.epoch_no), {
+      activeStakeAda:   Number(e.active_stake    ?? 0) / 1e6,
+      blkCount:         Number(e.blk_count       ?? 0),
+      totalRewardsAda:  e.total_rewards != null ? Number(e.total_rewards) / 1e6 : null,
+    });
+  }
+  return map;
+}
+
+// fetchCurrentEpoch — returns the latest epoch info.
+// Note: the current in-progress epoch has partial blk_count; active_stake is the snapshot.
+// Returns: { epochNo, activeStakeAda, blkCount }
+export async function fetchCurrentEpoch() {
+  const data = await koiosFetch(
+    '/epoch_info?select=epoch_no,blk_count,active_stake&order=epoch_no.desc&limit=1',
+  );
+  if (!data.length) throw new Error('Koios epoch_info returned empty result');
+  const e = data[0];
+  return {
+    epochNo:        Number(e.epoch_no),
+    activeStakeAda: Number(e.active_stake ?? 0) / 1e6,
+    blkCount:       Number(e.blk_count    ?? 0),
+  };
+}
+
+// fetchRecentR — compute the per-epoch reward rate r averaged over N settled epochs.
+// r_epoch = totalRewardsAda / activeStakeAda  (both in ADA — ratio is unit-free)
+// total_rewards is only populated ~2+ epochs in the past, so we look back enough epochs
+// to collect numEpochs settled data points.
+// Falls back to R_FALLBACK if data is insufficient.
+export async function fetchRecentR(numEpochs = 5) {
+  const current = await fetchCurrentEpoch();
+  // Fetch extra epochs to account for the 2-epoch settlement lag on total_rewards
+  const lookback = numEpochs + 4;
+  const epochNos = [];
+  for (let i = 2; i < 2 + lookback; i++) epochNos.push(current.epochNo - i);
+  const map = await fetchEpochInfo(epochNos);
+
+  const rates = [];
+  for (const [, info] of map) {
+    if (info.totalRewardsAda != null && info.activeStakeAda > 0 && info.totalRewardsAda > 0) {
+      const r = info.totalRewardsAda / info.activeStakeAda;
+      if (r >= R_MIN && r <= R_MAX) rates.push(r);
+    }
+    if (rates.length >= numEpochs) break;
+  }
+
+  if (rates.length === 0) {
+    console.warn(`[koios] Could not compute r from recent epochs — using fallback ${R_FALLBACK}`);
+    return R_FALLBACK;
+  }
+  return rates.reduce((a, b) => a + b, 0) / rates.length;
+}

@@ -4,18 +4,23 @@
 
 Every epoch, Pool Ranger runs an automated agent that:
 
-1. Pulls current parameters and delegation levels for every pool in the candidate list via Blockfrost.
-2. Runs the reward math on each pool to determine whether the pool is in a red zone, and if so, where the trough is.
-3. Decides whether to add delegation, remove delegation, or hold for each pool.
-4. Ranks safe pools by delegator ROA at the proposed new delegation level.
-5. Outputs a delegation adjustment plan for the administrator to execute.
+1. Pulls current parameters and delegation levels for every pool in the candidate list via Koios.
+2. Runs the reward math on each pool to determine whether or not there is a red zone for SPOs or delegators. And if there is a red zone then we need to know where the red zone is in relation to the current level of delegation. The intention is to determine if delegating more ADA to a pool will increase or decrease SPO earnings and ROA for the delegators. If increasing delegation would reduce earnings for either the SPO or for the delegators then the pool will be dropped from the list of potential candidates for delegation but will be added to a list of pools for which we will ask its delegators to delegate with us under the condition that the slope of the curve for the SPOs and for the delegators is negative going all the way out to pool saturation. In other words, assuming that the Fixed Fee, the Margin, and the Pledge will remain unchanged then we know that increased delegation will harm both the SPO and the delegator. Furthermore, we know that convincing some delegators to stake will us will actually increase the earnings for both the SPO and for the delegators. So there are two lists we are creating so far - a list of stake pools that we will consider for delegation and a list of stake pools from which we will try to convince delegators to stake with Pool Ranger. If there are any stake pools in the list which is being considered for delegation that do not have a performance factor of 100% for the last 20 epochs then the pool will be droped from the list.
+3. Now the agent should sort both lists. The list of pools selected for delegation (the list of pools for which both SPOs and delegators will benefit from increased delegation) must be sorted from highest to lowest according to which pools will produce the highest ROA for delegators. The list of pools selected for solicitation of delegators must be sorted from highest to lowest according which delegators are receiving the lowest ROA.
+4. Next the amount of ADA to be delegated to each pool must be determined such that maximum ROA is accomplished for Pool Ranger delegators and a report is provided to the administrator so he can make the delegations. The agent never replaces human judgment — it produces a ranked recommendation list. The administrator reviews it and approves execution. It would be best if as many delegations as possible were bundled into as few transactions as possible.
+5. Next the agent examines the stake pool delegation for those stake pools which are listed to solicit delegation. The staking address of the delegators is identifed and used to open a channel of communication and a solicitation is made by the agent to stake with the Pool Ranger cooperative.
 
-The agent never replaces human judgment — it produces a ranked recommendation list. The
-administrator reviews it and approves execution.
+
 
 ---
+Right now we are just in the planing stages. 
+Let's talk about how to accomplish the goals above and modify the goals if required. Then please create a new document in the ranger/claude_queries folder that discuses our plan.
+The following are some thoughts from a previous conversation which can be used for inspiration but these do not need to be followed exactly. 
+Also please refer to ranger/SPO_REWARD_ANALYSIS_CHART.html and ranger/SPO_REWARD_ANALYSIS_CHART_COMPANION.md to see how pools are currently being analyzed.
 
-## Data Pulled Each Epoch (Blockfrost)
+
+
+## Data Pulled Each Epoch (Koios)
 
 For each candidate pool:
 
