@@ -1,13 +1,13 @@
 Pool Ranger Delegation Report — Epoch 627
 ============================================================
-Generated: 2026-04-25T18:57:05.032Z
+Generated: 2026-04-25T19:28:56.854Z
 r = 0.000310  |  S_sat ≈ 43.60 M ADA  |  Pool Ranger stake: 1.00 M ADA
 Available to deploy: 1.00 M ADA
 
 NEW CANDIDATES
 ------------------------------------------------------------
 Pool pool1gtphgrd...  [ADAFR]  P=3.03 M ADA, F=170 ADA, m=1.5%
-  Classification:    HAS_RED_ZONE — cursor PAST trough at 3.21 M ADA ext — in green zone
+  Classification:    HAS_RED_ZONE — cursor PAST trough at 3.23 M ADA ext — in green zone
   Performance:       100.0%  (20 valid epochs)
   Active stake:      55.97 M ADA  (Pool Ranger: 0.00 M ADA)
   Delegator ROA now: 1.72 %/yr
@@ -15,7 +15,7 @@ Pool pool1gtphgrd...  [ADAFR]  P=3.03 M ADA, F=170 ADA, m=1.5%
   Note:              No stake can be added without over-saturating the pool.
 
 Pool pool17ahr5yg...  [ST3AK]  P=2.79 M ADA, F=170 ADA, m=2.0%
-  Classification:    HAS_RED_ZONE — cursor PAST trough at 1.33 M ADA ext — in green zone
+  Classification:    HAS_RED_ZONE — cursor PAST trough at 1.35 M ADA ext — in green zone
   Performance:       100.0%  (20 valid epochs)
   Active stake:      61.75 M ADA  (Pool Ranger: 0.00 M ADA)
   Delegator ROA now: 1.71 %/yr
@@ -34,7 +34,7 @@ Pool pool1dmqzwuq...  [BNTY1]  P=1.00 M ADA, F=170 ADA, m=3.0%
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
   Active stake:      7.42 M ADA  (Pool Ranger: 0.00 M ADA)
-  Delegator ROA now: 1.59 %/yr
+  Delegator ROA now: 1.60 %/yr
   Proposed addition: 0.20 M ADA
   ROA after add:     1.60 %/yr
   Recommendation:    ADD 0.20 M ADA
