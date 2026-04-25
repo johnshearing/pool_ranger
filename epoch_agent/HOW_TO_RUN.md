@@ -51,12 +51,17 @@ evaluate. The bech32 format starts with `pool1...`.
 
 ```json
 {
+  "_comment": "Mainnet bech32 pool IDs (pool1...) to evaluate each epoch. Add pools here.",
+  "_lastUpdated": "2026-04-24",
+  "_howToFind": "Look up pool IDs on pool.pm, adapools.org, or Cardano Explorer.",
   "poolIds": [
     "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n",
     "pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy"
   ]
 }
 ```
+
+The `_comment`, `_lastUpdated`, and `_howToFind` fields are optional metadata — the agent only reads `poolIds`.
 
 Where to find pool IDs:
 - [pool.pm](https://pool.pm) — search by ticker, click a pool, copy the Pool ID
@@ -96,7 +101,8 @@ If you recently submitted delegation changes that haven't yet settled on-chain, 
 ```
 
 The agent auto-migrates settled entries (where `activeFromEpoch ≤ currentEpoch`) into
-`currentDelegations` on each run.
+`currentDelegations` on each run. Settled entries are also appended to `completedChanges`
+for a permanent audit trail — do not edit that field manually.
 
 ---
 
@@ -119,20 +125,35 @@ The report is printed to the terminal and also saved to:
 ranger/epoch_agent/reports/epoch_NNNN.txt
 ```
 
+What the agent does on each run, in order:
+1. Reads `candidate_pools.json` (pool IDs to evaluate)
+2. Reads `ranger_state.json` (current delegations, in-flight changes, total stake)
+3. Fetches the current epoch number and network active stake from Koios
+4. Settles any in-flight delegation changes that are now active on-chain
+5. Computes the live epoch rate `r` (average over the 5 most recent settled epochs)
+6. Fetches pool parameters for all candidates (one batched POST to Koios)
+7. Fetches up to 73 epochs of block and stake history per pool (parallel requests)
+8. Fetches network-wide epoch info for all epochs found in the pool histories
+9. Classifies each pool (ALL_GREEN / ALL_RED / HAS_RED_ZONE) and produces a recommendation
+10. Allocates available stake to DELEGATE-recommended pools using a greedy ROA-ranked strategy
+11. Formats and prints the report; saves it to `reports/epoch_NNNN.txt`
+12. Writes updated `ranger_state.json` (unless `--dry-run`)
+
 ---
 
 ## Step 4 — Read the report
 
-The report has these sections:
+The report has these sections, in order:
 
 | Section | What it means |
 |---|---|
 | **EXISTING DELEGATIONS** | Pools where Pool Ranger is currently delegating. Shows HOLD or WITHDRAW recommendations. |
 | **NEW CANDIDATES** | Pools from the candidate list not yet delegated to. Shows ADD recommendations, or explains why a qualifying pool is at saturation. |
-| **POOLS DROPPED** | Pools that passed safety classification but failed the 20-epoch 100% performance requirement. |
+| **POOLS AVOIDED** | Pools not currently delegated to where adding delegation would harm the SPO (ALL_RED) or where Pool Ranger cannot supply enough stake to clear the red zone (HAS_RED_ZONE — cannot clear). |
+| **POOLS DROPPED** | Pools that passed safety classification (ALL_GREEN) but failed the 20-epoch 100% performance requirement. |
 | **SOLICITATION CANDIDATES** | Pools where adding delegation would harm the SPO — delegators here would benefit from joining Pool Ranger. (Phase 2 — reporting only, no outreach yet.) |
 | **SUMMARY** | Count of adds, withdrawals, and any undeployed stake. Weighted ROA before and after. |
-| **NEXT STEPS** | Exact transactions to execute, with pool IDs and amounts. |
+| **NEXT STEPS** | Transactions to execute, with pool IDs and amounts. |
 
 ---
 
@@ -140,7 +161,8 @@ The report has these sections:
 
 If the report recommends changes you approve:
 
-1. Use `_delegate.mjs` to submit each ADD or WITHDRAW transaction.
+1. Submit each ADD or WITHDRAW transaction using your preferred Cardano wallet or CLI tool.
+   (`_delegate.mjs` is planned but not yet implemented — transaction submission is manual for now.)
 2. Record the submitted changes in `ranger_state.json → inFlightChanges` (see Step 2 format).
 
 Cardano delegation timing:
@@ -172,6 +194,9 @@ perf = actual blocks produced / expected blocks (based on stake fraction)
 ```
 
 Epochs where the pool had less than 0.5 expected blocks are excluded (too small to measure).
+Performance is capped at 1.0 — lucky over-production does not inflate the score.
+The agent fetches up to 73 epochs of pool history to supply the network epoch data needed
+for these calculations, but only the most recent 20 epochs count toward the performance score.
 
 ### Saturation
 
@@ -181,6 +206,19 @@ S_sat = total_network_active_stake / 500
 ```
 Pools at or above `S_sat` receive a **QUALIFIES — but at or above saturation** note.
 No stake is added — it would over-saturate the pool and reduce delegator ROA.
+
+### Allocation limits
+
+When distributing available stake across DELEGATE-recommended pools the allocator enforces
+two hard limits:
+
+- **20% concentration cap** — no more than 20% of the total available ADA is added to any
+  single pool.
+- **10,000 ADA minimum** — delegations smaller than 10,000 ADA are skipped (too small to
+  matter on-chain).
+
+Pools are ranked by their current delegator ROA (highest first) and filled greedily until
+the available stake is exhausted or all DELEGATE pools are at saturation.
 
 ### Epoch rate `r`
 
@@ -217,3 +255,7 @@ Without a key the public tier (~10 req/s) is sufficient for up to ~50 candidate 
 | `candidate_pools.json` | **Edit this** — list of pool IDs to evaluate |
 | `ranger_state.json` | **Edit this** — Pool Ranger's stake and delegation state |
 | `reports/` | One `.txt` report file per epoch run |
+
+**Not yet implemented:** `_delegate.mjs` (transaction submission helper) is referenced in
+the NEXT STEPS section of each report but has not been written yet. Until it exists, execute
+delegation transactions manually and record the changes in `ranger_state.json → inFlightChanges`.
