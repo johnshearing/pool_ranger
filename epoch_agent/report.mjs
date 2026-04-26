@@ -16,6 +16,11 @@ function line(char = '-', len = 60) {
   return char.repeat(len);
 }
 
+function beLabel(epochs) {
+  if (epochs === null) return 'n/a — no ROA gain expected';
+  return `${epochs} epochs (~${Math.round(epochs * 5)} days)`;
+}
+
 // formatReport — produces the full text report.
 //
 // reportData: {
@@ -23,9 +28,10 @@ function line(char = '-', len = 60) {
 //   r:                    number,
 //   sSat:                 number (ADA),
 //   rangerTotalStakeAda:  number,
-//   rangerAvailableAda:   number,
+//   rangerAvailableAda:   number (= globalBudget),
 //   classifications:      ClassificationResult[],
-//   allocation:           Map<poolId, { addAda, totalAfterAda, roaAtTotal }>,
+//   allocation:           Map<poolId, GlobalAllocationEntry>,
+//   forcedWithdrawals:    ClassificationResult[] (unsafe pools — ALL_RED or unclearable),
 //   weightedRoaBefore:    number,
 //   weightedRoaAfter:     number,
 //   generatedAt:          string (ISO),
@@ -39,72 +45,160 @@ export function formatReport(reportData) {
     rangerTotalStakeAda, rangerAvailableAda,
     classifications,
     allocation,
+    forcedWithdrawals = [],
     weightedRoaBefore, weightedRoaAfter,
     generatedAt,
     undeployedAda,
   } = reportData;
 
   const lines = [];
-
   const push  = (...ss) => ss.forEach(s => lines.push(s));
   const blank = ()      => lines.push('');
+
+  // Build lookup map: poolId → ClassificationResult
+  const classMap = new Map(classifications.map(c => [c.poolId, c]));
+
+  // Partition allocation entries
+  const existingEntries = []; // currently delegated (currentAda > 0)
+  const newEntries      = []; // ADD_NEW (not previously delegated)
+
+  for (const [poolId, entry] of allocation) {
+    const c = classMap.get(poolId);
+    if (!c) continue;
+    if (entry.currentAda > 0) {
+      existingEntries.push({ c, entry });
+    } else if (entry.moveType === 'ADD_NEW') {
+      newEntries.push({ c, entry });
+    }
+  }
+
+  // Sort existing: HOLD first, ADD_MORE, REDUCE, WITHDRAW
+  const moveOrder = { HOLD: 0, ADD_MORE: 1, REDUCE: 2, WITHDRAW: 3 };
+  existingEntries.sort((a, b) =>
+    (moveOrder[a.entry.moveType] ?? 4) - (moveOrder[b.entry.moveType] ?? 4)
+  );
+
+  const rebalanceMoves = existingEntries.filter(
+    ({ entry }) => entry.moveType === 'REDUCE' || entry.moveType === 'WITHDRAW'
+  );
+
+  // DELEGATE pools that qualified but received no stake (saturated or budget exhausted)
+  const allocatedIds = new Set(allocation.keys());
+  const forcedIds    = new Set(forcedWithdrawals.map(c => c.poolId));
+  const unfunded     = classifications.filter(
+    c => c.recommendation === Rec.DELEGATE && !allocatedIds.has(c.poolId) && !forcedIds.has(c.poolId)
+  );
+
+  // AVOID pools (not currently delegated, not safe to start)
+  const avoids = classifications.filter(
+    c => c.recommendation === Rec.AVOID && !allocatedIds.has(c.poolId) && !forcedIds.has(c.poolId)
+  );
+  const avoidSafety = avoids.filter(c =>
+    c.classType === ClassType.ALL_RED ||
+    (c.classType === ClassType.HAS_RED_ZONE && !c.canClearTrough && !c.cursorPastTrough)
+  );
+  const perfFailed = avoids.filter(c => c.classType === ClassType.ALL_GREEN && !c.perfPasses);
+
+  // Solicitation candidates sorted by lowest ROA (most harmed first)
+  const solicit = classifications.filter(c => c.solicitCandidate)
+    .sort((a, b) => a.roaAtCurrent - b.roaAtCurrent);
 
   // ── Header ────────────────────────────────────────────────────────────────
   push(`Pool Ranger Delegation Report — Epoch ${epochNo}`);
   push(line('='));
   push(`Generated: ${generatedAt}`);
   push(`r = ${r.toFixed(6)}  |  S_sat ≈ ${ada(sSat)}  |  Pool Ranger stake: ${ada(rangerTotalStakeAda)}`);
-  push(`Available to deploy: ${ada(rangerAvailableAda)}`);
+  push(`Global budget (total stake minus in-flight): ${ada(rangerAvailableAda)}`);
   blank();
 
-  // Split classifications by recommendation
-  const holding    = classifications.filter(c => c.recommendation === Rec.HOLD);
-  const withdraws  = classifications.filter(c => c.recommendation === Rec.WITHDRAW);
-  const delegates  = classifications.filter(c => c.recommendation === Rec.DELEGATE);
-  const avoids     = classifications.filter(c => c.recommendation === Rec.AVOID);
-  const perfFailed = classifications.filter(c =>
-    c.recommendation === Rec.AVOID && c.classType === ClassType.ALL_GREEN && !c.perfPasses
-  );
-  const solicit    = classifications.filter(c => c.solicitCandidate)
-    .sort((a, b) => a.roaAtCurrent - b.roaAtCurrent);
-
-  // ── Existing Delegations (HOLD + WITHDRAW) ────────────────────────────────
-  const existing = [...holding, ...withdraws];
-  if (existing.length > 0) {
+  // ── Existing Delegations ──────────────────────────────────────────────────
+  const existingTotal = existingEntries.length + forcedWithdrawals.length;
+  if (existingTotal > 0) {
     push('EXISTING DELEGATIONS');
     push(line());
-    for (const c of existing) {
-      push(formatPool(c, allocation));
+    for (const { c, entry } of existingEntries) {
+      push(formatPool(c, entry));
+      blank();
+    }
+    for (const c of forcedWithdrawals) {
+      push(formatForcedWithdrawal(c));
       blank();
     }
   }
 
-  // ── New Candidates (DELEGATE) ─────────────────────────────────────────────
-  if (delegates.length > 0) {
+  // ── Rebalancing Moves ─────────────────────────────────────────────────────
+  if (rebalanceMoves.length > 0) {
+    push('REBALANCING MOVES  (epoch-agent recommends; administrator decides)');
+    push(line('='));
+    blank();
+
+    let totalChurn = 0;
+    let totalMoved = 0;
+    let weightedBE = 0;
+
+    for (const { c, entry } of rebalanceMoves) {
+      const label    = c.ticker ? `[${c.ticker}]` : '';
+      const movedAda = Math.abs(entry.netChangeAda);
+      totalChurn    += entry.churnCostAda;
+      totalMoved    += movedAda;
+      if (entry.breakEvenEpochs !== null) weightedBE += movedAda * entry.breakEvenEpochs;
+
+      push(`  Pool ${c.poolId.slice(0, 12)}... ${label}`);
+      push(`    Current delegation : ${ada(entry.currentAda)}  @  ${pct(entry.roaAtCurrent)}`);
+      if (entry.moveType === 'REDUCE') {
+        push(`    Proposed           : ${ada(entry.proposedAda)}  @  ${pct(entry.roaAtProposed)}  (REDUCE)`);
+      } else {
+        push(`    Proposed           : 0 ADA  (WITHDRAW — optimizer found higher-ROA opportunities)`);
+      }
+      push(`    Freed stake        : ${ada(movedAda)}  → redeployed to higher-ROA pools`);
+      push(`    Churn cost         : ${entry.churnCostAda.toFixed(0)} ADA  (2 missed epochs on moved amount)`);
+      push(`    Break-even         : ${beLabel(entry.breakEvenEpochs)}`);
+      blank();
+    }
+
+    const avgBE = totalMoved > 0 && weightedBE > 0
+      ? Math.round(weightedBE / totalMoved)
+      : null;
+    push(`  Totals — Churn cost: ${totalChurn.toFixed(0)} ADA` +
+         (avgBE !== null ? `  |  Avg break-even: ${avgBE} epochs (~${Math.round(avgBE * 5)} days)` : ''));
+    blank();
+    push('  ⚠ WARNING: If any member joined within the last 2 epochs, their churn cost is');
+    push('    doubled (4 missed epochs instead of 2). Per-member tracking not yet implemented.');
+    blank();
+  }
+
+  // ── New Candidates ────────────────────────────────────────────────────────
+  if (newEntries.length > 0 || unfunded.length > 0) {
     push('NEW CANDIDATES');
     push(line());
-    for (const c of delegates) {
-      push(formatPool(c, allocation));
+    for (const { c, entry } of newEntries) {
+      push(formatPool(c, entry));
+      blank();
+    }
+    for (const c of unfunded) {
+      const label     = c.ticker ? `[${c.ticker}]` : '';
+      const saturated = c.activeStakeAda >= sSat;
+      push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+      push(`  Classification:    ${describeClass(c)}`);
+      push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
+      push(`  Active stake:      ${ada(c.activeStakeAda)}`);
+      push(`  Delegator ROA now: ${pct(c.roaAtCurrent)}`);
+      push(`  Recommendation:    QUALIFIES — ${saturated ? 'at or above saturation — no stake can be added' : 'budget exhausted this epoch'}`);
       blank();
     }
   }
 
-  // ── Avoid (not currently delegating, not safe to start) ──────────────────
-  const avoidNonPerf = avoids.filter(c => c.classType !== ClassType.ALL_GREEN || c.perfPasses === false);
-  const avoidSafety  = avoids.filter(c =>
-    (c.classType === ClassType.ALL_RED) ||
-    (c.classType === ClassType.HAS_RED_ZONE && !c.canClearTrough && !c.cursorPastTrough)
-  );
+  // ── Pools Avoided (safety reasons) ───────────────────────────────────────
   if (avoidSafety.length > 0) {
     push('POOLS AVOIDED (delegation would harm SPO or cannot clear trough)');
     push(line());
     for (const c of avoidSafety) {
-      push(formatPool(c, allocation));
+      push(formatPool(c, undefined));
       blank();
     }
   }
 
-  // ── Performance failures ──────────────────────────────────────────────────
+  // ── Performance Failures ──────────────────────────────────────────────────
   if (perfFailed.length > 0) {
     push('POOLS DROPPED (failed 20-epoch performance filter)');
     push(line());
@@ -117,7 +211,7 @@ export function formatReport(reportData) {
     blank();
   }
 
-  // ── Solicitation Candidates (Phase 2 stub) ────────────────────────────────
+  // ── Solicitation Candidates ───────────────────────────────────────────────
   push('SOLICITATION CANDIDATES  (Phase 2 — outreach not yet implemented)');
   push(line());
   if (solicit.length === 0) {
@@ -144,18 +238,32 @@ export function formatReport(reportData) {
   push('SUMMARY');
   push(line());
 
-  const withdrawCount   = withdraws.length;
-  const withdrawAda     = withdraws.reduce((s, c) => s + c.rangerCurrentStake, 0);
-  const addCount        = allocation.size;
-  const addAda          = [...allocation.values()].reduce((s, e) => s + e.addAda, 0);
-  const qualifyNoRoom   = delegates.filter(c => !allocation.has(c.poolId)).length;
+  const forcedWdCount  = forcedWithdrawals.length;
+  const forcedWdAda    = forcedWithdrawals.reduce((s, c) => s + c.rangerCurrentStake, 0);
+  const rebalCount     = rebalanceMoves.length;
+  const rebalMovedAda  = rebalanceMoves.reduce((s, { entry }) => s + Math.abs(entry.netChangeAda), 0);
+  const totalChurnAda  = rebalanceMoves.reduce((s, { entry }) => s + entry.churnCostAda, 0);
+  const addMoreEntries = existingEntries.filter(({ entry }) => entry.moveType === 'ADD_MORE');
+  const addMoreAda     = addMoreEntries.reduce((s, { entry }) => s + entry.netChangeAda, 0);
+  const addNewCount    = newEntries.length;
+  const addNewAda      = newEntries.reduce((s, { entry }) => s + entry.proposedAda, 0);
+  const qualifyNoRoom  = unfunded.length;
 
-  push(`Withdrawals:       ${withdrawCount} pool(s) — ${ada(withdrawAda)} freed`);
-  push(`New delegations:   ${addCount} pool(s) — ${ada(addAda)} added`);
-  if (qualifyNoRoom > 0) {
-    push(`Qualifies/saturated: ${qualifyNoRoom} pool(s) qualify but are at or above saturation — no stake added`);
+  if (forcedWdCount > 0) {
+    push(`Forced withdrawals:  ${forcedWdCount} pool(s) — ${ada(forcedWdAda)} freed  (unsafe pools)`);
   }
-  push(`Undeployed:        ${ada(undeployedAda)} (remaining after allocation)`);
+  if (rebalCount > 0) {
+    push(`Rebalancing moves:   ${rebalCount} pool(s) — ${ada(rebalMovedAda)} redistributed`);
+    push(`Churn cost:          ${totalChurnAda.toFixed(0)} ADA  (2 missed epochs on moved stake)`);
+  }
+  if (addMoreEntries.length > 0) {
+    push(`Increases:           ${addMoreEntries.length} existing pool(s) — ${ada(addMoreAda)} added`);
+  }
+  push(`New delegations:     ${addNewCount} pool(s) — ${ada(addNewAda)} to new pools`);
+  if (qualifyNoRoom > 0) {
+    push(`Qualifies/unfunded:  ${qualifyNoRoom} pool(s) qualify but received no stake this epoch`);
+  }
+  push(`Undeployed:          ${ada(undeployedAda)} (remaining after all allocations)`);
   blank();
 
   if (weightedRoaBefore > 0 || weightedRoaAfter > 0) {
@@ -174,28 +282,47 @@ export function formatReport(reportData) {
   push(line());
   push('1. Review the recommendations above.');
 
-  if (withdraws.length > 0) {
-    push('2. Execute WITHDRAW transactions via _delegate.mjs for:');
-    for (const c of withdraws) {
+  let step = 2;
+
+  if (forcedWdCount > 0) {
+    push(`${step}. Execute WITHDRAW transactions (unsafe pools) via _delegate.mjs for:`);
+    for (const c of forcedWithdrawals) {
       const label = c.ticker ? `[${c.ticker}]` : '';
       push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — withdraw ${ada(c.rangerCurrentStake)}`);
     }
+    step++;
   }
 
-  if (delegates.length > 0) {
-    const step = withdraws.length > 0 ? '3' : '2';
-    push(`${step}. Execute ADD transactions via _delegate.mjs for:`);
-    for (const [poolId, entry] of allocation) {
-      const c     = classifications.find(x => x.poolId === poolId);
-      const label = c?.ticker ? `[${c.ticker}]` : '';
-      push(`     Pool ${poolId.slice(0, 12)}... ${label} — add ${ada(entry.addAda)}`);
+  if (rebalCount > 0) {
+    push(`${step}. Review REBALANCING MOVES above. For each approved move, execute via _delegate.mjs:`);
+    for (const { c, entry } of rebalanceMoves) {
+      const label = c.ticker ? `[${c.ticker}]` : '';
+      if (entry.moveType === 'WITHDRAW') {
+        push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — withdraw ${ada(entry.currentAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
+      } else {
+        push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — reduce to ${ada(entry.proposedAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
+      }
     }
+    step++;
   }
 
-  const n = (withdraws.length > 0 ? 1 : 0) + (delegates.length > 0 ? 1 : 0) + 2;
-  push(`${n}. After submitting, record each change in ranger_state.json → inFlightChanges.`);
-  push(`${n + 1}. Delegation changes take effect at epoch ${epochNo + 2} (rewards from epoch ${epochNo + 3}).`);
-  push(`${n + 2}. Run this agent next epoch to track progress.`);
+  const hasAdds = addMoreEntries.length > 0 || newEntries.length > 0;
+  if (hasAdds) {
+    push(`${step}. Execute ADD/INCREASE transactions via _delegate.mjs for:`);
+    for (const { c, entry } of addMoreEntries) {
+      const label = c.ticker ? `[${c.ticker}]` : '';
+      push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — increase by ${ada(entry.netChangeAda)} to ${ada(entry.proposedAda)}`);
+    }
+    for (const { c, entry } of newEntries) {
+      const label = c.ticker ? `[${c.ticker}]` : '';
+      push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — add ${ada(entry.proposedAda)}`);
+    }
+    step++;
+  }
+
+  push(`${step}. After submitting, record each change in ranger_state.json → inFlightChanges.`);
+  push(`${step + 1}. Delegation changes take effect at epoch ${epochNo + 2} (rewards from epoch ${epochNo + 3}).`);
+  push(`${step + 2}. Run this agent next epoch to track progress.`);
   blank();
 
   push('NOTE: Solicitation (Phase 2) not yet implemented.');
@@ -204,11 +331,13 @@ export function formatReport(reportData) {
   return lines.join('\n');
 }
 
-// Internal helper — formats a single pool section.
-function formatPool(c, allocation) {
-  const label      = c.ticker ? `[${c.ticker}]` : '';
-  const alloc      = allocation.get(c.poolId);
-  const parts      = [];
+// ── Pool formatters ────────────────────────────────────────────────────────
+
+// formatPool — formats a single pool section.
+// entry: GlobalAllocationEntry from globalAllocateWithR, or undefined for AVOID pools.
+function formatPool(c, entry) {
+  const label = c.ticker ? `[${c.ticker}]` : '';
+  const parts = [];
 
   parts.push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
   parts.push(`  Classification:    ${describeClass(c)}`);
@@ -216,23 +345,8 @@ function formatPool(c, allocation) {
   parts.push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
   parts.push(`  Delegator ROA now: ${pct(c.roaAtCurrent)}`);
 
-  if (c.recommendation === Rec.HOLD) {
-    parts.push(`  Recommendation:    HOLD`);
-  } else if (c.recommendation === Rec.WITHDRAW) {
-    parts.push(`  Recommendation:    WITHDRAW ${ada(c.rangerCurrentStake)}`);
-    if (c.classType === ClassType.ALL_RED) {
-      parts.push(`  Note:              m=0% — SPO earns less with every delegator. Withdrawing helps the SPO.`);
-    } else {
-      parts.push(`  Note:              Cursor before trough — withdrawing reduces harm to SPO.`);
-    }
-  } else if (c.recommendation === Rec.DELEGATE && alloc) {
-    parts.push(`  Proposed addition: ${ada(alloc.addAda)}`);
-    parts.push(`  ROA after add:     ${pct(alloc.roaAtTotal)}`);
-    parts.push(`  Recommendation:    ADD ${ada(alloc.addAda)}`);
-  } else if (c.recommendation === Rec.DELEGATE && !alloc) {
-    parts.push(`  Recommendation:    QUALIFIES — but at or above saturation (${ada(c.activeStakeAda)} ≥ S_sat)`);
-    parts.push(`  Note:              No stake can be added without over-saturating the pool.`);
-  } else if (c.recommendation === Rec.AVOID) {
+  if (!entry) {
+    // AVOID pool — show reason
     parts.push(`  Recommendation:    AVOID`);
     if (!c.perfPasses) {
       parts.push(`  Reason:            Performance ${(c.perf * 100).toFixed(1)}% < 100% (last 20 epochs)`);
@@ -241,6 +355,60 @@ function formatPool(c, allocation) {
     } else if (c.classType === ClassType.HAS_RED_ZONE && !c.canClearTrough) {
       parts.push(`  Reason:            Before trough (${ada(c.troughExtAda)}) — insufficient stake to clear`);
     }
+    return parts.join('\n');
+  }
+
+  switch (entry.moveType) {
+    case 'HOLD':
+      parts.push(`  Allocation:        ${ada(entry.currentAda)}  (no change)`);
+      parts.push(`  Recommendation:    HOLD`);
+      break;
+
+    case 'ADD_NEW':
+      parts.push(`  Current:           0 ADA  (new candidate)`);
+      parts.push(`  Proposed:          ${ada(entry.proposedAda)}  @  ${pct(entry.roaAtProposed)}`);
+      parts.push(`  Recommendation:    ADD  ${ada(entry.proposedAda)}`);
+      break;
+
+    case 'ADD_MORE':
+      parts.push(`  Current:           ${ada(entry.currentAda)}  @  ${pct(entry.roaAtCurrent)}`);
+      parts.push(`  Proposed:          ${ada(entry.proposedAda)}  @  ${pct(entry.roaAtProposed)}`);
+      parts.push(`  Recommendation:    ADD MORE  (+${ada(entry.netChangeAda)})`);
+      break;
+
+    case 'REDUCE':
+      parts.push(`  Current:           ${ada(entry.currentAda)}  @  ${pct(entry.roaAtCurrent)}`);
+      parts.push(`  Proposed:          ${ada(entry.proposedAda)}  @  ${pct(entry.roaAtProposed)}`);
+      parts.push(`  Recommendation:    REDUCE  (−${ada(Math.abs(entry.netChangeAda))})`);
+      parts.push(`  Churn cost:        ${entry.churnCostAda.toFixed(0)} ADA  |  Break-even: ${beLabel(entry.breakEvenEpochs)}`);
+      break;
+
+    case 'WITHDRAW':
+      parts.push(`  Current:           ${ada(entry.currentAda)}  @  ${pct(entry.roaAtCurrent)}`);
+      parts.push(`  Proposed:          0 ADA  (optimizer found higher-ROA opportunities elsewhere)`);
+      parts.push(`  Recommendation:    WITHDRAW  (−${ada(entry.currentAda)})`);
+      parts.push(`  Churn cost:        ${entry.churnCostAda.toFixed(0)} ADA  |  Break-even: ${beLabel(entry.breakEvenEpochs)}`);
+      break;
+  }
+
+  return parts.join('\n');
+}
+
+// formatForcedWithdrawal — formats an unsafe pool being exited (ALL_RED or unclearable).
+function formatForcedWithdrawal(c) {
+  const label = c.ticker ? `[${c.ticker}]` : '';
+  const parts = [];
+
+  parts.push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+  parts.push(`  Classification:    ${describeClass(c)}`);
+  parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
+  parts.push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
+  parts.push(`  Delegator ROA now: ${pct(c.roaAtCurrent)}`);
+  parts.push(`  Recommendation:    WITHDRAW ${ada(c.rangerCurrentStake)}  [UNSAFE POOL]`);
+  if (c.classType === ClassType.ALL_RED) {
+    parts.push(`  Note:              m=0% — SPO earns less with every delegator. Withdrawing helps the SPO.`);
+  } else {
+    parts.push(`  Note:              Cursor before trough — cannot clear with available stake. Withdrawing reduces harm.`);
   }
 
   return parts.join('\n');

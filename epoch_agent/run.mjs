@@ -21,7 +21,7 @@ import { fileURLToPath } from 'url';
 import { fetchPoolsInfo, fetchPoolHistory, fetchEpochInfo,
          fetchCurrentEpoch, fetchRecentR } from './koios.mjs';
 import { classifyPool, Rec } from './classify.mjs';
-import { allocateWithR } from './allocate.mjs';
+import { globalAllocateWithR } from './allocate.mjs';
 import { formatReport } from './report.mjs';
 import { delegROA, computeSsat } from './math.mjs';
 
@@ -194,14 +194,19 @@ async function main() {
     classifications.push(result);
   }
 
-  // 10. Process withdrawals first — free up stake
-  const withdrawals    = classifications.filter(c => c.recommendation === Rec.WITHDRAW);
-  const freedStake     = withdrawals.reduce((s, c) => s + c.rangerCurrentStake, 0);
-  const availableAfterWithdrawals = rangerAvailableAda + freedStake;
+  // 10. Forced withdrawals — unsafe pools (ALL_RED or unclearable HAS_RED_ZONE)
+  const forcedWithdrawals = classifications.filter(c => c.recommendation === Rec.WITHDRAW);
 
-  // 11. Allocate stake to DELEGATE candidates
-  const delegateCandidates = classifications.filter(c => c.recommendation === Rec.DELEGATE);
-  const allocation = allocateWithR(delegateCandidates, availableAfterWithdrawals, sSat, r);
+  // 11. Global allocation — all safe pools compete for Pool Ranger's full stake.
+  // HOLD and DELEGATE pools are treated identically: every safe pool is re-evaluated
+  // each epoch so stake naturally flows toward better opportunities.
+  const safePools    = classifications.filter(
+    c => c.recommendation === Rec.DELEGATE || c.recommendation === Rec.HOLD
+  );
+  // Budget = total member stake minus in-flight ADDs (those are already committed to
+  // specific pools and must not be double-counted).
+  const globalBudget = Math.max(0, state.totalMemberStakeAda - pendingStake);
+  const allocation   = globalAllocateWithR(safePools, globalBudget, sSat, r);
 
   // 12. Compute weighted ROA before and after changes
   const roaBefore = new Map();
@@ -211,19 +216,18 @@ async function main() {
     if (c.rangerCurrentStake > 0) {
       roaBefore.set(c.poolId, { stakeAda: c.rangerCurrentStake, roaPct: c.roaAtCurrent });
     }
-    const alloc = allocation.get(c.poolId);
-    if (c.recommendation === Rec.HOLD) {
-      roaAfter.set(c.poolId, { stakeAda: c.rangerCurrentStake, roaPct: c.roaAtCurrent });
-    } else if (alloc) {
-      roaAfter.set(c.poolId, { stakeAda: alloc.addAda, roaPct: alloc.roaAtTotal });
+  }
+  for (const [poolId, entry] of allocation) {
+    if (entry.proposedAda > 0) {
+      roaAfter.set(poolId, { stakeAda: entry.proposedAda, roaPct: entry.roaAtProposed });
     }
   }
   const weightedRoaBefore = computeWeightedRoa(roaBefore);
   const weightedRoaAfter  = computeWeightedRoa(roaAfter);
 
   // 13. Compute undeployed ADA
-  const totalAllocated = [...allocation.values()].reduce((s, e) => s + e.addAda, 0);
-  const undeployedAda  = Math.max(0, availableAfterWithdrawals - totalAllocated);
+  const totalAllocated = [...allocation.values()].reduce((s, e) => s + e.proposedAda, 0);
+  const undeployedAda  = Math.max(0, globalBudget - totalAllocated);
 
   // 14. Format and output report
   const generatedAt = new Date().toISOString();
@@ -232,9 +236,10 @@ async function main() {
     r,
     sSat,
     rangerTotalStakeAda: state.totalMemberStakeAda,
-    rangerAvailableAda: availableAfterWithdrawals,
+    rangerAvailableAda: globalBudget,
     classifications,
     allocation,
+    forcedWithdrawals,
     weightedRoaBefore,
     weightedRoaAfter,
     generatedAt,

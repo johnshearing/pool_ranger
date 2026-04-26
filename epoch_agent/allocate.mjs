@@ -73,6 +73,7 @@ export function allocate(delegateCandidates, totalAvailableAda, sSat, config = {
 // config: optional overrides
 //
 // Returns: Map<poolId, AllocationEntry>
+// NOTE: This function is kept for reference. run.mjs now uses globalAllocateWithR.
 export function allocateWithR(delegateCandidates, totalAvailableAda, sSat, r, config = {}) {
   const maxConcentrationFrac = config.maxConcentrationFrac ?? DEFAULT_MAX_CONCENTRATION;
   const minMeaningfulAda     = config.minMeaningfulAda     ?? DEFAULT_MIN_MEANINGFUL;
@@ -105,6 +106,130 @@ export function allocateWithR(delegateCandidates, totalAvailableAda, sSat, r, co
 
     result.set(poolId, { addAda: maxAdd, totalAfterAda, roaAtTotal });
     remaining -= maxAdd;
+  }
+
+  return result;
+}
+
+// globalAllocateWithR — global optimizer that re-evaluates ALL currently-delegated pools
+// alongside new candidates each epoch, treating the full member stake as one unified pool.
+// Every safe pool (HOLD or DELEGATE recommendation) competes for the full budget.
+//
+// safePools: ClassificationResult[] where recommendation is DELEGATE or HOLD
+// totalBudget: ADA to redistribute (totalMemberStakeAda - pendingInFlightAdds)
+// sSat: saturation point in ADA
+// r: epoch rate
+// config: optional overrides for concentration and minimum thresholds
+//
+// Returns: Map<poolId, GlobalAllocationEntry>
+//   GlobalAllocationEntry: {
+//     proposedAda,     // ADA Pool Ranger should have at this pool after the change
+//     currentAda,      // ADA Pool Ranger currently has at this pool
+//     netChangeAda,    // proposedAda - currentAda
+//     roaAtProposed,   // delegROA at proposed total pool stake
+//     roaAtCurrent,    // delegROA at current total pool stake
+//     churnCostAda,    // 2 missed epochs of rewards on the moved amount (only when reducing)
+//     breakEvenEpochs, // epochs until ROA gain repays churn cost (null if no gain)
+//     moveType,        // 'HOLD' | 'ADD_NEW' | 'ADD_MORE' | 'REDUCE' | 'WITHDRAW'
+//   }
+export function globalAllocateWithR(safePools, totalBudget, sSat, r, config = {}) {
+  const maxConcentrationFrac = config.maxConcentrationFrac ?? DEFAULT_MAX_CONCENTRATION;
+  const minMeaningfulAda     = config.minMeaningfulAda     ?? DEFAULT_MIN_MEANINGFUL;
+  const result               = new Map();
+
+  if (safePools.length === 0) return result;
+
+  // Sort by ROA at current stake (descending) — greedy rank
+  const ranked  = [...safePools].sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
+  const proposed = new Map(); // poolId → proposedAda
+  let remaining  = Math.max(0, totalBudget);
+
+  // ── Step 1: greedy fill ────────────────────────────────────────────────────
+  for (const pool of ranked) {
+    if (remaining < minMeaningfulAda) break;
+
+    const { poolId, activeStakeAda } = pool;
+    const roomToSat = Math.max(0, sSat - activeStakeAda);
+    if (roomToSat < minMeaningfulAda) continue;
+
+    const maxAdd = Math.min(
+      roomToSat,
+      totalBudget * maxConcentrationFrac,
+      remaining,
+    );
+    if (maxAdd < minMeaningfulAda) continue;
+
+    proposed.set(poolId, maxAdd);
+    remaining -= maxAdd;
+  }
+
+  // ── Step 2: destination ROA (weighted avg of pools receiving stake) ────────
+  // Used as the "newROA" benchmark when computing break-even for reductions.
+  let totalReceived   = 0;
+  let weightedDestRoa = 0;
+  for (const pool of safePools) {
+    const allocAda = proposed.get(pool.poolId) ?? 0;
+    if (allocAda === 0) continue;
+    const { pledgeAda: P, fixedCostAda: F, margin: m,
+            activeStakeAda, perf, rangerCurrentStake } = pool;
+    const newS = activeStakeAda - rangerCurrentStake + allocAda;
+    const roa  = delegROA(newS, P, F, m, r, perf);
+    totalReceived   += allocAda;
+    weightedDestRoa += allocAda * roa;
+  }
+  const avgDestRoa = totalReceived > 0 ? weightedDestRoa / totalReceived : 0;
+
+  // ── Step 3: build result with diffs and churn costs ───────────────────────
+  for (const pool of safePools) {
+    const { poolId, pledgeAda: P, fixedCostAda: F, margin: m,
+            activeStakeAda, perf,
+            rangerCurrentStake: currentAda,
+            roaAtCurrent } = pool;
+
+    const proposedAda = proposed.get(poolId) ?? 0;
+    if (currentAda === 0 && proposedAda === 0) continue; // unfunded new candidate — omit
+
+    const netChangeAda  = proposedAda - currentAda;
+    const newS          = activeStakeAda - currentAda + proposedAda;
+    const roaAtProposed = delegROA(newS, P, F, m, r, perf);
+
+    // Determine move type
+    let moveType;
+    if (Math.abs(netChangeAda) < minMeaningfulAda) {
+      moveType = 'HOLD';
+    } else if (currentAda === 0) {
+      moveType = 'ADD_NEW';
+    } else if (proposedAda > currentAda) {
+      moveType = 'ADD_MORE';
+    } else if (proposedAda > 0) {
+      moveType = 'REDUCE';
+    } else {
+      moveType = 'WITHDRAW';
+    }
+
+    // Churn cost — 2 missed epochs on the stake being moved away.
+    // Break-even formula: 2 × oldROA / (avgDestROA - oldROA) epochs.
+    let churnCostAda    = 0;
+    let breakEvenEpochs = null;
+    if (netChangeAda < -(minMeaningfulAda) && currentAda > 0) {
+      const movedAda = Math.abs(netChangeAda);
+      churnCostAda   = 2 * movedAda * (roaAtCurrent / 73 / 100);
+      const roaDiff  = avgDestRoa - roaAtCurrent;
+      if (roaDiff > 0) {
+        breakEvenEpochs = Math.ceil(2 * roaAtCurrent / roaDiff);
+      }
+    }
+
+    result.set(poolId, {
+      proposedAda,
+      currentAda,
+      netChangeAda,
+      roaAtProposed,
+      roaAtCurrent,
+      churnCostAda,
+      breakEvenEpochs,
+      moveType,
+    });
   }
 
   return result;
