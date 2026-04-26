@@ -7,6 +7,7 @@
   "_currentDelegationsExample": {
     "_note": "After the admin submits the epoch-629 delegation tx and it settles, this is what currentDelegations looks like.",
     "pool1dmqzwuql5mylffvn7ln3pr9j7kh4gdsssrmma5wgx56f6rtyf42": {
+      "ticker": "BNTY1",
       "stakeAda": 200000,
       "delegatedAtEpoch": 627,
       "activeFromEpoch": 629

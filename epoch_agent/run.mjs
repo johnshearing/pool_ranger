@@ -70,6 +70,7 @@ function settleInFlight(state, currentEpoch) {
       if (change.changeType === 'ADD') {
         const existing = state.currentDelegations[change.poolId];
         state.currentDelegations[change.poolId] = {
+          ticker:            change.ticker ?? existing?.ticker,
           stakeAda:          (existing?.stakeAda ?? 0) + change.stakeAda,
           delegatedAtEpoch:  existing?.delegatedAtEpoch ?? change.submittedAtEpoch,
           activeFromEpoch:   change.activeFromEpoch,

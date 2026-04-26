@@ -143,7 +143,7 @@ export function formatReport(reportData) {
       totalMoved    += movedAda;
       if (entry.breakEvenEpochs !== null) weightedBE += movedAda * entry.breakEvenEpochs;
 
-      push(`  Pool ${c.poolId.slice(0, 12)}... ${label}`);
+      push(`  ${label}`);
       push(`    Full ID:            ${c.poolId}`);
       push(`    Current delegation : ${ada(entry.currentAda)}  @  ${pct(entry.roaAtCurrent)}`);
       if (entry.moveType === 'REDUCE') {
@@ -179,7 +179,7 @@ export function formatReport(reportData) {
     for (const c of unfunded) {
       const label     = c.ticker ? `[${c.ticker}]` : '';
       const saturated = c.activeStakeAda >= sSat;
-      push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+      push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
       push(`  Full ID:           ${c.poolId}`);
       push(`  Classification:    ${describeClass(c)}`);
       push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
@@ -206,7 +206,7 @@ export function formatReport(reportData) {
     push(line());
     for (const c of perfFailed) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`  Pool ${c.poolId.slice(0, 12)}... ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda}, m=${(c.margin*100).toFixed(1)}%`);
+      push(`  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda}, m=${(c.margin*100).toFixed(1)}%`);
       push(`    Full ID:     ${c.poolId}`);
       push(`    Performance: ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs checked)`);
       push(`    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility`);
@@ -225,7 +225,7 @@ export function formatReport(reportData) {
     blank();
     for (const c of solicit) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`  Pool ${c.poolId.slice(0, 12)}... ${label}`);
+      push(`  ${label}`);
       push(`    Full ID:        ${c.poolId}`);
       push(`    Classification: ${c.classType}`);
       push(`    Delegator ROA: ${pct(c.roaAtCurrent)}`);
@@ -292,7 +292,7 @@ export function formatReport(reportData) {
     push(`${step}. Execute WITHDRAW transactions (unsafe pools) via _delegate.mjs for:`);
     for (const c of forcedWithdrawals) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — withdraw ${ada(c.rangerCurrentStake)}`);
+      push(`     ${label} — withdraw ${ada(c.rangerCurrentStake)}`);
     }
     step++;
   }
@@ -302,9 +302,9 @@ export function formatReport(reportData) {
     for (const { c, entry } of rebalanceMoves) {
       const label = c.ticker ? `[${c.ticker}]` : '';
       if (entry.moveType === 'WITHDRAW') {
-        push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — withdraw ${ada(entry.currentAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
+        push(`     ${label} — withdraw ${ada(entry.currentAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
       } else {
-        push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — reduce to ${ada(entry.proposedAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
+        push(`     ${label} — reduce to ${ada(entry.proposedAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
       }
     }
     step++;
@@ -315,11 +315,11 @@ export function formatReport(reportData) {
     push(`${step}. Execute ADD/INCREASE transactions via _delegate.mjs for:`);
     for (const { c, entry } of addMoreEntries) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — increase by ${ada(entry.netChangeAda)} to ${ada(entry.proposedAda)}`);
+      push(`     ${label} — increase by ${ada(entry.netChangeAda)} to ${ada(entry.proposedAda)}`);
     }
     for (const { c, entry } of newEntries) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`     Pool ${c.poolId.slice(0, 12)}... ${label} — add ${ada(entry.proposedAda)}`);
+      push(`     ${label} — add ${ada(entry.proposedAda)}`);
     }
     step++;
   }
@@ -343,7 +343,7 @@ function formatPool(c, entry) {
   const label = c.ticker ? `[${c.ticker}]` : '';
   const parts = [];
 
-  parts.push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+  parts.push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
   parts.push(`  Full ID:           ${c.poolId}`);
   parts.push(`  Classification:    ${describeClass(c)}`);
   parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
@@ -404,7 +404,7 @@ function formatForcedWithdrawal(c) {
   const label = c.ticker ? `[${c.ticker}]` : '';
   const parts = [];
 
-  parts.push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+  parts.push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
   parts.push(`  Full ID:           ${c.poolId}`);
   parts.push(`  Classification:    ${describeClass(c)}`);
   parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);

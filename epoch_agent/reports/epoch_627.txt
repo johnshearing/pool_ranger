@@ -6,7 +6,7 @@ Global budget (total stake minus in-flight): 1.00 M ADA
 
 NEW CANDIDATES
 ------------------------------------------------------------
-Pool pool1dmqzwuq...  [BNTY1]  P=1.00 M ADA, F=170 ADA, m=3.0%
+[BNTY1]  P=1.00 M ADA, F=170 ADA, m=3.0%
   Full ID:           pool1dmqzwuql5mylffvn7ln3pr9j7kh4gdsssrmma5wgx56f6rtyf42
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
@@ -16,7 +16,7 @@ Pool pool1dmqzwuq...  [BNTY1]  P=1.00 M ADA, F=170 ADA, m=3.0%
   Proposed:          0.20 M ADA  @  1.60 %/yr
   Recommendation:    ADD  0.20 M ADA
 
-Pool pool1gtphgrd...  [ADAFR]  P=3.03 M ADA, F=170 ADA, m=1.5%
+[ADAFR]  P=3.03 M ADA, F=170 ADA, m=1.5%
   Full ID:           pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n
   Classification:    HAS_RED_ZONE — cursor PAST trough at 3.23 M ADA ext — in green zone
   Performance:       100.0%  (20 valid epochs)
@@ -24,7 +24,7 @@ Pool pool1gtphgrd...  [ADAFR]  P=3.03 M ADA, F=170 ADA, m=1.5%
   Delegator ROA now: 1.72 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
-Pool pool17ahr5yg...  [ST3AK]  P=2.79 M ADA, F=170 ADA, m=2.0%
+[ST3AK]  P=2.79 M ADA, F=170 ADA, m=2.0%
   Full ID:           pool17ahr5ygy48vpdfnatqn2z4wfu2te4quapk2yx3k50ce6kd7feg0
   Classification:    HAS_RED_ZONE — cursor PAST trough at 1.35 M ADA ext — in green zone
   Performance:       100.0%  (20 valid epochs)
@@ -32,7 +32,7 @@ Pool pool17ahr5yg...  [ST3AK]  P=2.79 M ADA, F=170 ADA, m=2.0%
   Delegator ROA now: 1.71 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
-Pool pool1qqqqqdk...  [ATADA]  P=1.30 M ADA, F=340 ADA, m=1.0%
+[ATADA]  P=1.30 M ADA, F=340 ADA, m=1.0%
   Full ID:           pool1qqqqqdk4zhsjuxxd8jyvwncf5eucfskz0xjjj64fdmlgj735lr9
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
@@ -40,7 +40,7 @@ Pool pool1qqqqqdk...  [ATADA]  P=1.30 M ADA, F=340 ADA, m=1.0%
   Delegator ROA now: 1.70 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
-Pool pool1ft4xjlz...  [1LOVE]  P=0.71 M ADA, F=340 ADA, m=1.0%
+[1LOVE]  P=0.71 M ADA, F=340 ADA, m=1.0%
   Full ID:           pool1ft4xjlz9uw0r0ewcgtkgeakqrfc5azxmxwsm5pt94dv67mw4rgd
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
@@ -48,7 +48,7 @@ Pool pool1ft4xjlz...  [1LOVE]  P=0.71 M ADA, F=340 ADA, m=1.0%
   Delegator ROA now: 1.69 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
-Pool pool173mzegw...  [ROCKY]  P=0.08 M ADA, F=340 ADA, m=2.0%
+[ROCKY]  P=0.08 M ADA, F=340 ADA, m=2.0%
   Full ID:           pool173mzegwuu0pjcrt60ekelzj5haqr8r5e4e0n45qh9jdz7xm5kh8
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
@@ -58,19 +58,19 @@ Pool pool173mzegw...  [ROCKY]  P=0.08 M ADA, F=340 ADA, m=2.0%
 
 POOLS DROPPED (failed 20-epoch performance filter)
 ------------------------------------------------------------
-  Pool pool166dkk9k... [VIPER]  P=0.40 M ADA, F=170, m=0.9%
+  [VIPER]  P=0.40 M ADA, F=170, m=0.9%
     Full ID:     pool166dkk9kx5y6ug9tnvh0dnvxhwt2yca3g5pd5jaqa8t39cgyqqlr
     Performance: 93.8%  (20 valid epochs checked)
     Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
-  Pool pool1qvvn2l6... [VIPER]  P=0.40 M ADA, F=170, m=0.0%
+  [VIPER]  P=0.40 M ADA, F=170, m=0.0%
     Full ID:     pool1qvvn2l690zm3v2p0f3vd66ly6cfs2wjqx34zpqcx5pwsx3eprtp
     Performance: 99.0%  (20 valid epochs checked)
     Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
-  Pool pool1krznhwu... [LEAF]  P=0.15 M ADA, F=170, m=1.0%
+  [LEAF]  P=0.15 M ADA, F=170, m=1.0%
     Full ID:     pool1krznhwu3h5pu2stuslr53z5rme50t6384macsmylcnljwc7yjky
     Performance: 97.1%  (20 valid epochs checked)
     Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
-  Pool pool1pu5jlj4... [NUTS]  P=0.25 M ADA, F=340, m=4.9%
+  [NUTS]  P=0.25 M ADA, F=340, m=4.9%
     Full ID:     pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy
     Performance: 97.7%  (20 valid epochs checked)
     Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
@@ -93,7 +93,7 @@ NEXT STEPS (for administrator)
 ------------------------------------------------------------
 1. Review the recommendations above.
 2. Execute ADD/INCREASE transactions via _delegate.mjs for:
-     Pool pool1dmqzwuq... [BNTY1] — add 0.20 M ADA
+     [BNTY1] — add 0.20 M ADA
 3. After submitting, record each change in ranger_state.json → inFlightChanges.
 4. Delegation changes take effect at epoch 629 (rewards from epoch 630).
 5. Run this agent next epoch to track progress.
