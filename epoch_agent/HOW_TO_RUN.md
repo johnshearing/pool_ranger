@@ -34,11 +34,13 @@ Currently, the Agent never signes transactions — it only advises.
 The human administrator reviews the report, decides whether to sign and post transactions, to move delegation.  
 In the future an ai agent will not only run the report but may also sign and post transactions.  
 
-The rest of this document explains how the Epoch Agent actually works currently.
+
+
+## How The Epoch Agent Works Currently
 
 ---
 
-## Prerequisites
+### Prerequisites
 
 - Node.js 18 or later (uses built-in `fetch`)
 - `dotenv` package installed (`npm install` from `ranger/`)
@@ -46,7 +48,7 @@ The rest of this document explains how the Epoch Agent actually works currently.
 
 ---
 
-## Step 1 — Populate `candidate_pools.json`
+### Step 1 — Populate `candidate_pools.json`
 
 Open `ranger/epoch_agent/candidate_pools.json` and add the bech32 pool IDs you want to
 evaluate. The bech32 format starts with `pool1...`.
@@ -72,7 +74,7 @@ Where to find pool IDs:
 
 ---
 
-## Step 2 — Update `ranger_state.json`
+### Step 2 — Update `ranger_state.json`
 
 Open `ranger/epoch_agent/ranger_state.json` and set `totalMemberStakeAda` to the combined
 ADA balance of all cooperative members. This is the total stake available for delegation.
@@ -108,7 +110,7 @@ for a permanent audit trail — do not edit that field manually.
 
 ---
 
-## Step 3 — Run the agent
+### Step 3 — Run the agent
 
 From the `ranger/` directory:
 
@@ -137,29 +139,30 @@ What the agent does on each run, in order:
 7. Fetches up to 73 epochs of block and stake history per pool (parallel requests)
 8. Fetches network-wide epoch info for all epochs found in the pool histories
 9. Classifies each pool (ALL_GREEN / ALL_RED / HAS_RED_ZONE) and produces a recommendation
-10. Allocates available stake to DELEGATE-recommended pools using a greedy ROA-ranked strategy
+10. Runs a **global allocation** over ALL safe pools — both currently-delegated (HOLD) pools and new (DELEGATE) candidates compete equally for the full member stake budget. Computes diffs versus current delegations to produce HOLD / ADD\_MORE / ADD\_NEW / REDUCE / WITHDRAW recommendations with churn costs and break-even estimates for any proposed moves.
 11. Formats and prints the report; saves it to `reports/epoch_NNNN.txt`
 12. Writes updated `ranger_state.json` (unless `--dry-run`)
 
 ---
 
-## Step 4 — Read the report
+### Step 4 — Read the report
 
 The report has these sections, in order:
 
 | Section | What it means |
 |---|---|
-| **EXISTING DELEGATIONS** | Pools where Pool Ranger is currently delegating. Shows HOLD or WITHDRAW recommendations. |
-| **NEW CANDIDATES** | Pools from the candidate list not yet delegated to. Shows ADD recommendations, or explains why a qualifying pool is at saturation. |
+| **EXISTING DELEGATIONS** | Pools where Pool Ranger is currently delegating. Shows HOLD (no change), ADD MORE (increasing), REDUCE (decreasing — includes churn cost), or WITHDRAW (removing — includes churn cost) based on the global optimizer's comparison of all safe pools each epoch. |
+| **REBALANCING MOVES** | Appears only when the optimizer proposes moving stake away from one or more currently-delegated pools. Lists each move with: the freed amount, churn cost in ADA (rewards missed during the 2-epoch delay), and break-even estimate (epochs until the ROA gain recovers the cost). Includes a ⚠ warning that members who joined within the last 2 epochs face a 4-epoch delay instead of 2. The administrator decides whether to approve each move. |
+| **NEW CANDIDATES** | Pools from the candidate list not yet delegated to. Shows ADD recommendations, or explains why a qualifying pool is at saturation or the budget was exhausted this epoch. |
 | **POOLS AVOIDED** | Pools not currently delegated to where adding delegation would harm the SPO (ALL_RED) or where Pool Ranger cannot supply enough stake to clear the red zone (HAS_RED_ZONE — cannot clear). |
 | **POOLS DROPPED** | Pools that passed safety classification (ALL_GREEN) but failed the 20-epoch 100% performance requirement. |
 | **SOLICITATION CANDIDATES** | Pools where adding delegation would harm the SPO — delegators here would benefit from joining Pool Ranger. (Phase 2 — reporting only, no outreach yet.) |
-| **SUMMARY** | Count of adds, withdrawals, and any undeployed stake. Weighted ROA before and after. |
-| **NEXT STEPS** | Transactions to execute, with pool IDs and amounts. |
+| **SUMMARY** | Count of forced withdrawals, rebalancing moves with total churn cost, new delegations, and any undeployed stake. Weighted ROA before and after. |
+| **NEXT STEPS** | Numbered actions to execute, separated by type: forced withdrawals, approved rebalancing moves, and new/increased delegations. |
 
 ---
 
-## Step 5 — Execute approved changes
+### Step 5 — Execute approved changes
 
 If the report recommends changes you approve:
 
@@ -174,9 +177,9 @@ Cardano delegation timing:
 
 ---
 
-## Interpretation guide
+### Interpretation guide
 
-### Pool classifications
+#### Pool classifications
 
 | Classification | Meaning |
 |---|---|
@@ -186,7 +189,7 @@ Cardano delegation timing:
 | `HAS_RED_ZONE — cursor BEFORE trough — cannot clear` | In the red zone and Pool Ranger cannot clear it. Do not delegate — it would harm the SPO. |
 | `ALL_RED` | m=0% with a pledge bonus larger than the fixed fee. Every delegator reduces SPO income. Never delegate here. |
 
-### Performance filter
+#### Performance filter
 
 Only pools with **100% block production performance over the last 20 epochs** are eligible
 for a DELEGATE recommendation. Performance is computed as:
@@ -200,7 +203,7 @@ Performance is capped at 1.0 — lucky over-production does not inflate the scor
 The agent fetches up to 73 epochs of pool history to supply the network epoch data needed
 for these calculations, but only the most recent 20 epochs count toward the performance score.
 
-### ROA calculation — 73 epochs is an annualization constant, not a lookback window
+#### ROA calculation — 73 epochs is an annualization constant, not a lookback window
 
 The ROA formula is:
 
@@ -220,7 +223,7 @@ This means **newer pools (30–73 epochs old) are fully supported.** Because ROA
 ROA estimated just as accurately as one that has run for 500 epochs. No historical reward data
 is needed beyond what is required to compute the 20-epoch performance factor.
 
-### Saturation
+#### Saturation
 
 The current saturation point `S_sat` is computed each run from live network data:
 ```
@@ -229,20 +232,41 @@ S_sat = total_network_active_stake / 500
 Pools at or above `S_sat` receive a **QUALIFIES — but at or above saturation** note.
 No stake is added — it would over-saturate the pool and reduce delegator ROA.
 
-### Allocation limits
+#### Allocation limits and the global optimizer
 
-When distributing available stake across DELEGATE-recommended pools the allocator enforces
-two hard limits:
+The allocator (`globalAllocateWithR` in `allocate.mjs`) treats every safe pool — whether
+currently delegated to (HOLD) or new (DELEGATE) — as an equal candidate each epoch. The full
+member stake budget (total member ADA minus any in-flight transaction commitments) is
+redistributed from scratch on every run. Two hard limits apply:
 
-- **20% concentration cap** — no more than 20% of the total available ADA is added to any
+- **20% concentration cap** — no more than 20% of the total member stake is allocated to any
   single pool.
-- **10,000 ADA minimum** — delegations smaller than 10,000 ADA are skipped (too small to
-  matter on-chain).
+- **10,000 ADA minimum** — proposed changes smaller than 10,000 ADA are treated as noise and
+  collapsed to HOLD.
 
-Pools are ranked by their current delegator ROA (highest first) and filled greedily until
-the available stake is exhausted or all DELEGATE pools are at saturation.
+All safe pools are ranked by delegator ROA at their current stake level (highest first) and the
+budget is filled greedily. The resulting proposed allocation is compared to the current
+allocation. Any pool whose proposed amount differs meaningfully from its current amount receives
+a REDUCE or WITHDRAW recommendation (for decreases) or ADD MORE (for increases).
 
-### Epoch rate `r`
+**Churn cost and break-even.** Moving delegation costs two missed reward epochs on the moved
+amount (the new pool's delegation does not become active until epoch N+2 after submission).
+For every proposed reduction or withdrawal, the report shows:
+
+```
+churn cost (ADA) = 2 × moved_ADA × (pool_ROA / 73 / 100)
+break-even       = 2 × old_pool_ROA / (avg_new_destination_ROA − old_pool_ROA)  [epochs]
+```
+
+Example: moving 1 M ADA from a 4.0 %/yr pool to one averaging 4.5 %/yr costs ~1,096 ADA
+and breaks even in ~16 epochs (~80 days).
+
+**New-member delay note.** For a member who just joined (within the last 2 epochs), a
+simultaneous Pool Ranger delegation move compounds to a 4-epoch delay (not 2) before their
+first rewards. The report flags this with a ⚠ warning; per-member tracking of join dates is
+not yet implemented.
+
+#### Epoch rate `r`
 
 `r` is computed fresh each run by averaging `total_rewards / active_stake` over the 5 most
 recent settled epochs. As of 2026, `r ≈ 0.000310` (the reserve has been depleting since
@@ -251,7 +275,7 @@ uses the live value.
 
 ---
 
-## Optional: Koios API key
+### Optional: Koios API key
 
 For higher rate limits (useful with large candidate lists), set `KOIOS_API_KEY` in
 `ranger/.env`:
@@ -264,7 +288,7 @@ Without a key the public tier (~10 req/s) is sufficient for up to ~50 candidate 
 
 ---
 
-## Files in this directory
+### Files in this directory
 
 | File | Purpose |
 |---|---|
@@ -272,7 +296,7 @@ Without a key the public tier (~10 req/s) is sufficient for up to ~50 candidate 
 | `math.mjs` | Pure reward math (identical to `SPO_REWARD_ANALYSIS_CHART.html`) |
 | `koios.mjs` | Koios mainnet API wrapper |
 | `classify.mjs` | Pool classification engine (ALL_GREEN / ALL_RED / HAS_RED_ZONE) |
-| `allocate.mjs` | Greedy stake allocator (maximizes weighted ROA) |
+| `allocate.mjs` | Global stake allocator — `globalAllocateWithR()` re-evaluates all safe pools (HOLD + DELEGATE) each epoch against the full member stake budget, producing HOLD / ADD\_NEW / ADD\_MORE / REDUCE / WITHDRAW recommendations with churn costs and break-even estimates |
 | `report.mjs` | Report formatter |
 | `candidate_pools.json` | **Edit this** — list of pool IDs to evaluate |
 | `ranger_state.json` | **Edit this** — Pool Ranger's stake and delegation state |
@@ -301,7 +325,7 @@ state. The following table maps each goal step to what is actually built today.
 ### Additional gaps not explicitly described in the goal
 
 - **No minimum pool age check.** The goal says candidates must have been running at least 30 epochs. The code fetches up to 73 epochs of history but never checks how many epochs a pool has actually existed. A newly launched pool with few history entries passes through unchecked.
-- **HOLD pools are never re-evaluated against new candidates.** Once a pool is in `currentDelegations` and remains safe, it gets a permanent HOLD. If a new DELEGATE-recommended pool offers meaningfully higher ROA, the system does not suggest moving stake.
+- **HOLD pools re-evaluated against new candidates: CLOSED (2026-04-26).** The global allocator (`globalAllocateWithR` in `allocate.mjs`) now treats HOLD and DELEGATE pools identically each epoch. Stake flows toward better ROA opportunities automatically; every proposed reduction or withdrawal includes a churn cost and break-even estimate in the REBALANCING MOVES section. Remaining gap: no configurable minimum ROA-difference threshold before a move is recommended — even a 0.01 %/yr difference can generate a REDUCE recommendation.
 - **Trough-clearing allocation is not minimum-precise.** For HAS_RED_ZONE pools that can be cleared, the plan implies delegating the minimum amount needed to push past the trough and restore earnings. The current allocator fills up to 20% of available stake or room-to-saturation — whichever is smaller — without targeting the trough minimum specifically.
 - **No epoch cadence enforcement.** The plan says to run once per Cardano epoch (~5 days). Nothing in the code or the environment enforces or schedules this.
 
@@ -354,17 +378,22 @@ minus `externalExcludingRanger`). Allocate that minimum first, plus a small buff
 then deploy remaining stake to other pools. Only fall back to the 20% cap if the trough-clearing
 minimum exceeds it.
 
-### 4 — Add a goal for periodic re-evaluation of HOLD pools
+### 4 — Re-evaluation of HOLD pools — IMPLEMENTED (2026-04-26)
 
-The current system never moves stake away from a HOLD pool unless it becomes ALL_RED or an
-unclearable HAS_RED_ZONE. Over time, a pool's ROA may drift significantly below newer candidates
-as its parameters change or the network evolves.
+The old system never moved stake away from a HOLD pool unless it became unsafe. The global
+allocator introduced in this session closes that gap.
 
-**Recommendation:** Add a goal step between steps 4 and 5: for each pool in `currentDelegations`
-with a HOLD classification, compare its current ROA to the top DELEGATE candidate. If the
-difference exceeds a configurable threshold (e.g., 0.25 %/yr), recommend withdrawing and
-redeploying. Account for the churn cost: withdrawal costs two epochs of missed rewards on the
-moved stake, which should be factored into the break-even calculation.
+**Implemented:** `globalAllocateWithR()` in `allocate.mjs` treats HOLD and DELEGATE pools as
+equal candidates every epoch. The full member stake budget is distributed from scratch each run.
+Any pool whose proposed allocation differs meaningfully from its current allocation receives a
+REDUCE or WITHDRAW recommendation in the REBALANCING MOVES section, along with the churn cost
+and break-even estimate. The administrator retains final approval.
+
+**Remaining gap:** There is no configurable minimum ROA-difference threshold. The optimizer will
+recommend a move even when the ROA gain is tiny (e.g., 0.01 %/yr), which could produce
+unnecessary churn. Adding a threshold (e.g., only recommend a move when `newROA − oldROA > 0.25 %/yr`
+or `breakEvenEpochs < 20`) would filter out marginal moves. This threshold should be configurable
+in `ranger_state.json`.
 
 ### 5 — Clarify what "bundle transactions" means for Pool Ranger's staking model
 
