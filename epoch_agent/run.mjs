@@ -5,7 +5,7 @@
 //   node epoch_agent/run.mjs --dry-run    (skip writing/updating ranger_state.json)
 //
 // What it does:
-//   1. Reads candidate_pools.json → list of mainnet pool IDs to evaluate
+//   1. Reads candidate_pools.json → list of mainnet pool entries ({ id, ticker }) to evaluate
 //   2. Reads ranger_state.json → current delegations, in-flight changes, total stake
 //   3. Fetches pool data and epoch info from Koios mainnet
 //   4. Classifies each pool (ALL_GREEN / ALL_RED / HAS_RED_ZONE)
@@ -102,9 +102,9 @@ async function main() {
     console.error('Create it with a list of mainnet pool IDs. See candidate_pools.json.example.');
     process.exit(1);
   }
-  const poolIds = candidateConfig.poolIds ?? [];
+  const poolIds = (candidateConfig.pools ?? []).map(p => p.id);
   if (poolIds.length === 0) {
-    console.error('ERROR: candidate_pools.json has no poolIds. Add mainnet bech32 pool IDs (pool1...).');
+    console.error('ERROR: candidate_pools.json has no pools. Add entries with { id, ticker } for each pool.');
     process.exit(1);
   }
   console.log(`[run] Evaluating ${poolIds.length} candidate pool(s).`);

@@ -1,17 +1,17 @@
 {
-  "_comment": "Mainnet bech32 pool IDs (pool1...) to evaluate each epoch. Add pools here.",
-  "_lastUpdated": "2026-04-24",
+  "_comment": "Mainnet pool entries to evaluate each epoch. Each entry has the bech32 pool ID (pool1...) and the pool ticker. Add pools here.",
+  "_lastUpdated": "2026-04-26",
   "_howToFind": "Look up pool IDs on pool.pm, adapools.org, or Cardano Explorer. Use the bech32 format (starts with pool1...).",
-  "poolIds": [
-    "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n",
-    "pool17ahr5ygy48vpdfnatqn2z4wfu2te4quapk2yx3k50ce6kd7feg0",
-    "pool1qqqqqdk4zhsjuxxd8jyvwncf5eucfskz0xjjj64fdmlgj735lr9",
-    "pool1dmqzwuql5mylffvn7ln3pr9j7kh4gdsssrmma5wgx56f6rtyf42",
-    "pool1ft4xjlz9uw0r0ewcgtkgeakqrfc5azxmxwsm5pt94dv67mw4rgd",
-    "pool166dkk9kx5y6ug9tnvh0dnvxhwt2yca3g5pd5jaqa8t39cgyqqlr",
-    "pool1qvvn2l690zm3v2p0f3vd66ly6cfs2wjqx34zpqcx5pwsx3eprtp",
-    "pool173mzegwuu0pjcrt60ekelzj5haqr8r5e4e0n45qh9jdz7xm5kh8",
-    "pool1krznhwu3h5pu2stuslr53z5rme50t6384macsmylcnljwc7yjky",
-    "pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy"
+  "pools": [
+    { "id": "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n", "ticker": "ADAFR" },
+    { "id": "pool17ahr5ygy48vpdfnatqn2z4wfu2te4quapk2yx3k50ce6kd7feg0", "ticker": "ST3AK" },
+    { "id": "pool1qqqqqdk4zhsjuxxd8jyvwncf5eucfskz0xjjj64fdmlgj735lr9", "ticker": "ATADA" },
+    { "id": "pool1dmqzwuql5mylffvn7ln3pr9j7kh4gdsssrmma5wgx56f6rtyf42", "ticker": "BNTY1" },
+    { "id": "pool1ft4xjlz9uw0r0ewcgtkgeakqrfc5azxmxwsm5pt94dv67mw4rgd", "ticker": "1LOVE" },
+    { "id": "pool166dkk9kx5y6ug9tnvh0dnvxhwt2yca3g5pd5jaqa8t39cgyqqlr", "ticker": "VIPER" },
+    { "id": "pool1qvvn2l690zm3v2p0f3vd66ly6cfs2wjqx34zpqcx5pwsx3eprtp", "ticker": "VIPER" },
+    { "id": "pool173mzegwuu0pjcrt60ekelzj5haqr8r5e4e0n45qh9jdz7xm5kh8", "ticker": "ROCKY" },
+    { "id": "pool1krznhwu3h5pu2stuslr53z5rme50t6384macsmylcnljwc7yjky", "ticker": "LEAF"  },
+    { "id": "pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy", "ticker": "NUTS"  }
   ]
 }

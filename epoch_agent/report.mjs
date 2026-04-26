@@ -144,6 +144,7 @@ export function formatReport(reportData) {
       if (entry.breakEvenEpochs !== null) weightedBE += movedAda * entry.breakEvenEpochs;
 
       push(`  Pool ${c.poolId.slice(0, 12)}... ${label}`);
+      push(`    Full ID:            ${c.poolId}`);
       push(`    Current delegation : ${ada(entry.currentAda)}  @  ${pct(entry.roaAtCurrent)}`);
       if (entry.moveType === 'REDUCE') {
         push(`    Proposed           : ${ada(entry.proposedAda)}  @  ${pct(entry.roaAtProposed)}  (REDUCE)`);
@@ -179,6 +180,7 @@ export function formatReport(reportData) {
       const label     = c.ticker ? `[${c.ticker}]` : '';
       const saturated = c.activeStakeAda >= sSat;
       push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+      push(`  Full ID:           ${c.poolId}`);
       push(`  Classification:    ${describeClass(c)}`);
       push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
       push(`  Active stake:      ${ada(c.activeStakeAda)}`);
@@ -205,6 +207,7 @@ export function formatReport(reportData) {
     for (const c of perfFailed) {
       const label = c.ticker ? `[${c.ticker}]` : '';
       push(`  Pool ${c.poolId.slice(0, 12)}... ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda}, m=${(c.margin*100).toFixed(1)}%`);
+      push(`    Full ID:     ${c.poolId}`);
       push(`    Performance: ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs checked)`);
       push(`    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility`);
     }
@@ -223,6 +226,7 @@ export function formatReport(reportData) {
     for (const c of solicit) {
       const label = c.ticker ? `[${c.ticker}]` : '';
       push(`  Pool ${c.poolId.slice(0, 12)}... ${label}`);
+      push(`    Full ID:        ${c.poolId}`);
       push(`    Classification: ${c.classType}`);
       push(`    Delegator ROA: ${pct(c.roaAtCurrent)}`);
       if (c.classType === ClassType.ALL_RED) {
@@ -340,6 +344,7 @@ function formatPool(c, entry) {
   const parts = [];
 
   parts.push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+  parts.push(`  Full ID:           ${c.poolId}`);
   parts.push(`  Classification:    ${describeClass(c)}`);
   parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
   parts.push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
@@ -400,6 +405,7 @@ function formatForcedWithdrawal(c) {
   const parts = [];
 
   parts.push(`Pool ${c.poolId.slice(0, 12)}...  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+  parts.push(`  Full ID:           ${c.poolId}`);
   parts.push(`  Classification:    ${describeClass(c)}`);
   parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
   parts.push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
