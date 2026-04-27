@@ -19,3 +19,8 @@ package-lock.json
 .DS_Store
 Thumbs.db
 *.swp
+
+# Epoch agent — runtime state and reports (local only)
+epoch_agent/reports/
+epoch_agent/ranger_state.json
+epoch_agent/candidate_pools.json
