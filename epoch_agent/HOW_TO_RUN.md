@@ -50,27 +50,75 @@ In the future an ai agent will not only run the report but may also sign and pos
 
 ### Step 1 — Populate `candidate_pools.json`
 
-Open `ranger/epoch_agent/candidate_pools.json` and add the bech32 pool IDs you want to
-evaluate. The bech32 format starts with `pool1...`.
+`candidate_pools.json` is the list of pools that `run.mjs` will evaluate each epoch.
+There are two ways to populate it — auto-discovery and hand-picking — and they can be combined.
+
+#### Option A — Auto-discovery (recommended for full mainnet scans)
+
+Run `discover_pools.mjs` from the `ranger/` directory:
+
+```bash
+node epoch_agent/discover_pools.mjs           # replace candidate_pools.json with all qualifying pools
+node epoch_agent/discover_pools.mjs --merge   # add new discoveries without removing existing pools
+node epoch_agent/discover_pools.mjs --dry-run # preview what would be written (nothing is changed)
+```
+
+The script queries Koios for every registered pool on mainnet, applies pre-filters, and writes
+the survivors to `candidate_pools.json`. Pre-filter thresholds (with defaults):
+
+| Filter | Default | What it removes |
+|--------|---------|----------------|
+| Pool status | registered only | Retired and retiring pools |
+| Min active stake | 1 M ADA | Tiny pools where fixed fee dominates rewards |
+| Max active stake | 100% of S_sat | Oversaturated pools that reduce delegator ROA |
+| Max margin | 5% | High-fee pools that rarely compete on ROA |
+| Min age | 30 epochs | Brand-new pools with too little history to measure |
+
+To override any threshold, add a `discoveryConfig` block to `ranger_state.json`:
+
+```json
+"discoveryConfig": {
+  "minActiveStakeAda":     1000000,
+  "maxMarginFraction":     0.05,
+  "minEpochsOld":          30,
+  "maxSaturationFraction": 1.0
+}
+```
+
+A Koios API key is strongly recommended for auto-discovery runs because the script fetches
+info for all ~6,000 mainnet pools in batches. Without a key the public tier (~10 req/s) will
+work but the run will take several minutes. See the *Optional: Koios API key* section below.
+
+After `discover_pools.mjs` finishes, proceed to Step 2 and then run `run.mjs` as normal.
+
+#### Option B — Hand-picking (for evaluating a specific set of pools)
+
+Edit `ranger/epoch_agent/candidate_pools.json` directly and add or remove entries:
 
 ```json
 {
-  "_comment": "Mainnet bech32 pool IDs (pool1...) to evaluate each epoch. Add pools here.",
-  "_lastUpdated": "2026-04-24",
-  "_howToFind": "Look up pool IDs on pool.pm, adapools.org, or Cardano Explorer.",
-  "poolIds": [
-    "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n",
-    "pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy"
+  "_comment": "Hand-picked pools to evaluate.",
+  "_lastUpdated": "2026-04-27",
+  "pools": [
+    { "id": "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n", "ticker": "ADAFR" },
+    { "id": "pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy", "ticker": "NUTS"  }
   ]
 }
 ```
 
-The `_comment`, `_lastUpdated`, and `_howToFind` fields are optional metadata — the agent only reads `poolIds`.
+The `_comment`, `_lastUpdated`, and `_howToFind` fields are optional metadata — `run.mjs`
+only reads the `pools` array. Each entry needs `id` (bech32, starts with `pool1...`) and
+`ticker` (any label you choose).
 
 Where to find pool IDs:
 - [pool.pm](https://pool.pm) — search by ticker, click a pool, copy the Pool ID
 - [adapools.org](https://adapools.org) — same
 - Koios API: `GET https://api.koios.rest/api/v1/pool_list?ticker=eq.YOURTICKER`
+
+#### Combining both approaches
+
+Run `discover_pools.mjs --merge` after hand-editing to add newly discovered pools without
+removing any pools you placed in the file manually.
 
 ---
 
@@ -395,14 +443,17 @@ undersaturation) is benefiting from luck without translating it into better memb
 
 ### Optional: Koios API key
 
-For higher rate limits (useful with large candidate lists), set `KOIOS_API_KEY` in
-`ranger/.env`:
+For higher rate limits, set `KOIOS_API_KEY` in `ranger/.env`:
 
 ```
 KOIOS_API_KEY=your_key_here
 ```
 
-Without a key the public tier (~10 req/s) is sufficient for up to ~50 candidate pools.
+Both `run.mjs` and `discover_pools.mjs` read this key automatically via `dotenv`.
+
+- **`run.mjs`** — the public tier (~10 req/s) is sufficient for up to ~50 candidate pools.
+- **`discover_pools.mjs`** — fetches info for all ~6,000 mainnet pools; an API key is
+  strongly recommended to avoid rate-limit delays during the batch fetch.
 
 ---
 
@@ -410,14 +461,15 @@ Without a key the public tier (~10 req/s) is sufficient for up to ~50 candidate 
 
 | File | Purpose |
 |---|---|
-| `run.mjs` | Main entry point — run this |
+| `run.mjs` | Main entry point — evaluates `candidate_pools.json` and produces the report |
+| `discover_pools.mjs` | Auto-discovers eligible mainnet pools and writes `candidate_pools.json`; supports `--merge` and `--dry-run` flags |
 | `math.mjs` | Pure reward math (identical to `SPO_REWARD_ANALYSIS_CHART.html`) |
 | `koios.mjs` | Koios mainnet API wrapper |
 | `classify.mjs` | Pool classification engine (ALL_GREEN / ALL_RED / HAS_RED_ZONE) |
 | `allocate.mjs` | Global stake allocator — `globalAllocateWithR()` re-evaluates all safe pools (HOLD + DELEGATE) each epoch against the full member stake budget, producing HOLD / ADD\_NEW / ADD\_MORE / REDUCE / WITHDRAW recommendations with churn costs and break-even estimates |
 | `report.mjs` | Report formatter |
-| `candidate_pools.json` | **Edit this** — list of pool IDs to evaluate |
-| `ranger_state.json` | **Edit this** — Pool Ranger's stake and delegation state |
+| `candidate_pools.json` | **Edit this** — list of pool IDs to evaluate (or generate with `discover_pools.mjs`) |
+| `ranger_state.json` | **Edit this** — Pool Ranger's stake, delegation state, and optional `discoveryConfig` |
 | `reports/` | One `.txt` report file per epoch run |
 
 **Not yet implemented:** `_delegate.mjs` (transaction submission helper) is referenced in
@@ -433,7 +485,7 @@ state. The following table maps each goal step to what is actually built today.
 
 | Goal step | What the goal says | What is currently implemented | Gap |
 |---|---|---|---|
-| **1 — Candidate list** | Auto-discover every pool on mainnet that has been running for at least 30 epochs. | User manually maintains `candidate_pools.json`. No network scan occurs. | Full gap — no auto-discovery. |
+| **1 — Candidate list** | Auto-discover every pool on mainnet that has been running for at least 30 epochs. | `discover_pools.mjs` (added 2026-04-27) queries all registered mainnet pools from Koios, applies pre-filters (age, stake, saturation, margin), and writes the survivors to `candidate_pools.json`. Supports `--merge` to preserve hand-picked pools. Filter thresholds are configurable via `discoveryConfig` in `ranger_state.json`. | Partially closed — discovery is a separate manual step rather than being integrated into `run.mjs`. The `discoveryConfig` filter for `minEpochsOld` implements the 30-epoch age requirement. |
 | **2 — Pull pool data** | Fetch ticker, bech32 ID, parameters, and delegation levels for every candidate. | ✓ Implemented — one batched Koios POST fetches all pool parameters; 73 epochs of history fetched per pool in parallel. | None. |
 | **3 — Reward math and two lists** | Classify pools by red-zone math; produce a delegation list and a solicitation list; drop pools below 99% performance over 20 epochs. | ✓ Classification, cursor logic, and both lists are implemented. Performance threshold is **100%** (stricter than the plan's 99%). The check that the SPO and delegator earnings are *restored to their pre-addition level* after clearing the trough is not done — only that the post-add delegation is past the trough. | Partial — performance threshold differs; trough-clearing earnings restoration not verified. |
 | **4 — Sort both lists** | Delegation list: highest to lowest ROA. Solicitation list: lowest to highest ROA (most harmed first). | ✓ Both sorts are implemented exactly as planned. | None. |
@@ -442,7 +494,7 @@ state. The following table maps each goal step to what is actually built today.
 
 ### Additional gaps not explicitly described in the goal
 
-- **No minimum pool age check.** The goal says candidates must have been running at least 30 epochs. The code fetches up to 73 epochs of history but never checks how many epochs a pool has actually existed. A newly launched pool with few history entries passes through unchecked.
+- **Minimum pool age check: CLOSED (2026-04-27).** `discover_pools.mjs` filters out any pool whose `active_epoch_no` is within 30 epochs of the current epoch. Pools that pre-date this check by entering `candidate_pools.json` manually are still not age-checked by `run.mjs` itself — `run.mjs` trusts the list it is given.
 - **HOLD pools re-evaluated against new candidates: CLOSED (2026-04-26).** The global allocator (`globalAllocateWithR` in `allocate.mjs`) now treats HOLD and DELEGATE pools identically each epoch. Stake flows toward better ROA opportunities automatically; every proposed reduction or withdrawal includes a churn cost and break-even estimate in the REBALANCING MOVES section. Remaining gap: no configurable minimum ROA-difference threshold before a move is recommended — even a 0.01 %/yr difference can generate a REDUCE recommendation.
 - **Trough-clearing allocation is not minimum-precise.** For HAS_RED_ZONE pools that can be cleared, the plan implies delegating the minimum amount needed to push past the trough and restore earnings. The current allocator fills up to 20% of available stake or room-to-saturation — whichever is smaller — without targeting the trough minimum specifically.
 - **No epoch cadence enforcement.** The plan says to run once per Cardano epoch (~5 days). Nothing in the code or the environment enforces or schedules this.
@@ -470,18 +522,21 @@ with fewer than 0.5 expected blocks are excluded. Consider increasing the perfor
 30 epochs (matching the minimum pool age) for a more statistically reliable measurement. Make
 the goal and the code agree on the same number.
 
-### 2 — Narrow the scope of auto-discovery before fetching history
+### 2 — Narrow the scope of auto-discovery before fetching history — IMPLEMENTED (2026-04-27)
 
-The plan says "every pool running for at least 30 epochs." On mainnet today there are roughly
-3,000 active pools. Fetching 73 epochs of block history for each would require thousands of
-Koios requests — slow, rate-limit-intensive, and most of the results will be filtered out anyway.
+**Implemented:** `discover_pools.mjs` applies a pre-filter stage before any expensive per-pool
+history fetches occur. It queries all registered mainnet pools via Koios `/pool_list` and
+`/pool_info` (in batches of 50), then discards pools that fail any of these cheap checks:
+pool retired/retiring, active stake below minimum, active stake at or above saturation, margin
+above maximum, pool age below minimum. Only the survivors are written to `candidate_pools.json`,
+keeping `run.mjs`'s expensive 73-epoch history fetches focused on a much smaller working set.
 
-**Recommendation:** Add a pre-filter step between discovery and history-fetching. Before pulling
-history, discard any pool whose current active stake is below a configurable minimum (for example,
-1 M ADA) or that is already at or above saturation. This will reduce the working set from thousands
-to hundreds before the expensive per-pool history calls begin. The pre-filter parameters (min
-active stake, max active stake relative to S_sat) should be configurable in `ranger_state.json`
-or a separate config file.
+All thresholds are configurable in `ranger_state.json` under `discoveryConfig`. Defaults:
+1 M ADA min stake, 5% max margin, 30 epochs min age, 100% of S_sat max saturation.
+
+**Remaining gap:** Discovery is still a separate manual step — the administrator must run
+`discover_pools.mjs` before `run.mjs`, rather than discovery happening automatically inside
+each epoch run.
 
 ### 3 — Specify the trough-clearing delegation amount more precisely
 

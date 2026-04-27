@@ -117,6 +117,45 @@ export async function fetchCurrentEpoch() {
   };
 }
 
+// fetchAllPoolIds — pages through /pool_list to get every pool ID (all statuses).
+// Status filtering (registered vs retired) happens downstream in fetchPoolsInfoForDiscovery,
+// because /pool_list does not expose pool_status as a filterable column.
+// Returns string[] of bech32 IDs.
+export async function fetchAllPoolIds() {
+  const PAGE_SIZE = 1000;
+  const ids = [];
+  let offset = 0;
+  while (true) {
+    const data = await koiosFetch(
+      `/pool_list?select=pool_id_bech32&limit=${PAGE_SIZE}&offset=${offset}`,
+    );
+    for (const p of data) ids.push(p.pool_id_bech32);
+    if (data.length < PAGE_SIZE) break;
+    offset += PAGE_SIZE;
+  }
+  return ids;
+}
+
+// fetchPoolsInfoForDiscovery — like fetchPoolsInfo but adds active_epoch_no and pool_status
+// for age and retirement filtering. Intended for use by discover_pools.mjs.
+// Returns: DiscoveryInfo[]
+//   { poolId, ticker, poolStatus, activeEpochNo, activeStakeAda, margin }
+export async function fetchPoolsInfoForDiscovery(poolIds) {
+  if (poolIds.length === 0) return [];
+  const data = await koiosFetch('/pool_info', {
+    method: 'POST',
+    body: JSON.stringify({ _pool_bech32_ids: poolIds }),
+  });
+  return data.map(p => ({
+    poolId:         p.pool_id_bech32,
+    ticker:         p.meta_json?.ticker ?? null,
+    poolStatus:     p.pool_status ?? 'registered',
+    activeEpochNo:  p.active_epoch_no != null ? Number(p.active_epoch_no) : null,
+    activeStakeAda: Number(p.active_stake ?? p.live_stake ?? 0) / 1e6,
+    margin:         Number(p.margin),
+  }));
+}
+
 // fetchRecentR — compute the per-epoch reward rate r averaged over N settled epochs.
 // r_epoch = totalRewardsAda / activeStakeAda  (both in ADA — ratio is unit-free)
 // total_rewards is only populated ~2+ epochs in the past, so we look back enough epochs
