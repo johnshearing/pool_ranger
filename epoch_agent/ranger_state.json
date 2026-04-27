@@ -1,9 +1,8 @@
 {
   "_schemaVersion": 1,
   "lastUpdatedEpoch": 627,
-  "lastRunAt": "2026-04-26T04:12:28.034Z",
+  "lastRunAt": "2026-04-27T02:47:34.408Z",
   "totalMemberStakeAda": 1000000,
-
   "_currentDelegationsExample": {
     "_note": "After the admin submits the epoch-629 delegation tx and it settles, this is what currentDelegations looks like.",
     "pool1dmqzwuql5mylffvn7ln3pr9j7kh4gdsssrmma5wgx56f6rtyf42": {
@@ -14,7 +13,6 @@
     }
   },
   "currentDelegations": {},
-
   "_inFlightChangesExample": {
     "_note": "After the admin submits a tx but before epoch 629, inFlightChanges looks like this. The agent settles it automatically once activeFromEpoch <= current epoch.",
     "_entries": [
@@ -30,7 +28,6 @@
     ]
   },
   "inFlightChanges": [],
-
   "_completedChangesExample": {
     "_note": "Once a change settles (activeFromEpoch <= currentEpoch), the agent moves it here automatically. It is a permanent log of every past delegation action.",
     "_entries": [

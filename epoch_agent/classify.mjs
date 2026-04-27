@@ -53,6 +53,42 @@ export function computePerformance(poolHistory, epochInfoMap, windowEpochs = 20)
   return { perf, validEpochs, totalActual, totalExpected, epochsChecked: slice.length };
 }
 
+// computeHistoricalROA — average actual delegator ROA over up to windowEpochs epochs.
+//
+// Unlike the projected "ROA now", this uses:
+//   - each epoch's own r_i  (totalRewardsAda / networkStake, only settled epochs)
+//   - each epoch's own pool activeStake (not today's)
+//   - per-epoch performance WITHOUT the 1.0 cap — lucky pools show values above 100%
+//
+// Returns: { historicalRoa, luckPremium } in %/yr, or nulls if no settled data available.
+// luckPremium = historicalRoa minus the same calculation at perf=1.0 (expected performance).
+// A positive luckPremium means the pool has minted more blocks than its slot assignment expected.
+export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowEpochs = 20) {
+  const slice = poolHistory.slice(0, windowEpochs);
+  const roaValues      = [];
+  const expectedValues = [];
+
+  for (const entry of slice) {
+    const net = epochInfoMap.get(entry.epochNo);
+    if (!net) continue;
+    if (net.totalRewardsAda == null || net.activeStakeAda <= 0 || net.blkCount <= 0) continue;
+    if (entry.activeStakeAda <= 0) continue;
+
+    const expected = (entry.activeStakeAda / net.activeStakeAda) * net.blkCount;
+    if (expected < 0.5) continue;
+
+    const r_i    = net.totalRewardsAda / net.activeStakeAda;
+    const perf_i = entry.blockCnt / expected;   // intentionally uncapped
+    roaValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, perf_i));
+    expectedValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, 1.0));
+  }
+
+  if (roaValues.length === 0) return { historicalRoa: null, luckPremium: null };
+  const historicalRoa = roaValues.reduce((a, b) => a + b, 0) / roaValues.length;
+  const expectedRoa   = expectedValues.reduce((a, b) => a + b, 0) / expectedValues.length;
+  return { historicalRoa, luckPremium: historicalRoa - expectedRoa };
+}
+
 // classifyPool — classify a single pool and produce a delegation recommendation.
 //
 // poolInfo: { poolId, ticker, name, pledgeAda, fixedCostAda, margin, activeStakeAda }
@@ -143,6 +179,7 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
   // ROA at current total stake and at proposed total stake
   const currentTotalStake   = activeStakeAda;
   const roaAtCurrent        = delegROA(currentTotalStake, P, F, m, r, perf);
+  const { historicalRoa, luckPremium } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20);
 
   let proposedTotalStake = currentTotalStake;
   if (recommendation === Rec.DELEGATE) {
@@ -178,6 +215,8 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     proposedTotalStake,
     roaAtProposed,
     roaAtCurrent,
+    historicalRoa,
+    luckPremium,
     solicitCandidate,
   };
 }

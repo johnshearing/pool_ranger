@@ -12,6 +12,19 @@ function pct(n) {
   return n.toFixed(2) + ' %/yr';
 }
 
+function signedPct(n) {
+  return (n >= 0 ? '+' : '') + n.toFixed(2) + ' %/yr';
+}
+
+function roaLines(indent, c) {
+  const L = 24;
+  return [
+    `${indent}${'Projected ROA:'.padEnd(L)} ${pct(c.roaAtCurrent)}`,
+    `${indent}${'Historical ROA (20 ep):'.padEnd(L)} ${c.historicalRoa  !== null ? pct(c.historicalRoa)      : 'n/a'}`,
+    `${indent}${'Luck premium (20 ep):'.padEnd(L)} ${c.luckPremium    !== null ? signedPct(c.luckPremium) : 'n/a'}`,
+  ];
+}
+
 function line(char = '-', len = 60) {
   return char.repeat(len);
 }
@@ -184,7 +197,7 @@ export function formatReport(reportData) {
       push(`  Classification:    ${describeClass(c)}`);
       push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
       push(`  Active stake:      ${ada(c.activeStakeAda)}`);
-      push(`  Delegator ROA now: ${pct(c.roaAtCurrent)}`);
+      roaLines('  ', c).forEach(l => push(l));
       push(`  Recommendation:    QUALIFIES — ${saturated ? 'at or above saturation — no stake can be added' : 'budget exhausted this epoch'}`);
       blank();
     }
@@ -228,7 +241,7 @@ export function formatReport(reportData) {
       push(`  ${label}`);
       push(`    Full ID:        ${c.poolId}`);
       push(`    Classification: ${c.classType}`);
-      push(`    Delegator ROA: ${pct(c.roaAtCurrent)}`);
+      push(`    Projected ROA: ${pct(c.roaAtCurrent)}`);
       if (c.classType === ClassType.ALL_RED) {
         push(`    Note: m=0% — SPO income falls with every delegator across full range.`);
       } else if (c.classType === ClassType.HAS_RED_ZONE) {
@@ -348,7 +361,7 @@ function formatPool(c, entry) {
   parts.push(`  Classification:    ${describeClass(c)}`);
   parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
   parts.push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
-  parts.push(`  Delegator ROA now: ${pct(c.roaAtCurrent)}`);
+  roaLines('  ', c).forEach(l => parts.push(l));
 
   if (!entry) {
     // AVOID pool — show reason
@@ -409,7 +422,7 @@ function formatForcedWithdrawal(c) {
   parts.push(`  Classification:    ${describeClass(c)}`);
   parts.push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
   parts.push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
-  parts.push(`  Delegator ROA now: ${pct(c.roaAtCurrent)}`);
+  roaLines('  ', c).forEach(l => parts.push(l));
   parts.push(`  Recommendation:    WITHDRAW ${ada(c.rangerCurrentStake)}  [UNSAFE POOL]`);
   if (c.classType === ClassType.ALL_RED) {
     parts.push(`  Note:              m=0% — SPO earns less with every delegator. Withdrawing helps the SPO.`);

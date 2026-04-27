@@ -1,6 +1,6 @@
 Pool Ranger Delegation Report — Epoch 627
 ============================================================
-Generated: 2026-04-26T04:12:28.034Z
+Generated: 2026-04-27T02:47:34.408Z
 r = 0.000310  |  S_sat ≈ 43.60 M ADA  |  Pool Ranger stake: 1.00 M ADA
 Global budget (total stake minus in-flight): 1.00 M ADA
 
@@ -11,7 +11,9 @@ NEW CANDIDATES
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
   Active stake:      7.42 M ADA  (Pool Ranger: 0.00 M ADA)
-  Delegator ROA now: 1.60 %/yr
+  Projected ROA:           1.60 %/yr
+  Historical ROA (20 ep):  1.92 %/yr
+  Luck premium (20 ep):    +0.31 %/yr
   Current:           0 ADA  (new candidate)
   Proposed:          0.20 M ADA  @  1.60 %/yr
   Recommendation:    ADD  0.20 M ADA
@@ -21,7 +23,9 @@ NEW CANDIDATES
   Classification:    HAS_RED_ZONE — cursor PAST trough at 3.23 M ADA ext — in green zone
   Performance:       100.0%  (20 valid epochs)
   Active stake:      55.97 M ADA
-  Delegator ROA now: 1.72 %/yr
+  Projected ROA:           1.72 %/yr
+  Historical ROA (20 ep):  1.77 %/yr
+  Luck premium (20 ep):    +0.03 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
 [ST3AK]  P=2.79 M ADA, F=170 ADA, m=2.0%
@@ -29,7 +33,9 @@ NEW CANDIDATES
   Classification:    HAS_RED_ZONE — cursor PAST trough at 1.35 M ADA ext — in green zone
   Performance:       100.0%  (20 valid epochs)
   Active stake:      61.75 M ADA
-  Delegator ROA now: 1.71 %/yr
+  Projected ROA:           1.71 %/yr
+  Historical ROA (20 ep):  1.79 %/yr
+  Luck premium (20 ep):    +0.06 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
 [ATADA]  P=1.30 M ADA, F=340 ADA, m=1.0%
@@ -37,7 +43,9 @@ NEW CANDIDATES
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
   Active stake:      68.60 M ADA
-  Delegator ROA now: 1.70 %/yr
+  Projected ROA:           1.70 %/yr
+  Historical ROA (20 ep):  1.73 %/yr
+  Luck premium (20 ep):    +0.02 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
 [1LOVE]  P=0.71 M ADA, F=340 ADA, m=1.0%
@@ -45,7 +53,9 @@ NEW CANDIDATES
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
   Active stake:      56.47 M ADA
-  Delegator ROA now: 1.69 %/yr
+  Projected ROA:           1.69 %/yr
+  Historical ROA (20 ep):  1.76 %/yr
+  Luck premium (20 ep):    +0.05 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
 [ROCKY]  P=0.08 M ADA, F=340 ADA, m=2.0%
@@ -53,7 +63,9 @@ NEW CANDIDATES
   Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
   Performance:       100.0%  (20 valid epochs)
   Active stake:      62.00 M ADA
-  Delegator ROA now: 1.67 %/yr
+  Projected ROA:           1.67 %/yr
+  Historical ROA (20 ep):  1.74 %/yr
+  Luck premium (20 ep):    +0.05 %/yr
   Recommendation:    QUALIFIES — at or above saturation — no stake can be added
 
 POOLS DROPPED (failed 20-epoch performance filter)
