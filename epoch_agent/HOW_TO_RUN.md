@@ -280,12 +280,48 @@ is needed beyond what is required to compute the 20-epoch performance factor.
 
 #### Saturation
 
-The current saturation point `S_sat` is computed each run from live network data:
+The saturation point is:
 ```
 S_sat = total_network_active_stake / 500
 ```
-Pools at or above `S_sat` receive a **QUALIFIES — but at or above saturation** note.
-No stake is added — it would over-saturate the pool and reduce delegator ROA.
+That 500 is Cardano's `k` (nOpt) parameter — the protocol targets 500 pools, so each pool's
+saturation point is 1/500th of all staked ADA. As of epoch 627 (April 2026), total network
+active stake is approximately **21.8 billion ADA**, making S_sat roughly **43.6 million ADA**.
+This value shifts every epoch as stake enters or leaves delegation — the agent always fetches
+the live figure from Koios and computes S_sat dynamically; no hardcoded value is used.
+
+Saturation affects a pool at two separate stages, and it is important not to confuse them.
+
+**Stage 1 — Discovery filter (`discover_pools.mjs`)**
+
+When you run `discover_pools.mjs`, it drops any pool whose `activeStakeAda` is at or above
+`maxSaturationFraction × S_sat` (default 1.0, i.e. 100% of S_sat). These pools never appear in
+`candidate_pools.json`. A pool *in* `candidate_pools.json` passed this check — it is a candidate,
+not a rejected pool.
+
+**Stage 2 — Allocation headroom check (`allocate.mjs`)**
+
+During each epoch run, even a pool classified as DELEGATE can receive no allocation if it is very
+close to saturation. The allocator computes:
+```
+roomToSat = S_sat − pool.activeStakeAda
+```
+If `roomToSat` is less than the 10,000 ADA minimum meaningful delegation, the pool is skipped
+entirely — even though it is not technically over-saturated. A pool could be at 99.98% of S_sat
+and still appear in the candidate list while receiving no stake for this reason. Such pools receive
+a **QUALIFIES — at or above saturation — no stake can be added** note in the report.
+
+**Why a pool might look "not that close" but still receive no allocation**
+
+Pools can also appear in the AVOID section or receive no stake for reasons unrelated to saturation:
+
+- **Performance failure** — the pool must have exactly 100% block production performance over the
+  last 20 qualifying epochs. Any deviation results in an AVOID recommendation.
+- **Red-zone logic** — a pool with low margin and high pledge relative to its fixed cost may have a
+  red zone where adding delegation reduces SPO income. If Pool Ranger cannot supply enough stake to
+  push the pool past the trough in one move, the pool is AVOID.
+- **20% concentration cap** — no more than 20% of the total budget goes to any single pool, so a
+  pool may receive nothing simply because the greedy ranker funded better-ROA pools first.
 
 #### Allocation limits and the global optimizer
 

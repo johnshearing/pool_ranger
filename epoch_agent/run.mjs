@@ -151,11 +151,18 @@ async function main() {
   }
   const poolInfoMap = new Map(poolInfos.map(p => [p.poolId, p]));
 
-  // 6. Fetch pool history for all candidates (parallel)
+  // 6. Fetch pool history for all candidates, throttled to avoid overwhelming Koios.
   console.log('[run] Fetching pool history (up to 73 epochs each)...');
-  const historyEntries = await Promise.all(
-    poolIds.map(id => fetchPoolHistory(id, 73).then(h => [id, h]))
-  );
+  const HISTORY_CONCURRENCY = 5;
+  const historyEntries = [];
+  for (let i = 0; i < poolIds.length; i += HISTORY_CONCURRENCY) {
+    const chunk = poolIds.slice(i, i + HISTORY_CONCURRENCY);
+    process.stdout.write(`\r[run]   ${Math.min(i + HISTORY_CONCURRENCY, poolIds.length)} / ${poolIds.length}   `);
+    const batch = await Promise.all(chunk.map(id => fetchPoolHistory(id, 73).then(h => [id, h])));
+    historyEntries.push(...batch);
+    if (i + HISTORY_CONCURRENCY < poolIds.length) await new Promise(r => setTimeout(r, 200));
+  }
+  process.stdout.write('\n');
   const poolHistoryMap = new Map(historyEntries);
 
   // 7. Collect all epoch numbers and fetch network epoch info

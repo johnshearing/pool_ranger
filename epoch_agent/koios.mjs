@@ -19,46 +19,65 @@ function authHeaders() {
   return key ? { Authorization: `Bearer ${key}` } : {};
 }
 
-// Internal fetch with retry on HTTP 429 (rate limit).
+// Internal fetch with retry on HTTP 429 (rate limit) and transient network errors.
 async function koiosFetch(path, options = {}) {
   const url = `${KOIOS_BASE}${path}`;
   const headers = { 'Content-Type': 'application/json', ...authHeaders(), ...options.headers };
-  let delay = 1000;
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const res = await fetch(url, { ...options, headers });
-    if (res.status === 429) {
+  let delay = 1500;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const res = await fetch(url, { ...options, headers });
+      if (res.status === 429 || res.status === 503 || res.status === 504) {
+        await new Promise(r => setTimeout(r, delay));
+        delay = Math.min(delay * 2, 30000);
+        continue;
+      }
+      if (!res.ok) {
+        const body = await res.text().catch(() => '');
+        throw new Error(`Koios ${res.status} ${res.statusText} for ${path}: ${body.slice(0, 200)}`);
+      }
+      return res.json();
+    } catch (err) {
+      // Re-throw non-retryable errors (e.g. JSON parse errors, explicit throws above)
+      if (err.message.startsWith('Koios ')) throw err;
+      // Transient network error — wait and retry
+      if (attempt === 5) throw new Error(`Koios network error for ${path} after retries: ${err.message}`);
       await new Promise(r => setTimeout(r, delay));
-      delay *= 2;
-      continue;
+      delay = Math.min(delay * 2, 30000);
     }
-    if (!res.ok) {
-      const body = await res.text().catch(() => '');
-      throw new Error(`Koios ${res.status} ${res.statusText} for ${path}: ${body.slice(0, 200)}`);
-    }
-    return res.json();
   }
-  throw new Error(`Koios rate limit persisted after retries for ${path}`);
+  throw new Error(`Koios request failed after retries for ${path}`);
 }
 
-// fetchPoolsInfo — fetch parameters for a list of pools in one POST call.
+const POOL_INFO_BATCH = 50;   // Koios /pool_info body limit is 5120 bytes; 50 IDs ≈ 3100 bytes
+
+// fetchPoolsInfo — fetch parameters for a list of pools, batching to stay under Koios's
+// 5120-byte POST body limit.
 // poolIds: string[] of bech32 pool IDs (pool1...)
 // Returns: PoolInfo[]
 //   { poolId, ticker, name, pledgeAda, fixedCostAda, margin, activeStakeAda }
 export async function fetchPoolsInfo(poolIds) {
   if (poolIds.length === 0) return [];
-  const data = await koiosFetch('/pool_info', {
-    method: 'POST',
-    body: JSON.stringify({ _pool_bech32_ids: poolIds }),
-  });
-  return data.map(p => ({
-    poolId:         p.pool_id_bech32,
-    ticker:         p.meta_json?.ticker ?? null,
-    name:           p.meta_json?.name   ?? null,
-    pledgeAda:      Number(p.pledge)      / 1e6,
-    fixedCostAda:   Number(p.fixed_cost)  / 1e6,
-    margin:         Number(p.margin),
-    activeStakeAda: Number(p.active_stake ?? p.live_stake ?? 0) / 1e6,
-  }));
+  const results = [];
+  for (let i = 0; i < poolIds.length; i += POOL_INFO_BATCH) {
+    const chunk = poolIds.slice(i, i + POOL_INFO_BATCH);
+    const data = await koiosFetch('/pool_info', {
+      method: 'POST',
+      body: JSON.stringify({ _pool_bech32_ids: chunk }),
+    });
+    for (const p of data) {
+      results.push({
+        poolId:         p.pool_id_bech32,
+        ticker:         p.meta_json?.ticker ?? null,
+        name:           p.meta_json?.name   ?? null,
+        pledgeAda:      Number(p.pledge)      / 1e6,
+        fixedCostAda:   Number(p.fixed_cost)  / 1e6,
+        margin:         Number(p.margin),
+        activeStakeAda: Number(p.active_stake ?? p.live_stake ?? 0) / 1e6,
+      });
+    }
+  }
+  return results;
 }
 
 // fetchPoolHistory — block and stake history for a single pool.
