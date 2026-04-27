@@ -18,10 +18,14 @@ function signedPct(n) {
 
 function roaLines(indent, c) {
   const L = 24;
+  const luckZStr = c.luckZ != null
+    ? (c.luckZ >= 0 ? '+' : '') + c.luckZ.toFixed(2) + ' σ'
+    : 'n/a';
   return [
     `${indent}${'Projected ROA:'.padEnd(L)} ${pct(c.roaAtCurrent)}`,
     `${indent}${'Historical ROA (20 ep):'.padEnd(L)} ${c.historicalRoa  !== null ? pct(c.historicalRoa)      : 'n/a'}`,
     `${indent}${'Luck premium (20 ep):'.padEnd(L)} ${c.luckPremium    !== null ? signedPct(c.luckPremium) : 'n/a'}`,
+    `${indent}${'Luck z-score (20 ep):'.padEnd(L)} ${luckZStr}`,
   ];
 }
 
@@ -49,6 +53,7 @@ function beLabel(epochs) {
 //   weightedRoaAfter:     number,
 //   generatedAt:          string (ISO),
 //   undeployedAda:        number,
+//   poolLuckHistory:      object (poolId → { ticker, observations: [{epoch,luckZ,luckPremium,nEpochs}] }),
 // }
 //
 // Returns: string
@@ -62,6 +67,7 @@ export function formatReport(reportData) {
     weightedRoaBefore, weightedRoaAfter,
     generatedAt,
     undeployedAda,
+    poolLuckHistory = {},
   } = reportData;
 
   const lines = [];
@@ -291,6 +297,49 @@ export function formatReport(reportData) {
     push(`Net ROA change:     ${sign}${pct(delta)}`);
   } else {
     push('(No deployed stake to compute weighted ROA)');
+  }
+  blank();
+
+  // ── Luck Z-Score Trend ───────────────────────────────────────────────────
+  // Show pools that have at least 2 recorded observations so the admin can
+  // spot systematic performance advantages accumulating over time.
+  const trendPools = Object.entries(poolLuckHistory)
+    .filter(([, h]) => h.observations && h.observations.length >= 2)
+    .sort(([, a], [, b]) => {
+      const latestA = a.observations[a.observations.length - 1]?.luckZ ?? 0;
+      const latestB = b.observations[b.observations.length - 1]?.luckZ ?? 0;
+      return latestB - latestA;
+    });
+
+  push('LUCK Z-SCORE TREND  (systematic advantage tracker)');
+  push(line());
+  push('  z > +1.5 consistently across reports → likely real advantage beyond random variance.');
+  push('  z ≈ 0   → normal luck; z < -1.5 consistently → possible systematic disadvantage.');
+  push('  Pools need 2+ observations before the trend is meaningful.');
+  blank();
+  if (trendPools.length === 0) {
+    push('  No pools with 2+ observations yet.');
+  } else {
+    for (const [poolId, hist] of trendPools) {
+      const label = hist.ticker ? `[${hist.ticker}]` : `[${poolId.slice(0, 12)}…]`;
+      const obs   = hist.observations;
+      const zVals = obs.map(o => o.luckZ != null
+        ? (o.luckZ >= 0 ? '+' : '') + o.luckZ.toFixed(2)
+        : ' n/a');
+      const epochs = obs.map(o => o.epoch);
+      push(`  ${label}`);
+      push(`    Epochs: ${epochs.join(', ')}`);
+      push(`    z-scores: ${zVals.join(', ')}`);
+
+      // Flag if consistently strong (all non-null values > +1.5 or < -1.5)
+      const nonNull = obs.filter(o => o.luckZ != null).map(o => o.luckZ);
+      if (nonNull.length >= 2) {
+        const allPositive = nonNull.every(z => z > 1.5);
+        const allNegative = nonNull.every(z => z < -1.5);
+        if (allPositive) push('    *** Consistently above +1.5σ — investigate for real advantage ***');
+        if (allNegative) push('    *** Consistently below −1.5σ — investigate for real disadvantage ***');
+      }
+    }
   }
   blank();
 

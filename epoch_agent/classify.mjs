@@ -3,7 +3,7 @@
 // harmful (ALL_RED), or conditional on cursor position (HAS_RED_ZONE).
 // Also computes performance factor using the same method as SPO_REWARD_ANALYSIS_CHART.html.
 
-import { pledgeBonus, mMin, troughExtDeleg, delegROA } from './math.mjs';
+import { pledgeBonus, mMin, troughExtDeleg, delegROA, gross, EPOCHS_PER_YR } from './math.mjs';
 
 export const ClassType = Object.freeze({
   ALL_GREEN:    'ALL_GREEN',    // no red zone — delegation is always cooperative
@@ -60,13 +60,18 @@ export function computePerformance(poolHistory, epochInfoMap, windowEpochs = 20)
 //   - each epoch's own pool activeStake (not today's)
 //   - per-epoch performance WITHOUT the 1.0 cap — lucky pools show values above 100%
 //
-// Returns: { historicalRoa, luckPremium } in %/yr, or nulls if no settled data available.
+// Returns: { historicalRoa, luckPremium, luckZ } in %/yr (luckZ is dimensionless σ),
+// or nulls if no settled data available.
 // luckPremium = historicalRoa minus the same calculation at perf=1.0 (expected performance).
 // A positive luckPremium means the pool has minted more blocks than its slot assignment expected.
+// luckZ = luckPremium divided by its theoretical standard error (Poisson block-assignment model).
+//   |luckZ| < 1.5 → consistent with pure random variance
+//   luckZ  > 1.5 consistently across many reports → likely real systematic advantage
 export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowEpochs = 20) {
   const slice = poolHistory.slice(0, windowEpochs);
   const roaValues      = [];
   const expectedValues = [];
+  let sumC2overExp     = 0;  // sum of (C_i^2 / expected_i) for z-score denominator
 
   for (const entry of slice) {
     const net = epochInfoMap.get(entry.epochNo);
@@ -81,12 +86,28 @@ export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowE
     const perf_i = entry.blockCnt / expected;   // intentionally uncapped
     roaValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, perf_i));
     expectedValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, 1.0));
+
+    // delegROA is exactly linear in perf when gross > F, so luck_i = C_i * (perf_i - 1).
+    // Var(perf_i) = 1/expected_i (Poisson), so Var(luck_i) = C_i^2 / expected_i.
+    const g_i = gross(entry.activeStakeAda, P, r_i);
+    if (g_i > F) {
+      const C_i = (1 - m) * g_i / entry.activeStakeAda * EPOCHS_PER_YR * 100;
+      sumC2overExp += (C_i * C_i) / expected;
+    }
   }
 
-  if (roaValues.length === 0) return { historicalRoa: null, luckPremium: null };
-  const historicalRoa = roaValues.reduce((a, b) => a + b, 0) / roaValues.length;
-  const expectedRoa   = expectedValues.reduce((a, b) => a + b, 0) / expectedValues.length;
-  return { historicalRoa, luckPremium: historicalRoa - expectedRoa };
+  if (roaValues.length === 0) return { historicalRoa: null, luckPremium: null, luckZ: null };
+  const n           = roaValues.length;
+  const historicalRoa = roaValues.reduce((a, b) => a + b, 0) / n;
+  const expectedRoa   = expectedValues.reduce((a, b) => a + b, 0) / n;
+  const luckPremium   = historicalRoa - expectedRoa;
+
+  // Standard error of the average luck premium (std dev of the mean over n epochs).
+  // se = sqrt(sum C_i^2/expected_i) / n
+  const se    = sumC2overExp > 0 ? Math.sqrt(sumC2overExp) / n : 0;
+  const luckZ = se > 0 ? luckPremium / se : null;
+
+  return { historicalRoa, luckPremium, luckZ };
 }
 
 // classifyPool — classify a single pool and produce a delegation recommendation.
@@ -179,7 +200,7 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
   // ROA at current total stake and at proposed total stake
   const currentTotalStake   = activeStakeAda;
   const roaAtCurrent        = delegROA(currentTotalStake, P, F, m, r, perf);
-  const { historicalRoa, luckPremium } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20);
+  const { historicalRoa, luckPremium, luckZ } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20);
 
   let proposedTotalStake = currentTotalStake;
   if (recommendation === Rec.DELEGATE) {
@@ -217,6 +238,7 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     roaAtCurrent,
     historicalRoa,
     luckPremium,
+    luckZ,
     solicitCandidate,
   };
 }

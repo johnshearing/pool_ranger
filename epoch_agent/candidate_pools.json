@@ -4,6 +4,10 @@
   "_howToFind": "Look up pool IDs on pool.pm, adapools.org, or Cardano Explorer. Use the bech32 format (starts with pool1...).",
   "pools": [
     { "id": "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n", "ticker": "ADAFR" },
+    { "id": "pool1a23gmvalpdams9d42t7fur8vmknzjv7wd3nsvuvrc7dv66lnau0", "ticker": "AOS" },
+    { "id": "pool1e98xlcgj80c3rdmm27v5hnvrdtut52e65uk0ema7ctfag596vr2", "ticker": "COSD" },
+    { "id": "pool1prc9hna2mgamtspchrygc66s9n4tlkvh39e3t9zccef4kzc3ns2", "ticker": "TERM" },
+    { "id": "pool1gtphgrdj8sluxm9e7ca2spcwcq2p0dxj9zf5v0yv3gsagzq704n", "ticker": "ADAFR" },                
     { "id": "pool17ahr5ygy48vpdfnatqn2z4wfu2te4quapk2yx3k50ce6kd7feg0", "ticker": "ST3AK" },
     { "id": "pool1qqqqqdk4zhsjuxxd8jyvwncf5eucfskz0xjjj64fdmlgj735lr9", "ticker": "ATADA" },
     { "id": "pool1dmqzwuql5mylffvn7ln3pr9j7kh4gdsssrmma5wgx56f6rtyf42", "ticker": "BNTY1" },

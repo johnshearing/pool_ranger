@@ -230,7 +230,28 @@ async function main() {
   const totalAllocated = [...allocation.values()].reduce((s, e) => s + e.proposedAda, 0);
   const undeployedAda  = Math.max(0, globalBudget - totalAllocated);
 
-  // 14. Format and output report
+  // 14. Update poolLuckHistory — append one observation per pool per epoch
+  if (!state.poolLuckHistory) state.poolLuckHistory = {};
+  for (const c of classifications) {
+    if (c.luckZ === null && c.luckPremium === null) continue;
+    if (!state.poolLuckHistory[c.poolId]) {
+      state.poolLuckHistory[c.poolId] = { ticker: c.ticker, observations: [] };
+    }
+    const hist = state.poolLuckHistory[c.poolId];
+    hist.ticker = c.ticker;
+    if (!hist.observations.some(o => o.epoch === epochNo)) {
+      hist.observations.push({
+        epoch:       epochNo,
+        luckZ:       c.luckZ        !== null ? parseFloat(c.luckZ.toFixed(2))        : null,
+        luckPremium: c.luckPremium  !== null ? parseFloat(c.luckPremium.toFixed(4))  : null,
+        nEpochs:     c.perfValidEpochs,
+      });
+      // Keep only the most recent 20 observations to bound file growth
+      if (hist.observations.length > 20) hist.observations.shift();
+    }
+  }
+
+  // Format and output report
   const generatedAt = new Date().toISOString();
   const reportText  = formatReport({
     epochNo,
@@ -245,6 +266,7 @@ async function main() {
     weightedRoaAfter,
     generatedAt,
     undeployedAda,
+    poolLuckHistory: state.poolLuckHistory,
   });
 
   console.log('\n' + reportText);

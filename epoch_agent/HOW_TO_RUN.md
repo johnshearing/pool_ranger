@@ -108,6 +108,12 @@ The agent auto-migrates settled entries (where `activeFromEpoch ≤ currentEpoch
 `currentDelegations` on each run. Settled entries are also appended to `completedChanges`
 for a permanent audit trail — do not edit that field manually.
 
+The `poolLuckHistory` field is maintained automatically by the agent — do not edit it manually.
+After each run it appends one observation `{ epoch, luckZ, luckPremium, nEpochs }` per evaluated
+pool. The last 20 observations per pool are kept; older ones are pruned. After 6+ runs, the
+accumulated z-score history becomes a meaningful signal for detecting systematic performance
+advantages (see *Luck premium and luck z-score* in the Interpretation guide below).
+
 ---
 
 ### Step 3 — Run the agent
@@ -158,6 +164,7 @@ The report has these sections, in order:
 | **POOLS DROPPED** | Pools that passed safety classification (ALL_GREEN) but failed the 20-epoch 100% performance requirement. |
 | **SOLICITATION CANDIDATES** | Pools where adding delegation would harm the SPO — delegators here would benefit from joining Pool Ranger. (Phase 2 — reporting only, no outreach yet.) |
 | **SUMMARY** | Count of forced withdrawals, rebalancing moves with total churn cost, new delegations, and any undeployed stake. Weighted ROA before and after. |
+| **LUCK Z-SCORE TREND** | Appears in every report. Lists pools with 2+ recorded luck z-score observations and displays each epoch's z value in sequence. Flags any pool consistently above +1.5σ or below −1.5σ with a `***` warning. Use this section to detect systematic performance advantages accumulating over time that projected ROA cannot see. |
 | **NEXT STEPS** | Numbered actions to execute, separated by type: forced withdrawals, approved rebalancing moves, and new/increased delegations. |
 
 ---
@@ -272,6 +279,117 @@ not yet implemented.
 recent settled epochs. As of 2026, `r ≈ 0.000310` (the reserve has been depleting since
 mainnet launch). The chart's hardcoded `r = 0.000548` is outdated — the agent always
 uses the live value.
+
+#### The projected ROA ceiling
+
+Looking across pools, projected ROA rarely exceeds about 2.2 %/yr regardless of how well a pool
+performs. This is a hard limit set by the protocol's monetary expansion rate, not a bug.
+
+The epoch rate `r` shown in the report header equals `total network rewards / total active stake`
+per epoch. At `r = 0.000310`:
+
+```
+0.000310 × 73 epochs/yr = 2.263 %/yr  ← gross ceiling, zero-fee pool at full saturation
+```
+
+After the minimum fixed fee (170 ADA) and any margin, delegators in the best-case pools receive
+approximately **2.1–2.2 %/yr** at most. Pools showing 1.6–1.7% projected ROA are lower either
+because they are undersaturated (the fixed fee consumes a larger share of a small pool's rewards)
+or because their margin is higher.
+
+A fully saturated pool at ~43.6 M ADA with a 170 ADA fixed fee and 1% margin illustrates this:
+the 170 ADA fee represents only ~1% of that pool's gross epoch rewards, so nearly all of the
+2.26% gross reaches delegators after the margin cut. A pool with only 7 M ADA active stake pays
+the same 170 ADA fixed fee but that fee now represents ~7–8% of gross rewards — a much larger
+drag, producing a projected ROA closer to 1.6%.
+
+As the Cardano reserve depletes over time, `r` slowly falls and the ceiling moves down with it.
+The report always uses the live `r` averaged over the 5 most recent settled epochs.
+
+#### Luck premium and luck z-score
+
+Two related metrics appear for each pool in the ROA block:
+
+**Luck premium** (`+0.31 %/yr`) is the raw number: the difference between the pool's historical
+ROA over the last 20 epochs and the ROA that would have been expected at exactly perf = 1.0 during
+those same epochs. A pool with +0.31 %/yr luck premium earned that much more than expected.
+
+The problem with using luck premium to compare pools or track trends is that it is contaminated
+by pool size. A small pool like BNTY1 (7.42 M ADA) produces only ~1–2 blocks per epoch on
+average. One extra block in a given epoch is a 50–100% overperformance for that epoch — which
+shows up as a large luck premium even if nothing systematic is happening. A large pool producing
+15 blocks per epoch has much smoother variance, so its luck premium will naturally be smaller no
+matter how well it performs. You cannot meaningfully compare luck premiums across pools of
+different sizes.
+
+**Luck z-score** (`+2.13 σ`) solves this by dividing the luck premium by its theoretical
+standard error, derived from the Poisson model of block assignment. The result answers: *"given
+how many blocks this pool typically produces, is this level of luck statistically surprising?"*
+A z-score of +1.06 means the same thing whether the pool has 7 M or 70 M ADA — it ran 1.06
+standard deviations above its expected performance.
+
+Think of it like this: flipping a coin 4 times and getting 3 heads feels lucky but is not
+surprising (z ≈ 1.0). Flipping 1,000 times and getting 600 heads suggests something systematic
+about the coin (z ≈ 6.3). The z-score puts both situations on the same scale.
+
+**Why the luck premium is almost always positive in this report.** All pools shown in the
+delegation candidates section passed a 100% performance filter over 20 epochs. This is a
+survivorship filter: pools that happened to run "hot" (got slightly more blocks than expected)
+are statistically more likely to have also had a perfect performance record, because more assigned
+blocks means more chances to demonstrate uptime. Any pool that ran cold over the same window is
+more likely to have a missed slot in its record, failing the filter before reaching the report.
+So the candidate list is pre-selected for pools on the lucky side of the distribution.
+
+#### What the luck z-score reveals — and what it cannot
+
+Projected ROA only models fees and saturation math. It assumes perf = 1.0 and is completely
+blind to how reliably a pool wins block production in practice. Real-world factors do affect
+which pools produce more blocks than expected:
+
+- **Network position.** When two pools are assigned adjacent slots and the first pool's block has
+  not propagated to the second before the second produces its own block, the two chains briefly
+  fork and the network keeps whichever block propagated further first. A pool with fast,
+  well-connected relay nodes near major Cardano relay clusters wins more of these "slot battles."
+  Geographic location and relay network quality are invisible to the ROA formula but visible in
+  the block count.
+- **Hardware and software quality.** Pools that produce blocks quickly within their assigned slot
+  window give those blocks more propagation time, reducing the chance of losing a fork fight.
+- **Operator reliability.** Pools that apply node software updates promptly, maintain hot-standby
+  infrastructure, and never miss an assigned slot demonstrate disciplined operation — which
+  compounds into a slightly higher average block count over many epochs.
+
+These advantages are small per epoch but real. Over many reports, they appear as a **persistently
+positive luck z-score**. A single high reading can be pure chance; the same pool showing above
++1.5σ in every report across 6–10 consecutive epochs is far more likely to reflect a genuine
+real-world edge.
+
+What the z-score cannot do: it cannot predict future luck, only describe past luck. A pool at
+z = +2.0 today may revert toward zero next epoch as the lucky epochs age out of the 20-epoch
+window. The trend over many reports is the signal; a single reading is noise.
+
+#### How to read the LUCK Z-SCORE TREND section
+
+The LUCK Z-SCORE TREND section near the end of each report shows all pools with 2 or more
+recorded observations. The full history is stored in `ranger_state.json → poolLuckHistory` and
+the report section summarises it.
+
+| Pattern | What it likely means | Suggested action |
+|---------|---------------------|-----------------|
+| z bouncing between −1.5 and +1.5 across reports | Normal random variance | No action — expected behaviour |
+| z consistently above +1.5 for 4+ reports | Likely real systematic advantage | Favour this pool when projected ROA is competitive |
+| z consistently below −1.5 for 4+ reports | Possible systematic disadvantage (slot battles lost, slower node) | Monitor; consider removing if the trend persists beyond 6 reports |
+| z high in one report, then drops toward zero | Lucky streak reverting — was random | Ignore; this is statistically expected |
+| z trending steadily downward over time | Old lucky epochs ageing out of the 20-epoch window | Do not chase; the historical premium is fading |
+
+**Practical decision rule.** Only treat a pool's z-score as a meaningful signal once it has
+**6 or more observations** and the **average across all of them exceeds +1.0**. Before that
+sample size, even a run of +2.0 readings can be explained by chance.
+
+The `***` warning that appears in the report when a pool is consistently above +1.5σ or below
+−1.5σ is a prompt to look more carefully — not an automatic recommendation to add or remove stake.
+Pair it with the projected ROA: a pool with consistent z > +1.5 *and* a high projected ROA is a
+genuinely attractive candidate. A pool with z > +1.5 but a low projected ROA (due to high fees or
+undersaturation) is benefiting from luck without translating it into better member returns.
 
 ---
 
