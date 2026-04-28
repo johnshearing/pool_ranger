@@ -18,15 +18,22 @@ function signedPct(n) {
 
 function roaLines(indent, c) {
   const L = 24;
-  const luckZStr   = c.luckZ != null
+  const luckZStr = c.luckZ != null
     ? (c.luckZ >= 0 ? '+' : '') + c.luckZ.toFixed(2) + ' σ'
     : 'n/a';
-  const nEp = c.luckZValidEpochs ?? 20;
+  const nEp    = c.luckZValidEpochs ?? 20;
+  const ageEp  = c.poolAgeEpochs ?? null;
+  const ageStr = ageEp === null
+    ? 'unknown'
+    : ageEp >= 73
+      ? '73+ epochs'
+      : `${ageEp} epochs  (less than full 73-ep window — luckZ less decisive)`;
   return [
     `${indent}${'Projected ROA:'.padEnd(L)} ${pct(c.roaAtCurrent)}`,
     `${indent}${'Historical ROA (20 ep):'.padEnd(L)} ${c.historicalRoa  !== null ? pct(c.historicalRoa)      : 'n/a'}`,
     `${indent}${'Luck premium (20 ep):'.padEnd(L)} ${c.luckPremium    !== null ? signedPct(c.luckPremium) : 'n/a'}`,
     `${indent}${`Luck z-score (${nEp} ep):`.padEnd(L)} ${luckZStr}`,
+    `${indent}${'Pool age:'.padEnd(L)} ${ageStr}`,
   ];
 }
 
@@ -98,6 +105,9 @@ export function formatReport(reportData) {
     (moveOrder[a.entry.moveType] ?? 4) - (moveOrder[b.entry.moveType] ?? 4)
   );
 
+  // Sort new candidates: highest projected ROA first
+  newEntries.sort((a, b) => b.c.roaAtCurrent - a.c.roaAtCurrent);
+
   const rebalanceMoves = existingEntries.filter(
     ({ entry }) => entry.moveType === 'REDUCE' || entry.moveType === 'WITHDRAW'
   );
@@ -107,7 +117,7 @@ export function formatReport(reportData) {
   const forcedIds    = new Set(forcedWithdrawals.map(c => c.poolId));
   const unfunded     = classifications.filter(
     c => c.recommendation === Rec.DELEGATE && !allocatedIds.has(c.poolId) && !forcedIds.has(c.poolId)
-  );
+  ).sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
 
   // AVOID pools (not currently delegated, not safe to start)
   const avoids = classifications.filter(

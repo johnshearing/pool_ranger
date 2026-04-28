@@ -275,5 +275,6 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     luckZValidEpochs,
     luckZWindows,
     solicitCandidate,
+    poolAgeEpochs: poolHistory.length,
   };
 }
