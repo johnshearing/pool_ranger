@@ -1,0 +1,209 @@
+Pool Ranger Delegation Report — Epoch 627
+============================================================
+Generated: 2026-04-28T14:27:05.558Z
+r = 0.000310  |  S_sat ≈ 77.18 M ADA  |  Pool Ranger stake: 0.00 M ADA
+Global budget (total stake minus in-flight): 0.00 M ADA
+
+NEW CANDIDATES
+------------------------------------------------------------
+  P=30.00 M ADA, F=340 ADA, m=4.0%
+  Full ID:           pool1ljqjqskd4f4zekzddw204u5xtzhyz2cllq5v5dmn27zdwf9c70f
+  Classification:    HAS_RED_ZONE — cursor PAST trough at 43.86 M ADA ext — in green zone
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      75.28 M ADA
+  Projected ROA:           1.84 %/yr
+  Historical ROA (20 ep):  1.90 %/yr
+  Luck premium (20 ep):    +0.04 %/yr
+  Luck z-score (73 ep):    +1.68 σ
+  Pool age:                73+ epochs
+  Recommendation:    QUALIFIES — budget exhausted this epoch
+
+[TERM]  P=3.35 M ADA, F=170 ADA, m=0.9%
+  Full ID:           pool1prc9hna2mgamtspchrygc66s9n4tlkvh39e3t9zccef4kzc3ns2
+  Classification:    HAS_RED_ZONE — cursor PAST trough at 7.05 M ADA ext — in green zone
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      70.64 M ADA
+  Projected ROA:           1.73 %/yr
+  Historical ROA (20 ep):  1.81 %/yr
+  Luck premium (20 ep):    +0.06 %/yr
+  Luck z-score (73 ep):    +1.16 σ
+  Pool age:                73+ epochs
+  Recommendation:    QUALIFIES — budget exhausted this epoch
+
+  P=8.44 M ADA, F=500 ADA, m=2.1%
+  Full ID:           pool1a4qtpgce7cu6wzc79fx7qrc3938hkl2gf8c2h5jugvm2gnu86l7
+  Classification:    HAS_RED_ZONE — cursor PAST trough at 4.53 M ADA ext — in green zone
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      29.93 M ADA
+  Projected ROA:           1.73 %/yr
+  Historical ROA (20 ep):  1.77 %/yr
+  Luck premium (20 ep):    +0.03 %/yr
+  Luck z-score (73 ep):    -0.68 σ
+  Pool age:                73+ epochs
+  Recommendation:    QUALIFIES — budget exhausted this epoch
+
+[BLADE]  P=0.50 M ADA, F=170 ADA, m=0.0%
+  Full ID:           pool16ajaae2n5lsyr4f9k9uz5y8tpf0996tw640dzu7chwp2wdrnz6a
+  Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      75.62 M ADA
+  Projected ROA:           1.73 %/yr
+  Historical ROA (20 ep):  1.76 %/yr
+  Luck premium (20 ep):    +0.02 %/yr
+  Luck z-score (73 ep):    +0.68 σ
+  Pool age:                73+ epochs
+  Recommendation:    QUALIFIES — budget exhausted this epoch
+
+  P=0.03 M ADA, F=340 ADA, m=3.0%
+  Full ID:           pool1x9q4jf3zwftwygeeulku8xtlywmtmzwxjk2g3fz3j5mlwjqnr3p
+  Classification:    ALL_GREEN (pledge bonus ≤ fixed fee — always safe)
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      1.03 M ADA
+  Projected ROA:           0.00 %/yr
+  Historical ROA (20 ep):  1.03 %/yr
+  Luck premium (20 ep):    +1.03 %/yr
+  Luck z-score (73 ep):    +5.91 σ
+  Pool age:                73+ epochs
+  Recommendation:    QUALIFIES — budget exhausted this epoch
+
+POOLS AVOIDED (delegation would harm SPO or cannot clear trough)
+------------------------------------------------------------
+[CH1]  P=3.00 M ADA, F=170 ADA, m=0.0%
+  Full ID:           pool14cq4fchmmqjygwjw4zexmqqd6a7caxptjnvseyu6wanjuppv4vk
+  Classification:    ALL_RED (m=0% — entire curve red)
+  Performance:       96.6%  (20 valid epochs)
+  Active stake:      76.59 M ADA  (Pool Ranger: 0.00 M ADA)
+  Projected ROA:           1.69 %/yr
+  Historical ROA (20 ep):  1.70 %/yr
+  Luck premium (20 ep):    -0.06 %/yr
+  Luck z-score (73 ep):    -0.68 σ
+  Pool age:                73+ epochs
+  Recommendation:    AVOID
+  Reason:            Performance 96.6% < 100% (last 20 epochs)
+
+  P=50.00 M ADA, F=340 ADA, m=4.0%
+  Full ID:           pool155p7g23vdme50kp5lfqylfx5h7ndldyz2mletvr8fqucqzyrk44
+  Classification:    HAS_RED_ZONE — cursor BEFORE trough at 77.64 M ADA ext — cannot clear
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      74.57 M ADA  (Pool Ranger: 0.00 M ADA)
+  Projected ROA:           1.98 %/yr
+  Historical ROA (20 ep):  2.05 %/yr
+  Luck premium (20 ep):    +0.05 %/yr
+  Luck z-score (73 ep):    +0.85 σ
+  Pool age:                73+ epochs
+  Recommendation:    AVOID
+  Reason:            Before trough (77.64 M ADA) — insufficient stake to clear
+
+  P=50.00 M ADA, F=340 ADA, m=4.0%
+  Full ID:           pool1l0m820vyqh5pp2yzpw973qzz23neqqd977u0uczh9fs9zqvg0je
+  Classification:    HAS_RED_ZONE — cursor BEFORE trough at 77.64 M ADA ext — cannot clear
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      75.04 M ADA  (Pool Ranger: 0.00 M ADA)
+  Projected ROA:           1.98 %/yr
+  Historical ROA (20 ep):  2.01 %/yr
+  Luck premium (20 ep):    +0.01 %/yr
+  Luck z-score (73 ep):    +0.95 σ
+  Pool age:                73+ epochs
+  Recommendation:    AVOID
+  Reason:            Before trough (77.64 M ADA) — insufficient stake to clear
+
+  P=35.00 M ADA, F=340 ADA, m=4.0%
+  Full ID:           pool1457cnl7qu568h98xrw8krfnjkhf05mfhaq2l50epwy36yuln20q
+  Classification:    HAS_RED_ZONE — cursor BEFORE trough at 52.32 M ADA ext — cannot clear
+  Performance:       100.0%  (20 valid epochs)
+  Active stake:      70.50 M ADA  (Pool Ranger: 0.00 M ADA)
+  Projected ROA:           1.89 %/yr
+  Historical ROA (20 ep):  1.99 %/yr
+  Luck premium (20 ep):    +0.08 %/yr
+  Luck z-score (73 ep):    +2.02 σ
+  Pool age:                73+ epochs
+  Recommendation:    AVOID
+  Reason:            Before trough (52.32 M ADA) — insufficient stake to clear
+
+POOLS DROPPED (failed 20-epoch performance filter)
+------------------------------------------------------------
+  [1PCT0]  P=0.05 M ADA, F=340, m=1.0%
+    Full ID:     pool1g8y2gz4sk7xhyaj469jlj3njyu5dlvqa7t7v9c2gk0yc69879z8
+    Performance: 94.2%  (20 valid epochs checked)
+    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
+  [1PCT1]  P=0.05 M ADA, F=340, m=1.0%
+    Full ID:     pool1s3z5qsg75dar26ykyzcz2u8wc2swgq7pyp7f9sdh5n06qh3jhq2
+    Performance: 95.9%  (20 valid epochs checked)
+    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
+  [1PCT3]  P=0.05 M ADA, F=340, m=1.0%
+    Full ID:     pool12mmcc4rc2fzfv7gyv8h06nvnsrm3m7erzdv8x6gzvjxlu2lf09n
+    Performance: 99.5%  (20 valid epochs checked)
+    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
+  [1PCT4]  P=0.05 M ADA, F=340, m=1.0%
+    Full ID:     pool17qvfg2g843gw6lurru282kkex6vp3pyj6zwj99j4u6k7zvmva5a
+    Performance: 94.9%  (20 valid epochs checked)
+    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
+  [1PCT5]  P=0.05 M ADA, F=340, m=1.0%
+    Full ID:     pool1rkyc3ss904h066sffergss99r9p2kqa4k6ds0g4u5ud4x7yaajd
+    Performance: 95.0%  (20 valid epochs checked)
+    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
+
+SOLICITATION CANDIDATES  (Phase 2 — outreach not yet implemented)
+------------------------------------------------------------
+  Delegators at these pools would benefit from joining Pool Ranger.
+  Sorted by lowest delegator ROA (most in need of better options first).
+
+  [CH1]
+    Full ID:        pool14cq4fchmmqjygwjw4zexmqqd6a7caxptjnvseyu6wanjuppv4vk
+    Classification: ALL_RED
+    Projected ROA: 1.69 %/yr
+    Note: m=0% — SPO income falls with every delegator across full range.
+  
+    Full ID:        pool1457cnl7qu568h98xrw8krfnjkhf05mfhaq2l50epwy36yuln20q
+    Classification: HAS_RED_ZONE
+    Projected ROA: 1.89 %/yr
+    Note: Cursor before trough at 52.32 M ADA ext. Can't clear — adding stake harms SPO.
+  
+    Full ID:        pool1l0m820vyqh5pp2yzpw973qzz23neqqd977u0uczh9fs9zqvg0je
+    Classification: HAS_RED_ZONE
+    Projected ROA: 1.98 %/yr
+    Note: Cursor before trough at 77.64 M ADA ext. Can't clear — adding stake harms SPO.
+  
+    Full ID:        pool155p7g23vdme50kp5lfqylfx5h7ndldyz2mletvr8fqucqzyrk44
+    Classification: HAS_RED_ZONE
+    Projected ROA: 1.98 %/yr
+    Note: Cursor before trough at 77.64 M ADA ext. Can't clear — adding stake harms SPO.
+
+SUMMARY
+------------------------------------------------------------
+New delegations:     0 pool(s) — 0.00 M ADA to new pools
+Qualifies/unfunded:  337 pool(s) qualify but received no stake this epoch
+Undeployed:          0.00 M ADA (remaining after all allocations)
+
+(No deployed stake to compute weighted ROA)
+
+LUCK Z-SCORE TREND  (systematic advantage tracker)
+------------------------------------------------------------
+  Windows: z-score per 20-epoch slice of full history — trend visible on first run.
+  Cross-run: z-score from each past report (builds up over multiple epochs).
+  z > +1.5 consistently → likely real advantage; z < -1.5 → possible disadvantage.
+
+  [ELITE]
+    Windows (epochs ago → z): 1-20: n/a,  21-40: n/a,  41-60: +2.49,  61-73: +2.37
+    *** Consistently above +1.5σ — investigate for real advantage ***
+  [TIA]
+    Windows (epochs ago → z): 1-20: n/a,  21-40: n/a,  41-60: +2.66,  61-73: +3.09
+    *** Consistently above +1.5σ — investigate for real advantage ***
+  [P2PFI]
+    Windows (epochs ago → z): 1-20: -1.71,  21-40: -1.88,  41-60: -2.02,  61-73: -1.65
+    *** Consistently below −1.5σ — investigate for real disadvantage ***
+  [pool1ekhy5xs…]
+    Windows (epochs ago → z): 1-20: -1.91,  21-40: -2.31,  41-60: -3.07,  61-73: -2.77
+    *** Consistently below −1.5σ — investigate for real disadvantage ***
+  [pool106sjgd9…]
+    Windows (epochs ago → z): 1-20: -7.55,  21-36: -2.32
+    *** Consistently below −1.5σ — investigate for real disadvantage ***
+
+NEXT STEPS (for administrator)
+------------------------------------------------------------
+1. Review the recommendations above.
+2. After submitting, record each change in ranger_state.json → inFlightChanges.
+3. Delegation changes take effect at epoch 629 (rewards from epoch 630).
+4. Run this agent next epoch to track progress.
+
+NOTE: Solicitation (Phase 2) not yet implemented.
