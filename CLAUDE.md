@@ -33,6 +33,3 @@ The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview 
 
 ---
 
-## Reference
-
-See `ranger/epoch_agent/HOW_TO_RUN.md` in this directory for full requirements, phased plan, open design questions.

@@ -175,6 +175,15 @@ export async function fetchPoolsInfoForDiscovery(poolIds) {
   }));
 }
 
+// fetchSupply — returns the total ADA supply for the current epoch (lovelace → ADA).
+// This is the correct denominator for computing S_sat = supply / k.
+// Using active_stake instead would undercount by ~40% since only ~57% of supply is staked.
+export async function fetchSupply() {
+  const data = await koiosFetch('/totals?order=epoch_no.desc&limit=1&select=epoch_no,supply');
+  if (!data.length) throw new Error('Koios /totals returned empty result');
+  return Number(data[0].supply) / 1e6;   // lovelace → ADA
+}
+
 // fetchRecentR — compute the per-epoch reward rate r averaged over N settled epochs.
 // r_epoch = totalRewardsAda / activeStakeAda  (both in ADA — ratio is unit-free)
 // total_rewards is only populated ~2+ epochs in the past, so we look back enough epochs

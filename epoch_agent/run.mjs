@@ -19,7 +19,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { fetchPoolsInfo, fetchPoolHistory, fetchEpochInfo,
-         fetchCurrentEpoch, fetchRecentR } from './koios.mjs';
+         fetchCurrentEpoch, fetchRecentR, fetchSupply } from './koios.mjs';
 import { classifyPool, Rec } from './classify.mjs';
 import { globalAllocateWithR } from './allocate.mjs';
 import { formatReport } from './report.mjs';
@@ -138,9 +138,12 @@ async function main() {
   const r = await fetchRecentR(5);
   console.log(`[run] Epoch rate r = ${r.toFixed(6)}`);
 
-  // Saturation point
-  const sSat = computeSsat(epochInfo.activeStakeAda);
-  console.log(`[run] S_sat ≈ ${(sSat / 1e6).toFixed(1)} M ADA`);
+  // Saturation point — use total ADA supply, not active stake.
+  // S_sat = supply / k because the protocol defines saturation as a fraction of total supply.
+  // active_stake is only ~57% of supply; using it understates S_sat by ~40%.
+  const supplyAda = await fetchSupply();
+  const sSat = computeSsat(supplyAda);
+  console.log(`[run] S_sat ≈ ${(sSat / 1e6).toFixed(1)} M ADA  (supply ${(supplyAda / 1e9).toFixed(2)} B ADA / k=500)`);
 
   // 5. Fetch pool info for all candidates
   console.log('[run] Fetching pool parameters...');

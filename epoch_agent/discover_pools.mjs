@@ -23,7 +23,8 @@ import { fileURLToPath } from 'url';
 
 import { fetchCurrentEpoch,
          fetchAllPoolIds,
-         fetchPoolsInfoForDiscovery } from './koios.mjs';
+         fetchPoolsInfoForDiscovery,
+         fetchSupply } from './koios.mjs';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 
@@ -78,10 +79,15 @@ async function main() {
   // Fetch current epoch and compute S_sat
   console.log('[discover] Fetching current epoch from Koios...');
   const epochInfo = await fetchCurrentEpoch();
-  const { epochNo, activeStakeAda } = epochInfo;
-  const sSat = activeStakeAda / 500;
+  const { epochNo } = epochInfo;
   console.log(`[discover] Current epoch: ${epochNo}`);
-  console.log(`[discover] S_sat ≈ ${(sSat / 1e6).toFixed(1)} M ADA`);
+
+  // S_sat = total ADA supply / k  (NOT active_stake / k).
+  // active_stake is only ~57% of supply; using it would understate S_sat by ~40%
+  // and incorrectly flag healthy pools as oversaturated.
+  const supplyAda = await fetchSupply();
+  const sSat = supplyAda / 500;
+  console.log(`[discover] S_sat ≈ ${(sSat / 1e6).toFixed(1)} M ADA  (supply ${(supplyAda / 1e9).toFixed(2)} B ADA / k=500)`);
 
   const maxStakeAda = cfg.maxSaturationFraction * sSat;
 

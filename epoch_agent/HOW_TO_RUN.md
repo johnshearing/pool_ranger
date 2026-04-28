@@ -191,7 +191,7 @@ ranger/epoch_agent/reports/epoch_NNNN.txt
 What the agent does on each run, in order:
 1. Reads `candidate_pools.json` (pool IDs to evaluate)
 2. Reads `ranger_state.json` (current delegations, in-flight changes, total stake)
-3. Fetches the current epoch number and network active stake from Koios
+3. Fetches the current epoch number and total ADA supply from Koios (supply is used to compute S_sat)
 4. Settles any in-flight delegation changes that are now active on-chain
 5. Computes the live epoch rate `r` (average over the 5 most recent settled epochs)
 6. Fetches pool parameters for all candidates (one batched POST to Koios)
@@ -287,13 +287,17 @@ is needed beyond what is required to compute the 20-epoch performance factor.
 
 The saturation point is:
 ```
-S_sat = total_network_active_stake / 500
+S_sat = total_ADA_supply / 500
 ```
-That 500 is Cardano's `k` (nOpt) parameter — the protocol targets 500 pools, so each pool's
-saturation point is 1/500th of all staked ADA. As of epoch 627 (April 2026), total network
-active stake is approximately **21.8 billion ADA**, making S_sat roughly **43.6 million ADA**.
-This value shifts every epoch as stake enters or leaves delegation — the agent always fetches
-the live figure from Koios and computes S_sat dynamically; no hardcoded value is used.
+That 500 is Cardano's `k` (nOpt) parameter. The Cardano protocol defines a pool's stake share
+as a fraction of the **total ADA supply** (not the amount currently staked), so S_sat is 1/500th
+of total supply. As of epoch 627 (April 2026), total supply is approximately **38.6 billion ADA**,
+making S_sat roughly **77.1 million ADA**. Only about 57% of supply is actively staked (~21.8 B ADA),
+so using active stake instead of supply would understate S_sat by ~40% and incorrectly flag healthy
+pools as oversaturated — a bug that was fixed in this codebase by fetching supply from Koios
+`/totals` rather than active stake from `/epoch_info`.
+This value shifts every epoch as the reserve depletes — the agent always fetches the live figure
+from Koios and computes S_sat dynamically; no hardcoded value is used.
 
 Saturation affects a pool at two separate stages, and it is important not to confuse them.
 
@@ -386,8 +390,8 @@ approximately **2.1–2.2 %/yr** at most. Pools showing 1.6–1.7% projected ROA
 because they are undersaturated (the fixed fee consumes a larger share of a small pool's rewards)
 or because their margin is higher.
 
-A fully saturated pool at ~43.6 M ADA with a 170 ADA fixed fee and 1% margin illustrates this:
-the 170 ADA fee represents only ~1% of that pool's gross epoch rewards, so nearly all of the
+A fully saturated pool at ~77 M ADA with a 170 ADA fixed fee and 1% margin illustrates this:
+the 170 ADA fee represents only ~0.7% of that pool's gross epoch rewards, so nearly all of the
 2.26% gross reaches delegators after the margin cut. A pool with only 7 M ADA active stake pays
 the same 170 ADA fixed fee but that fee now represents ~7–8% of gross rewards — a much larger
 drag, producing a projected ROA closer to 1.6%.
@@ -555,6 +559,7 @@ state. The following table maps each goal step to what is actually built today.
 
 ### Additional gaps not explicitly described in the goal
 
+- **S_sat computed from total supply, not active stake: CLOSED (2026-04-28).** The original code passed `activeStakeAda` (from Koios `/epoch_info`) to `computeSsat()`. Only ~57% of ADA supply is actively staked, so this produced an S_sat of ~43.6 M instead of the correct ~77.1 M — silently filtering out any pool between those two values (e.g. TERM at 88% of true S_sat) as "oversaturated." Fixed by adding `fetchSupply()` to `koios.mjs` (queries `/totals`) and passing supply to `computeSsat()` in both `run.mjs` and `discover_pools.mjs`.
 - **Minimum pool age check: CLOSED (2026-04-27).** `discover_pools.mjs` filters out any pool whose `active_epoch_no` is within 30 epochs of the current epoch. Pools that pre-date this check by entering `candidate_pools.json` manually are still not age-checked by `run.mjs` itself — `run.mjs` trusts the list it is given.
 - **HOLD pools re-evaluated against new candidates: CLOSED (2026-04-26).** The global allocator (`globalAllocateWithR` in `allocate.mjs`) now treats HOLD and DELEGATE pools identically each epoch. Stake flows toward better ROA opportunities automatically; every proposed reduction or withdrawal includes a churn cost and break-even estimate in the REBALANCING MOVES section. Remaining gap: no configurable minimum ROA-difference threshold before a move is recommended — even a 0.01 %/yr difference can generate a REDUCE recommendation.
 - **Trough-clearing allocation is not minimum-precise.** For HAS_RED_ZONE pools that can be cleared, the plan implies delegating the minimum amount needed to push past the trough and restore earnings. The current allocator fills up to 20% of available stake or room-to-saturation — whichever is smaller — without targeting the trough minimum specifically.
