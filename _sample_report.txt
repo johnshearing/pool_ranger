@@ -66,6 +66,12 @@ NEW CANDIDATES
   Pool age:                73+ epochs
   Recommendation:    QUALIFIES — budget exhausted this epoch
 
+
+There are several thousand more entries in the actual report.
+
+
+
+
 POOLS AVOIDED (delegation would harm SPO or cannot clear trough)
 ------------------------------------------------------------
 [CH1]  P=3.00 M ADA, F=170 ADA, m=0.0%
@@ -120,6 +126,11 @@ POOLS AVOIDED (delegation would harm SPO or cannot clear trough)
   Recommendation:    AVOID
   Reason:            Before trough (52.32 M ADA) — insufficient stake to clear
 
+
+There are several thousand more entries in the actual report.
+
+
+
 POOLS DROPPED (failed 20-epoch performance filter)
 ------------------------------------------------------------
   [1PCT0]  P=0.05 M ADA, F=340, m=1.0%
@@ -142,6 +153,12 @@ POOLS DROPPED (failed 20-epoch performance filter)
     Full ID:     pool1rkyc3ss904h066sffergss99r9p2kqa4k6ds0g4u5ud4x7yaajd
     Performance: 95.0%  (20 valid epochs checked)
     Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility
+
+
+
+There are several thousand more entries in the actual report.
+
+
 
 SOLICITATION CANDIDATES  (Phase 2 — outreach not yet implemented)
 ------------------------------------------------------------
