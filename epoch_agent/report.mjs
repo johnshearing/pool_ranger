@@ -18,14 +18,15 @@ function signedPct(n) {
 
 function roaLines(indent, c) {
   const L = 24;
-  const luckZStr = c.luckZ != null
+  const luckZStr   = c.luckZ != null
     ? (c.luckZ >= 0 ? '+' : '') + c.luckZ.toFixed(2) + ' σ'
     : 'n/a';
+  const nEp = c.luckZValidEpochs ?? 20;
   return [
     `${indent}${'Projected ROA:'.padEnd(L)} ${pct(c.roaAtCurrent)}`,
     `${indent}${'Historical ROA (20 ep):'.padEnd(L)} ${c.historicalRoa  !== null ? pct(c.historicalRoa)      : 'n/a'}`,
     `${indent}${'Luck premium (20 ep):'.padEnd(L)} ${c.luckPremium    !== null ? signedPct(c.luckPremium) : 'n/a'}`,
-    `${indent}${'Luck z-score (20 ep):'.padEnd(L)} ${luckZStr}`,
+    `${indent}${`Luck z-score (${nEp} ep):`.padEnd(L)} ${luckZStr}`,
   ];
 }
 
@@ -301,10 +302,21 @@ export function formatReport(reportData) {
   blank();
 
   // ── Luck Z-Score Trend ───────────────────────────────────────────────────
-  // Show pools that have at least 2 recorded observations so the admin can
-  // spot systematic performance advantages accumulating over time.
+  // WINDOWS: z-score for non-overlapping 20-epoch slices of each pool's full history.
+  //   Trend is visible on the very first run — no need to wait for multiple reports.
+  // CROSS-RUN: z-score accumulated from previous epoch reports.
+  //
+  // Shown: pools with 2+ cross-run observations, OR pools whose within-run windows
+  // are ALL consistently above +1.5σ or ALL below −1.5σ (systematic signal on run 1).
   const trendPools = Object.entries(poolLuckHistory)
-    .filter(([, h]) => h.observations && h.observations.length >= 2)
+    .filter(([, h]) => {
+      if (!h.observations || h.observations.length === 0) return false;
+      if (h.observations.length >= 2) return true;
+      const wins = (h.observations[h.observations.length - 1]?.luckZ_windows ?? [])
+        .map(w => w.luckZ).filter(z => z !== null);
+      if (wins.length < 2) return false;
+      return wins.every(z => z > 1.5) || wins.every(z => z < -1.5);
+    })
     .sort(([, a], [, b]) => {
       const latestA = a.observations[a.observations.length - 1]?.luckZ ?? 0;
       const latestB = b.observations[b.observations.length - 1]?.luckZ ?? 0;
@@ -313,32 +325,45 @@ export function formatReport(reportData) {
 
   push('LUCK Z-SCORE TREND  (systematic advantage tracker)');
   push(line());
-  push('  z > +1.5 consistently across reports → likely real advantage beyond random variance.');
-  push('  z ≈ 0   → normal luck; z < -1.5 consistently → possible systematic disadvantage.');
-  push('  Pools need 2+ observations before the trend is meaningful.');
+  push('  Windows: z-score per 20-epoch slice of full history — trend visible on first run.');
+  push('  Cross-run: z-score from each past report (builds up over multiple epochs).');
+  push('  z > +1.5 consistently → likely real advantage; z < -1.5 → possible disadvantage.');
   blank();
   if (trendPools.length === 0) {
-    push('  No pools with 2+ observations yet.');
+    push('  No pools with 2+ cross-run reports or consistently extreme windows yet.');
   } else {
     for (const [poolId, hist] of trendPools) {
-      const label = hist.ticker ? `[${hist.ticker}]` : `[${poolId.slice(0, 12)}…]`;
-      const obs   = hist.observations;
-      const zVals = obs.map(o => o.luckZ != null
-        ? (o.luckZ >= 0 ? '+' : '') + o.luckZ.toFixed(2)
-        : ' n/a');
-      const epochs = obs.map(o => o.epoch);
+      const label  = hist.ticker ? `[${hist.ticker}]` : `[${poolId.slice(0, 12)}…]`;
+      const obs    = hist.observations;
+      const latest = obs[obs.length - 1];
       push(`  ${label}`);
-      push(`    Epochs: ${epochs.join(', ')}`);
-      push(`    z-scores: ${zVals.join(', ')}`);
 
-      // Flag if consistently strong (all non-null values > +1.5 or < -1.5)
-      const nonNull = obs.filter(o => o.luckZ != null).map(o => o.luckZ);
-      if (nonNull.length >= 2) {
-        const allPositive = nonNull.every(z => z > 1.5);
-        const allNegative = nonNull.every(z => z < -1.5);
-        if (allPositive) push('    *** Consistently above +1.5σ — investigate for real advantage ***');
-        if (allNegative) push('    *** Consistently below −1.5σ — investigate for real disadvantage ***');
+      // Within-run windows from most recent observation
+      const wins = latest?.luckZ_windows ?? [];
+      if (wins.length > 0) {
+        const wStr = wins.map(w =>
+          `${w.epochsAgo}: ${w.luckZ !== null ? (w.luckZ >= 0 ? '+' : '') + w.luckZ.toFixed(2) : 'n/a'}`
+        ).join(',  ');
+        push(`    Windows (epochs ago → z): ${wStr}`);
       }
+
+      // Cross-run trend (only shown once 2+ reports exist)
+      if (obs.length >= 2) {
+        const zVals  = obs.map(o => o.luckZ != null
+          ? (o.luckZ >= 0 ? '+' : '') + o.luckZ.toFixed(2) : ' n/a');
+        const epochs = obs.map(o => o.epoch);
+        push(`    Cross-run — Epochs: ${epochs.join(', ')}  z: ${zVals.join(', ')}`);
+      }
+
+      // Flag if windows are consistently directional, or cross-run readings are consistent
+      const allWinZ  = wins.map(w => w.luckZ).filter(z => z !== null);
+      const crossZ   = obs.filter(o => o.luckZ != null).map(o => o.luckZ);
+      const winPos   = allWinZ.length  >= 2 && allWinZ.every(z => z >  1.5);
+      const winNeg   = allWinZ.length  >= 2 && allWinZ.every(z => z < -1.5);
+      const crossPos = crossZ.length   >= 2 && crossZ.every(z =>  z >  1.5);
+      const crossNeg = crossZ.length   >= 2 && crossZ.every(z =>  z < -1.5);
+      if (winPos || crossPos) push('    *** Consistently above +1.5σ — investigate for real advantage ***');
+      if (winNeg || crossNeg) push('    *** Consistently below −1.5σ — investigate for real disadvantage ***');
     }
   }
   blank();

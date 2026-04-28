@@ -157,10 +157,15 @@ The agent auto-migrates settled entries (where `activeFromEpoch ≤ currentEpoch
 for a permanent audit trail — do not edit that field manually.
 
 The `poolLuckHistory` field is maintained automatically by the agent — do not edit it manually.
-After each run it appends one observation `{ epoch, luckZ, luckPremium, nEpochs }` per evaluated
-pool. The last 20 observations per pool are kept; older ones are pruned. After 6+ runs, the
-accumulated z-score history becomes a meaningful signal for detecting systematic performance
-advantages (see *Luck premium and luck z-score* in the Interpretation guide below).
+After each run it appends one observation per evaluated pool:
+`{ epoch, luckZ, luckPremium, nEpochs, luckZ_windows }`. Here `nEpochs` is the number of valid
+epochs contributing to the headline `luckZ` calculation (up to 73), and `luckZ_windows` is an
+array of non-overlapping 20-epoch z-scores covering the pool's full 73-epoch history —
+for example `[{ epochsAgo: "1-20", luckZ: +1.23, nEpochs: 18 }, { epochsAgo: "21-40", ... }]`.
+This window breakdown gives a meaningful trend signal even on the very first run — no previous
+observations are required. The last 20 observations per pool are kept; older ones are pruned.
+Cross-run observations accumulating over multiple epoch runs reinforce or contradict the
+within-run window trend (see *Luck premium and luck z-score* in the Interpretation guide below).
 
 ---
 
@@ -212,7 +217,7 @@ The report has these sections, in order:
 | **POOLS DROPPED** | Pools that passed safety classification (ALL_GREEN) but failed the 20-epoch 100% performance requirement. |
 | **SOLICITATION CANDIDATES** | Pools where adding delegation would harm the SPO — delegators here would benefit from joining Pool Ranger. (Phase 2 — reporting only, no outreach yet.) |
 | **SUMMARY** | Count of forced withdrawals, rebalancing moves with total churn cost, new delegations, and any undeployed stake. Weighted ROA before and after. |
-| **LUCK Z-SCORE TREND** | Appears in every report. Lists pools with 2+ recorded luck z-score observations and displays each epoch's z value in sequence. Flags any pool consistently above +1.5σ or below −1.5σ with a `***` warning. Use this section to detect systematic performance advantages accumulating over time that projected ROA cannot see. |
+| **LUCK Z-SCORE TREND** | Appears in every report. Shows two signals per pool: (1) **Windows** — non-overlapping 20-epoch z-scores across the full 73-epoch history, visible on the very first run; (2) **Cross-run** — headline z-scores from past agent runs, accumulating over multiple epochs. Flags any pool whose windows or cross-run readings are all consistently above +1.5σ or below −1.5σ with a `***` warning. Use this section to detect systematic performance advantages that projected ROA cannot see. |
 | **NEXT STEPS** | Numbered actions to execute, separated by type: forced withdrawals, approved rebalancing moves, and new/increased delegations. |
 
 ---
@@ -406,9 +411,12 @@ shows up as a large luck premium even if nothing systematic is happening. A larg
 matter how well it performs. You cannot meaningfully compare luck premiums across pools of
 different sizes.
 
-**Luck z-score** (`+2.13 σ`) solves this by dividing the luck premium by its theoretical
-standard error, derived from the Poisson model of block assignment. The result answers: *"given
-how many blocks this pool typically produces, is this level of luck statistically surprising?"*
+**Luck z-score** (`+2.13 σ, 73 ep`) solves this by computing the average luck premium over up
+to 73 epochs and dividing it by its theoretical standard error, derived from the Poisson model
+of block assignment. Using 73 epochs instead of 20 makes the score more resistant to short-term
+swings — a single lucky run moves a 73-epoch average much less than it would move a 20-epoch
+average. The result answers: *"given how many blocks this pool typically produces across its full
+available history, is this level of luck statistically surprising?"*
 A z-score of +1.06 means the same thing whether the pool has 7 M or 70 M ADA — it ran 1.06
 standard deviations above its expected performance.
 
@@ -442,38 +450,55 @@ which pools produce more blocks than expected:
   infrastructure, and never miss an assigned slot demonstrate disciplined operation — which
   compounds into a slightly higher average block count over many epochs.
 
-These advantages are small per epoch but real. Over many reports, they appear as a **persistently
-positive luck z-score**. A single high reading can be pure chance; the same pool showing above
-+1.5σ in every report across 6–10 consecutive epochs is far more likely to reflect a genuine
-real-world edge.
+These advantages are small per epoch but real. They appear as a **persistently positive luck
+z-score** — and now, thanks to the 73-epoch history and rolling windows, a meaningful signal
+can be visible on the very first run. All non-overlapping 20-epoch windows being positive across
+the pool's full 73-epoch history is a much stronger first-run signal than any single high z
+reading. Confirming the same pattern across multiple cross-run observations removes most of the
+remaining uncertainty.
 
-What the z-score cannot do: it cannot predict future luck, only describe past luck. A pool at
-z = +2.0 today may revert toward zero next epoch as the lucky epochs age out of the 20-epoch
-window. The trend over many reports is the signal; a single reading is noise.
+What the z-score cannot do: it cannot predict future luck, only describe past luck. The headline
+z-score uses up to 73 epochs, making it more stable than a 20-epoch reading — a single lucky
+run cannot move it as dramatically. But as a pool's history evolves the score will change.
+The combination of consistent within-run windows and a stable cross-run trend is the signal;
+any single reading — even a high one — may still reflect chance.
 
 #### How to read the LUCK Z-SCORE TREND section
 
-The LUCK Z-SCORE TREND section near the end of each report shows all pools with 2 or more
-recorded observations. The full history is stored in `ranger_state.json → poolLuckHistory` and
-the report section summarises it.
+The LUCK Z-SCORE TREND section near the end of each report shows up to two rows per pool:
+
+- **Windows** row — non-overlapping 20-epoch z-scores computed across the full 73 epochs of
+  history fetched on this run. Labels like `1-20`, `21-40`, `41-60`, `61-73` say how many epochs
+  ago that window ended. The first window (`1-20`) is the most recent; the last window is the
+  oldest history available. This row appears on the **very first run** — no prior observations
+  are needed.
+- **Cross-run** row — the headline z-score (computed over all available epochs, up to 73) from
+  each past agent run, stored in `ranger_state.json → poolLuckHistory`. This row appears only
+  once a pool has 2 or more recorded observations.
+
+A pool is shown in this section if it has 2+ cross-run observations **or** if all of its
+within-run windows are consistently above +1.5σ or below −1.5σ.
 
 | Pattern | What it likely means | Suggested action |
 |---------|---------------------|-----------------|
-| z bouncing between −1.5 and +1.5 across reports | Normal random variance | No action — expected behaviour |
-| z consistently above +1.5 for 4+ reports | Likely real systematic advantage | Favour this pool when projected ROA is competitive |
-| z consistently below −1.5 for 4+ reports | Possible systematic disadvantage (slot battles lost, slower node) | Monitor; consider removing if the trend persists beyond 6 reports |
-| z high in one report, then drops toward zero | Lucky streak reverting — was random | Ignore; this is statistically expected |
-| z trending steadily downward over time | Old lucky epochs ageing out of the 20-epoch window | Do not chase; the historical premium is fading |
+| All windows bounce between −1.5 and +1.5 | Normal random variance across the pool's full history | No action — expected behaviour |
+| All windows consistently above +1.5 | Likely real systematic advantage throughout the pool's history | Favour this pool when projected ROA is competitive |
+| All windows consistently below −1.5 | Possible systematic disadvantage throughout history | Monitor; consider removing if cross-run trend confirms |
+| Recent windows high, older windows near zero | Advantage may be recent — earlier history was unremarkable | Watch cross-run trend before acting |
+| Recent windows near zero, older windows high | Lucky early history; recent performance now average | Do not chase; the advantage may have faded |
+| Cross-run z consistently above +1.5 for 4+ runs | Persistent advantage confirmed across multiple runs | Strong candidate — pair with projected ROA |
+| Cross-run z consistently below −1.5 for 4+ runs | Persistent disadvantage confirmed across multiple runs | Consider removing if trend persists beyond 6 runs |
 
-**Practical decision rule.** Only treat a pool's z-score as a meaningful signal once it has
-**6 or more observations** and the **average across all of them exceeds +1.0**. Before that
-sample size, even a run of +2.0 readings can be explained by chance.
+**Practical decision rule.** On the **first run**, look for pools where all or most 20-epoch
+windows are above +1.5σ — this suggests a systematic advantage spread across the pool's full
+history, not a recent lucky streak. After **6 or more cross-run observations**, also require the
+average cross-run z to exceed +1.0 before treating the signal as confirmed.
 
-The `***` warning that appears in the report when a pool is consistently above +1.5σ or below
-−1.5σ is a prompt to look more carefully — not an automatic recommendation to add or remove stake.
-Pair it with the projected ROA: a pool with consistent z > +1.5 *and* a high projected ROA is a
-genuinely attractive candidate. A pool with z > +1.5 but a low projected ROA (due to high fees or
-undersaturation) is benefiting from luck without translating it into better member returns.
+The `***` warning is a prompt to look more carefully — not an automatic recommendation to add or
+remove stake. Pair it with the projected ROA: a pool with consistent z > +1.5 *and* a high
+projected ROA is a genuinely attractive candidate. A pool with z > +1.5 but a low projected ROA
+(due to high fees or undersaturation) is benefiting from luck without translating it into better
+member returns.
 
 ---
 

@@ -60,15 +60,18 @@ export function computePerformance(poolHistory, epochInfoMap, windowEpochs = 20)
 //   - each epoch's own pool activeStake (not today's)
 //   - per-epoch performance WITHOUT the 1.0 cap — lucky pools show values above 100%
 //
-// Returns: { historicalRoa, luckPremium, luckZ } in %/yr (luckZ is dimensionless σ),
+// offset: number of epochs to skip from the most-recent end of poolHistory (default 0).
+//         Pass offset=20 to compute over epochs 21-40 ago, etc.
+//
+// Returns: { historicalRoa, luckPremium, luckZ, validEpochs } in %/yr (luckZ dimensionless σ),
 // or nulls if no settled data available.
 // luckPremium = historicalRoa minus the same calculation at perf=1.0 (expected performance).
 // A positive luckPremium means the pool has minted more blocks than its slot assignment expected.
 // luckZ = luckPremium divided by its theoretical standard error (Poisson block-assignment model).
 //   |luckZ| < 1.5 → consistent with pure random variance
-//   luckZ  > 1.5 consistently across many reports → likely real systematic advantage
-export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowEpochs = 20) {
-  const slice = poolHistory.slice(0, windowEpochs);
+//   luckZ  > 1.5 consistently → likely real systematic advantage
+export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowEpochs = 20, offset = 0) {
+  const slice = poolHistory.slice(offset, offset + windowEpochs);
   const roaValues      = [];
   const expectedValues = [];
   let sumC2overExp     = 0;  // sum of (C_i^2 / expected_i) for z-score denominator
@@ -96,7 +99,7 @@ export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowE
     }
   }
 
-  if (roaValues.length === 0) return { historicalRoa: null, luckPremium: null, luckZ: null };
+  if (roaValues.length === 0) return { historicalRoa: null, luckPremium: null, luckZ: null, validEpochs: 0 };
   const n           = roaValues.length;
   const historicalRoa = roaValues.reduce((a, b) => a + b, 0) / n;
   const expectedRoa   = expectedValues.reduce((a, b) => a + b, 0) / n;
@@ -107,7 +110,32 @@ export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowE
   const se    = sumC2overExp > 0 ? Math.sqrt(sumC2overExp) / n : 0;
   const luckZ = se > 0 ? luckPremium / se : null;
 
-  return { historicalRoa, luckPremium, luckZ };
+  return { historicalRoa, luckPremium, luckZ, validEpochs: roaValues.length };
+}
+
+// computeLuckZWindows — compute luckZ for non-overlapping 20-epoch windows across the pool's
+// full available history. Returns a trend signal on the very first run without waiting for
+// multiple agent runs to accumulate cross-run observations.
+//
+// poolHistory sorted descending (index 0 = most recent). Windows are labelled by how many
+// epochs ago they ended, e.g. "1-20" = the 20 most recent, "21-40" = the next 20, etc.
+//
+// Returns: Array<{ epochsAgo, luckZ, nEpochs }>
+export function computeLuckZWindows(poolHistory, epochInfoMap, P, F, m) {
+  const WINDOW  = 20;
+  const windows = [];
+  for (let start = 0; start < poolHistory.length; start += WINDOW) {
+    const end = Math.min(start + WINDOW, poolHistory.length);
+    const { luckZ, validEpochs } = computeHistoricalROA(
+      poolHistory, epochInfoMap, P, F, m, end - start, start,
+    );
+    windows.push({
+      epochsAgo: `${start + 1}-${end}`,
+      luckZ:     luckZ !== null ? parseFloat(luckZ.toFixed(2)) : null,
+      nEpochs:   validEpochs,
+    });
+  }
+  return windows;
 }
 
 // classifyPool — classify a single pool and produce a delegation recommendation.
@@ -200,7 +228,12 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
   // ROA at current total stake and at proposed total stake
   const currentTotalStake   = activeStakeAda;
   const roaAtCurrent        = delegROA(currentTotalStake, P, F, m, r, perf);
-  const { historicalRoa, luckPremium, luckZ } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20);
+  // 20-epoch window for historicalRoa and luckPremium (short-term signal, labelled in report)
+  const { historicalRoa, luckPremium } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20);
+  // Full available history (up to 73 ep) for the headline luckZ — more statistically reliable
+  const { luckZ, validEpochs: luckZValidEpochs } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 73);
+  // Non-overlapping 20-epoch windows across full history — trend visible on first run
+  const luckZWindows = computeLuckZWindows(poolHistory, epochInfoMap, P, F, m);
 
   let proposedTotalStake = currentTotalStake;
   if (recommendation === Rec.DELEGATE) {
@@ -239,6 +272,8 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     historicalRoa,
     luckPremium,
     luckZ,
+    luckZValidEpochs,
+    luckZWindows,
     solicitCandidate,
   };
 }

@@ -248,10 +248,11 @@ async function main() {
     hist.ticker = c.ticker;
     if (!hist.observations.some(o => o.epoch === epochNo)) {
       hist.observations.push({
-        epoch:       epochNo,
-        luckZ:       c.luckZ        !== null ? parseFloat(c.luckZ.toFixed(2))        : null,
-        luckPremium: c.luckPremium  !== null ? parseFloat(c.luckPremium.toFixed(4))  : null,
-        nEpochs:     c.perfValidEpochs,
+        epoch:         epochNo,
+        luckZ:         c.luckZ       !== null ? parseFloat(c.luckZ.toFixed(2))       : null,
+        luckPremium:   c.luckPremium !== null ? parseFloat(c.luckPremium.toFixed(4)) : null,
+        nEpochs:       c.luckZValidEpochs ?? 0,
+        luckZ_windows: c.luckZWindows ?? [],
       });
       // Keep only the most recent 20 observations to bound file growth
       if (hist.observations.length > 20) hist.observations.shift();
