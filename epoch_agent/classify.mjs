@@ -56,7 +56,7 @@ export function computePerformance(poolHistory, epochInfoMap, windowEpochs = 20)
 // computeHistoricalROA — average actual delegator ROA over up to windowEpochs epochs.
 //
 // Unlike the projected "ROA now", this uses:
-//   - each epoch's own r_i  (totalRewardsAda / networkStake, only settled epochs)
+//   - each epoch's own r_i  (totalRewardsAda / networkStake × (1+A₀), only settled epochs)
 //   - each epoch's own pool activeStake (not today's)
 //   - per-epoch performance WITHOUT the 1.0 cap — lucky pools show values above 100%
 //
@@ -85,7 +85,8 @@ export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowE
     const expected = (entry.activeStakeAda / net.activeStakeAda) * net.blkCount;
     if (expected < 0.5) continue;
 
-    const r_i    = net.totalRewardsAda / net.activeStakeAda;
+    // Same correction as fetchRecentR: Koios total_rewards ≈ R/(1+A₀); gross() needs R/TAS.
+    const r_i    = net.totalRewardsAda / net.activeStakeAda * (1 + A0);
     const perf_i = entry.blockCnt / expected;   // intentionally uncapped
     roaValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, perf_i));
     expectedValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, 1.0));

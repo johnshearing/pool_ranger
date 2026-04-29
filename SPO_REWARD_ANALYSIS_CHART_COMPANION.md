@@ -44,10 +44,11 @@ The chart fetches live data from the Cardano blockchain via the
 | **Cursor (external delegation)** | live\_stake − pledge for the current epoch |
 | **Performance Factor (p)** | actual blocks minted / expected blocks, averaged over the chosen epoch window |
 
-**What is not set automatically:** The **Epoch Rate (r)** slider is a network-wide
-parameter — not specific to any pool — so it is left at whatever value you have it set to.
-The default (0.000548) is a reasonable approximation for 2025/2026; see Step 11 for how to
-think about it.
+**What is also set automatically:** The **Epoch Rate (r)** slider IS auto-fetched from Koios
+when you load a pool — the live rate is averaged over the last 5 settled epochs and applied
+immediately. If the fetch fails, the slider keeps its current value and a warning appears in
+the status line. The default before any pool is loaded is **0.000400**, which reflects the
+current mainnet rate in 2026. See Step 11 for how r changes over time.
 
 **Caveats:**
 - Tickers and pool IDs are mainnet only. Preview/preprod testnet pools will not be found.
@@ -119,7 +120,7 @@ theoretical A. All card values reflect the performance factor currently set by t
 
 | Symbol | Meaning | Current value |
 |--------|---------|---------------|
-| `r` | Per-epoch reward rate | ≈ 0.000548 (≈ 4 % / 73 epochs/yr) |
+| `r` | Per-epoch reward rate | ≈ 0.000400 (current mainnet, 2026); auto-fetched on Load Pool |
 | `a₀` | Pledge influence factor | 0.3 (protocol parameter) |
 | `k` | Target number of pools | 500 (protocol parameter) |
 | `F` | Fixed fee (ADA / epoch) | 170 to 340 ADA (SPO-set, min enforced) |
@@ -130,8 +131,8 @@ theoretical A. All card values reflect the performance factor currently set by t
 | `S_sat` | Saturation point ≈ active_stake / k | ≈ 65–75 M ADA (2026) |
 | `A_eff` | Effective pledge bonus per epoch = p·r·a₀·P/(1+a₀) | derived |
 
-> **Note:** `r` drifts downward over time as the reserve depletes. Recompute periodically
-> from recent epoch data or use the current Cardano staking calculator rate.
+> **Note:** `r` drifts downward over time as the reserve depletes. The chart auto-fetches
+> the live rate from Koios each time you load a pool — no manual update needed.
 
 ---
 
@@ -608,11 +609,10 @@ chart — the pool is already near-saturated by pledge alone.
 
 For any candidate pool, type its ticker **or full pool ID** into the **Pool Lookup** panel
 and click **Load Pool** (or press **Enter**) — this sets the Margin, Fixed Fee, Pledge, Cursor,
-and Performance Factor sliders automatically from live on-chain data. Press **Ctrl+K** to jump
-straight to the input field. Use the pool ID (`pool1…`) for pools that have not registered a ticker. Then set the **Epoch Rate** slider to the
-current network value (default 0.000548 is fine for 2025/2026). If the pool is not on
-mainnet or you prefer to enter values manually, look up P, F, m on pool.pm or adapools.org
-and set the sliders by hand.
+Epoch Rate, and Performance Factor sliders automatically from live on-chain data. Press **Ctrl+K** to jump
+straight to the input field. Use the pool ID (`pool1…`) for pools that have not registered a ticker.
+If the pool is not on mainnet or you prefer to enter values manually, look up P, F, m on
+pool.pm or adapools.org and use r = 0.000400 as the current mainnet default (2026).
 
 Then work through this checklist:
 
@@ -712,7 +712,7 @@ p  =  Σ(actual blocks) / Σ(expected blocks)   over chosen epoch window
 
 | Symbol | Meaning | Current value |
 |--------|---------|---------------|
-| `r` | Per-epoch reward rate | ≈ 0.000548 (≈ 4 % / 73 epochs/yr) |
+| `r` | Per-epoch reward rate | ≈ 0.000400 (current mainnet, 2026); auto-fetched on Load Pool |
 | `a₀` | Pledge influence factor | 0.3 (protocol parameter) |
 | `k` | Target number of pools | 500 (protocol parameter) |
 | `F` | Fixed fee (ADA / epoch) | 170 to 340 ADA (SPO-set, min enforced) |

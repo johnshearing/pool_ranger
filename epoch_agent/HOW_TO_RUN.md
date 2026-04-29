@@ -368,33 +368,43 @@ not yet implemented.
 
 #### Epoch rate `r`
 
-`r` is computed fresh each run by averaging `total_rewards / active_stake` over the 5 most
-recent settled epochs. As of 2026, `r ≈ 0.000310` (the reserve has been depleting since
-mainnet launch). The chart's hardcoded `r = 0.000548` is outdated — the agent always
-uses the live value.
+`r` is computed fresh each run by averaging over the 5 most recent settled epochs:
+
+```
+r = (total_rewards / active_stake) × (1 + a₀)
+```
+
+The `× (1 + a₀)` correction is necessary because Koios `total_rewards` is the sum of rewards
+actually distributed to stakers — approximately `R / (1 + a₀)` — not the full epoch reward pot
+`R`. The `gross()` formula requires `r = R / TAS`, so the raw Koios value must be scaled up by
+`(1 + a₀) = 1.3` before use. Without this correction ROA is underestimated by approximately 23%.
+As of 2026, the corrected `r ≈ 0.000400`. Both the agent and the interactive chart apply this
+correction automatically when fetching live data from Koios.
 
 #### The projected ROA ceiling
 
 Looking across pools, projected ROA rarely exceeds about 2.2 %/yr regardless of how well a pool
 performs. This is a hard limit set by the protocol's monetary expansion rate, not a bug.
 
-The epoch rate `r` shown in the report header equals `total network rewards / total active stake`
-per epoch. At `r = 0.000310`:
+The epoch rate `r` shown in the report header is the corrected value
+`(total_rewards / active_stake) × (1 + a₀)`. At `r ≈ 0.000400`, the ceiling for a typical pool
+where pledge is small relative to total stake (P << S) is:
 
 ```
-0.000310 × 73 epochs/yr = 2.263 %/yr  ← gross ceiling, zero-fee pool at full saturation
+r / (1 + a₀) × 73 epochs/yr  =  0.000400 / 1.3 × 73 × 100  ≈  2.25 %/yr
+← zero-fee pool at full saturation with minimal pledge
 ```
 
 After the minimum fixed fee (170 ADA) and any margin, delegators in the best-case pools receive
-approximately **2.1–2.2 %/yr** at most. Pools showing 1.6–1.7% projected ROA are lower either
+approximately **2.1–2.2 %/yr** at most. Pools showing 1.6–2.0% projected ROA are lower either
 because they are undersaturated (the fixed fee consumes a larger share of a small pool's rewards)
 or because their margin is higher.
 
 A fully saturated pool at ~77 M ADA with a 170 ADA fixed fee and 1% margin illustrates this:
 the 170 ADA fee represents only ~0.7% of that pool's gross epoch rewards, so nearly all of the
-2.26% gross reaches delegators after the margin cut. A pool with only 7 M ADA active stake pays
-the same 170 ADA fixed fee but that fee now represents ~7–8% of gross rewards — a much larger
-drag, producing a projected ROA closer to 1.6%.
+2.25 %/yr ceiling reaches delegators after the margin cut. A pool with only 7 M ADA active stake
+pays the same 170 ADA fixed fee but that fee now represents ~7–8% of gross rewards — a much
+larger drag, producing a projected ROA closer to 2.0–2.1%.
 
 As the Cardano reserve depletes over time, `r` slowly falls and the ceiling moves down with it.
 The report always uses the live `r` averaged over the 5 most recent settled epochs.

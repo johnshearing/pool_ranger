@@ -190,8 +190,8 @@ input[type=range] {
       <input type="range" id="sl-f" min="170" max="1000" step="10" value="340">
     </div>
     <div class="slider-row">
-      <label>Epoch Rate (r) <span id="lbl-r">0.000548</span></label>
-      <input type="range" id="sl-r" min="0.0003" max="0.0008" step="0.000001" value="0.000548">
+      <label>Epoch Rate (r) <span id="lbl-r">0.000400</span></label>
+      <input type="range" id="sl-r" min="0.0003" max="0.0008" step="0.000001" value="0.000400">
     </div>
   </div>
 </div>
@@ -730,7 +730,8 @@ async function fetchLiveR(numEpochs = 5) {
       const rates = [];
       for (const e of epochs) {
         if (e.total_rewards == null) continue;
-        const r = Number(e.total_rewards) / Number(e.active_stake);
+        // Same correction as koios.mjs: Koios total_rewards ≈ R/(1+A₀); gross() needs R/TAS.
+        const r = Number(e.total_rewards) / Number(e.active_stake) * (1 + A0);
         if (r >= R_MIN && r <= R_MAX) rates.push(r);
         if (rates.length >= numEpochs) break;
       }

@@ -8,6 +8,7 @@
 // Without a key the public tier allows ~10 req/s which is sufficient.
 
 import 'dotenv/config';
+import { A0 } from './math.mjs';
 
 const KOIOS_BASE = 'https://api.koios.rest/api/v1';
 const R_FALLBACK = 0.000548;   // per-epoch rate fallback if Koios data is unavailable
@@ -200,7 +201,9 @@ export async function fetchRecentR(numEpochs = 5) {
   const rates = [];
   for (const [, info] of map) {
     if (info.totalRewardsAda != null && info.activeStakeAda > 0 && info.totalRewardsAda > 0) {
-      const r = info.totalRewardsAda / info.activeStakeAda;
+      // Koios total_rewards = actual distributed rewards ≈ R/(1+A₀).
+      // The gross() formula requires r = R/TAS, so correct by (1+A₀).
+      const r = info.totalRewardsAda / info.activeStakeAda * (1 + A0);
       if (r >= R_MIN && r <= R_MAX) rates.push(r);
     }
     if (rates.length >= numEpochs) break;
