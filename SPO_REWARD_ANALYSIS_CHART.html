@@ -114,8 +114,9 @@ input[type=range] {
   font-family: monospace;
   font-size: 0.95rem;
   padding: 0.45rem 0.75rem;
-  width: 9rem;
-  text-transform: uppercase;
+  flex: 1;
+  min-width: 9rem;
+  max-width: 30rem;
   outline: none;
   transition: border-color 0.15s;
 }
@@ -160,12 +161,13 @@ input[type=range] {
 <div class="panel">
   <div class="panel-title">Pool Lookup — Mainnet via Koios + corsproxy.io (no API key needed)</div>
   <div class="lookup-row">
-    <input type="text" id="ticker-input" placeholder="e.g. IOHK" maxlength="5"
+    <input type="text" id="ticker-input" placeholder="Ticker (e.g. IOHK) or pool1…" maxlength="60"
            autocomplete="off" spellcheck="false">
     <button id="load-btn">Load Pool</button>
     <span style="font-size:0.75rem;color:var(--muted)">
-      Type a mainnet pool ticker and press Enter or click Load Pool.
+      Enter a ticker <em>or</em> a full pool ID (pool1…) then press Enter or click Load Pool.
       Sliders for margin, fee, pledge, current delegation, and performance will be set automatically.
+      <strong style="color:var(--accent)">Ctrl+K</strong> returns focus here.
     </span>
   </div>
   <div id="lookup-status"></div>
@@ -742,8 +744,12 @@ async function fetchLiveR(numEpochs = 5) {
 }
 
 async function loadPool() {
-  const ticker = document.getElementById('ticker-input').value.trim().toUpperCase();
-  if (!ticker) { setStatus('Please enter a ticker symbol.', 'muted'); return; }
+  const raw = document.getElementById('ticker-input').value.trim();
+  if (!raw) { setStatus('Please enter a ticker or pool ID.', 'muted'); return; }
+
+  // Detect whether input is a bech32 pool ID (starts with "pool1", length > 30)
+  const isPoolId = /^pool1[a-z0-9]{50,}$/i.test(raw);
+  const ticker   = isPoolId ? null : raw.toUpperCase();
 
   const btn = document.getElementById('load-btn');
   btn.disabled = true;
@@ -755,23 +761,31 @@ async function loadPool() {
   document.getElementById('perf-status').textContent = 'Fetching performance history…';
   document.getElementById('perf-status').style.color = 'var(--muted)';
 
-  setStatus('Searching for ' + ticker + ' on mainnet…', 'muted');
+  const label = isPoolId ? raw.slice(0, 16) + '…' : ticker;
+  setStatus('Searching for ' + label + ' on mainnet…', 'muted');
 
   try {
-    // Step 1: resolve ticker → pool_id_bech32
-    const listResp = await fetch(
-      proxied(`${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`)
-    );
-    if (!listResp.ok) throw new Error(`Koios pool_list HTTP ${listResp.status}`);
-    const pools = await listResp.json();
+    let poolId;
 
-    if (!Array.isArray(pools) || pools.length === 0) {
-      setStatus(`Pool "${ticker}" not found on mainnet. Check the ticker and try again.`, 'red');
-      document.getElementById('perf-status').textContent = 'Pool not found.';
-      return;
+    if (isPoolId) {
+      // Input is already a bech32 pool ID — skip the ticker lookup
+      poolId = raw.toLowerCase();
+    } else {
+      // Step 1: resolve ticker → pool_id_bech32
+      const listResp = await fetch(
+        proxied(`${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`)
+      );
+      if (!listResp.ok) throw new Error(`Koios pool_list HTTP ${listResp.status}`);
+      const pools = await listResp.json();
+
+      if (!Array.isArray(pools) || pools.length === 0) {
+        setStatus(`Pool "${ticker}" not found on mainnet. Check the ticker and try again.`, 'red');
+        document.getElementById('perf-status').textContent = 'Pool not found.';
+        return;
+      }
+
+      poolId = pools[0].pool_id_bech32;
     }
-
-    const poolId = pools[0].pool_id_bech32;
     setStatus('Found pool ID — fetching parameters…', 'muted');
 
     // Step 2: fetch pool financial parameters
@@ -789,7 +803,7 @@ async function loadPool() {
     }
 
     const info = infos[0];
-    const name         = info.meta_json?.name ?? ticker;
+    const name         = info.meta_json?.name ?? ticker ?? poolId.slice(0, 20);
     const marginPct    = (info.margin ?? 0) * 100;                          // % (0–100)
     const fixedADA     = Number(info.fixed_cost ?? 340000000) / 1e6;        // lovelace → ADA
     const pledgeMADA   = Number(info.pledge     ?? 0)         / 1e12;       // lovelace → M ADA
@@ -809,8 +823,9 @@ async function loadPool() {
     if (extDelegMADA > 70) warnings.push('delegation clamped to 70 M ADA');
     const warn = warnings.length ? ' ⚠ ' + warnings.join(', ') : '';
 
+    const displayTag = ticker ? `${name} [${ticker}]` : `${name} [${poolId.slice(0, 16)}…]`;
     setStatus(
-      `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
+      `${displayTag} · ${delegators} delegators · ${totalMADA} M ADA live stake` +
       `${warn} · fetching epoch history and live r…`,
       'accent'
     );
@@ -823,8 +838,8 @@ async function loadPool() {
       )
     );
     if (histResp.ok) {
-      const raw = await histResp.json();
-      if (Array.isArray(raw)) poolHistoryData = raw;
+      const histJson = await histResp.json();
+      if (Array.isArray(histJson)) poolHistoryData = histJson;
     }
 
     // Step 4: fetch network epoch info for those epochs (blk_count + active_stake)
@@ -859,7 +874,7 @@ async function loadPool() {
     autoSetPerformance();
 
     setStatus(
-      `${name} [${ticker}] · ${delegators} delegators · ${totalMADA} M ADA live stake` +
+      `${displayTag} · ${delegators} delegators · ${totalMADA} M ADA live stake` +
       `${rNote}${warn}`,
       liveR !== null ? 'green' : 'accent'
     );
@@ -879,7 +894,20 @@ document.getElementById('ticker-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') loadPool();
 });
 
+// Ctrl+K → focus the ticker/pool-ID input from anywhere on the page
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'k') {
+    e.preventDefault();
+    const inp = document.getElementById('ticker-input');
+    inp.focus();
+    inp.select();
+  }
+});
+
 update(); // initial render
+
+// Auto-focus the input so the user can start typing immediately
+document.getElementById('ticker-input').focus();
 </script>
 </body>
 </html>

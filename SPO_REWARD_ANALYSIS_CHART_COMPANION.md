@@ -18,7 +18,7 @@ When you open the chart you will see six areas, top to bottom:
 
 | Area | What it is |
 |------|-----------|
-| **Pool Lookup** panel | Text box + Load Pool button — type a mainnet ticker to auto-fill all sliders |
+| **Pool Lookup** panel | Text box + Load Pool button — type a mainnet ticker **or full pool ID** to auto-fill all sliders |
 | **Pool Parameters** panel | Four sliders: Margin, Pledge, Fixed Fee, Epoch Rate |
 | **Performance Analysis** panel | Two sliders: Epoch Window and Performance Factor — auto-set from Koios on Load Pool |
 | **Metric cards** row | Four live readouts that update with every slider move |
@@ -27,8 +27,13 @@ When you open the chart you will see six areas, top to bottom:
 
 ### The Pool Lookup panel
 
-Type any mainnet stake pool ticker (e.g. `IOHK`, `GENS`, `COSD`) and press **Enter** or
-click **Load Pool**. The chart fetches live data from the Cardano blockchain via the
+The input field receives focus automatically when the page loads, so you can start typing
+immediately. Press **Ctrl+K** at any time to return focus to this field from anywhere on the page.
+
+Type a mainnet stake pool **ticker** (e.g. `IOHK`, `GENS`, `COSD`) **or a full bech32 pool ID**
+(e.g. `pool1pu5jlj4q9w9jlxeu370a3c9myx47md5j5m2str0naunn2q3lkdy`) and press **Enter** or
+click **Load Pool**. Use the pool ID form for pools that have not registered a ticker.
+The chart fetches live data from the Cardano blockchain via the
 [Koios](https://koios.rest) public API and sets the sliders automatically:
 
 | Slider set | Source |
@@ -45,7 +50,9 @@ The default (0.000548) is a reasonable approximation for 2025/2026; see Step 11 
 think about it.
 
 **Caveats:**
-- Tickers are mainnet only. Preview/preprod testnet pools will not be found.
+- Tickers and pool IDs are mainnet only. Preview/preprod testnet pools will not be found.
+- If you enter a full bech32 pool ID (starts with `pool1`, roughly 56 characters), the ticker
+  lookup step is skipped entirely and the ID is used directly — useful for pools with no registered ticker.
 - If a pool's pledge or current delegation exceeds 70 M ADA (the slider maximum), the value
   is clamped and a warning appears in the status line.
 - The declared pledge (used for the reward formula) may differ from the live pledge (actual
@@ -599,9 +606,10 @@ chart — the pool is already near-saturated by pledge alone.
 
 ## Step 12 — Quick Evaluation Checklist (Chart-Assisted)
 
-For any candidate pool, type its ticker into the **Pool Lookup** panel and click
-**Load Pool** — this sets the Margin, Fixed Fee, Pledge, Cursor, and Performance Factor
-sliders automatically from live on-chain data. Then set the **Epoch Rate** slider to the
+For any candidate pool, type its ticker **or full pool ID** into the **Pool Lookup** panel
+and click **Load Pool** (or press **Enter**) — this sets the Margin, Fixed Fee, Pledge, Cursor,
+and Performance Factor sliders automatically from live on-chain data. Press **Ctrl+K** to jump
+straight to the input field. Use the pool ID (`pool1…`) for pools that have not registered a ticker. Then set the **Epoch Rate** slider to the
 current network value (default 0.000548 is fine for 2025/2026). If the pool is not on
 mainnet or you prefer to enter values manually, look up P, F, m on pool.pm or adapools.org
 and set the sliders by hand.
