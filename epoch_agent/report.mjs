@@ -126,12 +126,12 @@ export function formatReport(reportData) {
   const avoidSafety = avoids.filter(c =>
     c.classType === ClassType.ALL_RED ||
     (c.classType === ClassType.HAS_RED_ZONE && !c.canClearTrough && !c.cursorPastTrough)
-  );
+  ).sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
   const perfFailed = avoids.filter(c => c.classType === ClassType.ALL_GREEN && !c.perfPasses);
 
-  // Solicitation candidates sorted by lowest ROA (most harmed first)
+  // Solicitation candidates sorted by highest ROA first
   const solicit = classifications.filter(c => c.solicitCandidate)
-    .sort((a, b) => a.roaAtCurrent - b.roaAtCurrent);
+    .sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
 
   // ── Header ────────────────────────────────────────────────────────────────
   push(`Pool Ranger Delegation Report — Epoch ${epochNo}`);
@@ -232,16 +232,20 @@ export function formatReport(reportData) {
 
   // ── Performance Failures ──────────────────────────────────────────────────
   if (perfFailed.length > 0) {
+    perfFailed.sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
     push('POOLS DROPPED (failed 20-epoch performance filter)');
     push(line());
     for (const c of perfFailed) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`  ${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda}, m=${(c.margin*100).toFixed(1)}%`);
-      push(`    Full ID:     ${c.poolId}`);
-      push(`    Performance: ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs checked)`);
-      push(`    Dropped: requires 100% performance over 20 epochs for DELEGATE eligibility`);
+      push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+      push(`  Full ID:           ${c.poolId}`);
+      push(`  Classification:    ${describeClass(c)}`);
+      push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs checked)`);
+      push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
+      roaLines('  ', c).forEach(l => push(l));
+      push(`  Dropped:           requires 100% performance over 20 epochs for DELEGATE eligibility`);
+      blank();
     }
-    blank();
   }
 
   // ── Solicitation Candidates ───────────────────────────────────────────────
@@ -251,19 +255,22 @@ export function formatReport(reportData) {
     push('  None identified this epoch.');
   } else {
     push('  Delegators at these pools would benefit from joining Pool Ranger.');
-    push('  Sorted by lowest delegator ROA (most in need of better options first).');
+    push('  Sorted by highest Projected ROA first.');
     blank();
     for (const c of solicit) {
       const label = c.ticker ? `[${c.ticker}]` : '';
-      push(`  ${label}`);
-      push(`    Full ID:        ${c.poolId}`);
-      push(`    Classification: ${c.classType}`);
-      push(`    Projected ROA: ${pct(c.roaAtCurrent)}`);
+      push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+      push(`  Full ID:           ${c.poolId}`);
+      push(`  Classification:    ${describeClass(c)}`);
+      push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
+      push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
+      roaLines('  ', c).forEach(l => push(l));
       if (c.classType === ClassType.ALL_RED) {
-        push(`    Note: m=0% — SPO income falls with every delegator across full range.`);
+        push(`  Note:              m=0% — SPO income falls with every delegator across full range.`);
       } else if (c.classType === ClassType.HAS_RED_ZONE) {
-        push(`    Note: Cursor before trough at ${ada(c.troughExtAda)} ext. Can't clear — adding stake harms SPO.`);
+        push(`  Note:              Cursor before trough at ${ada(c.troughExtAda)} ext. Can't clear — adding stake harms SPO.`);
       }
+      blank();
     }
   }
   blank();
@@ -327,10 +334,10 @@ export function formatReport(reportData) {
       if (wins.length < 2) return false;
       return wins.every(z => z > 1.5) || wins.every(z => z < -1.5);
     })
-    .sort(([, a], [, b]) => {
-      const latestA = a.observations[a.observations.length - 1]?.luckZ ?? 0;
-      const latestB = b.observations[b.observations.length - 1]?.luckZ ?? 0;
-      return latestB - latestA;
+    .sort(([idA], [idB]) => {
+      const roaA = classMap.get(idA)?.roaAtCurrent ?? 0;
+      const roaB = classMap.get(idB)?.roaAtCurrent ?? 0;
+      return roaB - roaA;
     });
 
   push('LUCK Z-SCORE TREND  (systematic advantage tracker)');
@@ -346,7 +353,18 @@ export function formatReport(reportData) {
       const label  = hist.ticker ? `[${hist.ticker}]` : `[${poolId.slice(0, 12)}…]`;
       const obs    = hist.observations;
       const latest = obs[obs.length - 1];
-      push(`  ${label}`);
+      const c = classMap.get(poolId);
+
+      if (c) {
+        push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin*100).toFixed(1)}%`);
+        push(`  Full ID:           ${c.poolId}`);
+        push(`  Classification:    ${describeClass(c)}`);
+        push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
+        push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
+        roaLines('  ', c).forEach(l => push(l));
+      } else {
+        push(`  ${label}`);
+      }
 
       // Within-run windows from most recent observation
       const wins = latest?.luckZ_windows ?? [];
@@ -354,7 +372,7 @@ export function formatReport(reportData) {
         const wStr = wins.map(w =>
           `${w.epochsAgo}: ${w.luckZ !== null ? (w.luckZ >= 0 ? '+' : '') + w.luckZ.toFixed(2) : 'n/a'}`
         ).join(',  ');
-        push(`    Windows (epochs ago → z): ${wStr}`);
+        push(`  Windows (epochs ago → z): ${wStr}`);
       }
 
       // Cross-run trend (only shown once 2+ reports exist)
@@ -362,7 +380,7 @@ export function formatReport(reportData) {
         const zVals  = obs.map(o => o.luckZ != null
           ? (o.luckZ >= 0 ? '+' : '') + o.luckZ.toFixed(2) : ' n/a');
         const epochs = obs.map(o => o.epoch);
-        push(`    Cross-run — Epochs: ${epochs.join(', ')}  z: ${zVals.join(', ')}`);
+        push(`  Cross-run — Epochs: ${epochs.join(', ')}  z: ${zVals.join(', ')}`);
       }
 
       // Flag if windows are consistently directional, or cross-run readings are consistent
@@ -372,8 +390,9 @@ export function formatReport(reportData) {
       const winNeg   = allWinZ.length  >= 2 && allWinZ.every(z => z < -1.5);
       const crossPos = crossZ.length   >= 2 && crossZ.every(z =>  z >  1.5);
       const crossNeg = crossZ.length   >= 2 && crossZ.every(z =>  z < -1.5);
-      if (winPos || crossPos) push('    *** Consistently above +1.5σ — investigate for real advantage ***');
-      if (winNeg || crossNeg) push('    *** Consistently below −1.5σ — investigate for real disadvantage ***');
+      if (winPos || crossPos) push('  *** Consistently above +1.5σ — investigate for real advantage ***');
+      if (winNeg || crossNeg) push('  *** Consistently below −1.5σ — investigate for real disadvantage ***');
+      blank();
     }
   }
   blank();

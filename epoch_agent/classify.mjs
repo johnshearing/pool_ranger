@@ -3,7 +3,7 @@
 // harmful (ALL_RED), or conditional on cursor position (HAS_RED_ZONE).
 // Also computes performance factor using the same method as SPO_REWARD_ANALYSIS_CHART.html.
 
-import { pledgeBonus, mMin, troughExtDeleg, delegROA, gross, EPOCHS_PER_YR } from './math.mjs';
+import { pledgeBonus, mMin, troughExtDeleg, delegROA, gross, EPOCHS_PER_YR, A0 } from './math.mjs';
 
 export const ClassType = Object.freeze({
   ALL_GREEN:    'ALL_GREEN',    // no red zone — delegation is always cooperative
