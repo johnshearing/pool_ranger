@@ -328,7 +328,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
     <div class="metric-unit">ADA / year</div>
   </div>
   <div class="metric-card">
-    <div class="metric-lbl">Switching Cost (2 lost epochs)</div>
+    <div class="metric-lbl">Opportunity Cost (2 transition epochs)</div>
     <div class="metric-val red" id="m-cost">—</div>
     <div class="metric-unit">ADA</div>
   </div>
@@ -390,16 +390,17 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
     <span class="hl">Your annual reward</span>
       = epoch_reward × 73 epochs/year<br>
 
-    <span class="hl">Switching cost</span>
-      = 2 × old_pool_epoch_reward
-      &nbsp;— Cardano takes ~2 epochs (~10 days) for new delegation to activate;
-      your stake earns nothing during that window.<br>
+    <span class="hl">Opportunity cost</span>
+      = 2 × max(0, new_epoch_reward − old_epoch_reward)
+      &nbsp;— For 2 epochs after switching your stake still earns old-pool rewards (no gap);
+      the cost is only the rate difference, not 2 lost epochs.<br>
 
     <span class="hl">Break-even time</span>
-      = switching_cost / (new_epoch_reward − old_epoch_reward) epochs × 5 days/epoch<br>
+      = opportunity_cost / (new_epoch_reward − old_epoch_reward) epochs × 5 days/epoch
+      &nbsp;— always ≈ 2 epochs (~10 days) when the new pool pays more<br>
 
     <span class="hl">Net benefit (1 yr)</span>
-      = annual_gain − switching_cost
+      = annual_gain − opportunity_cost
       &nbsp;|&nbsp; annual_gain = new_annual − old_annual
   </div>
 </div>
@@ -665,7 +666,7 @@ function computeResults() {
   const newROA    = D > 0 ? (newAnnual / D) * 100 : 0;
 
   // Switch analysis
-  const switchingCost = 2 * oldEpoch;   // 2 epochs with zero earnings
+  const switchingCost = 2 * Math.max(0, newEpoch - oldEpoch);  // opportunity cost only
   const annualGain    = newAnnual - oldAnnual;
   const netBenefit1yr = annualGain - switchingCost;
 
@@ -757,30 +758,14 @@ function computeResults() {
       `The target pool pays ${fmtADA(Math.abs(annualGain))} less per year for your ${ada_s}. ` +
       `Unless you have other reasons to switch (trust, decentralization, mission alignment), ` +
       `staying on the current pool is better financially.`;
-  } else if (!isFinite(recoveryDays) || recoveryDays > 730) {
-    verdictEl.className    = 'verdict visible caution';
-    verdictTitle.textContent = 'Caution — very long break-even period';
-    verdictBody.textContent  =
-      `Your ${ada_s} would earn ${fmtADA(annualGain)} more per year on the target pool, but ` +
-      (isFinite(recoveryDays)
-        ? `the 2-epoch switching cost takes ${recoveryDays.toFixed(0)} days (${(recoveryDays/365).toFixed(1)} years) to recoup. `
-        : `you never fully recoup the switching cost. `) +
-      `Consider non-financial reasons before switching.`;
-  } else if (recoveryDays > 180) {
-    verdictEl.className    = 'verdict visible caution';
-    verdictTitle.textContent = 'Marginally worth it — break-even in ' + recoveryDays.toFixed(0) + ' days';
-    verdictBody.textContent  =
-      `Your ${ada_s} earns ${fmtADA(annualGain)} more per year on the target pool. ` +
-      `The 2-epoch switching cost of ${fmtADA(switchingCost)} takes ${recoveryEpochs.toFixed(1)} epochs ` +
-      `(${recoveryDays.toFixed(0)} days) to recoup. ` +
-      `Net benefit after one full year: ${(netBenefit1yr >= 0 ? '+' : '') + fmtADA(netBenefit1yr)} ADA.`;
   } else {
     verdictEl.className    = 'verdict visible good';
-    verdictTitle.textContent = 'Worth switching — breaks even in ' + recoveryDays.toFixed(0) + ' days';
+    verdictTitle.textContent = 'Worth switching — nearly immediate break-even';
     verdictBody.textContent  =
       `Your ${ada_s} earns ${fmtADA(annualGain)} more per year on the target pool. ` +
-      `The 2-epoch switching cost of ${fmtADA(switchingCost)} is recovered in ` +
-      `${recoveryEpochs.toFixed(1)} epochs (${recoveryDays.toFixed(0)} days). ` +
+      `For 2 epochs after switching you still earn old-pool rewards (no gap), ` +
+      `so the only cost is the rate difference: ${fmtADA(switchingCost)} ADA, ` +
+      `recovered in about ${isFinite(recoveryDays) ? recoveryDays.toFixed(0) + ' days' : '2 epochs'}. ` +
       `Net benefit after one full year: +${fmtADA(netBenefit1yr)} ADA.`;
   }
 }
