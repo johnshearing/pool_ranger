@@ -327,21 +327,6 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
     <div class="metric-val" id="m-gain">—</div>
     <div class="metric-unit">ADA / year</div>
   </div>
-  <div class="metric-card">
-    <div class="metric-lbl">Opportunity Cost (2 transition epochs)</div>
-    <div class="metric-val red" id="m-cost">—</div>
-    <div class="metric-unit">ADA</div>
-  </div>
-  <div class="metric-card">
-    <div class="metric-lbl">Net Benefit After 1 Year</div>
-    <div class="metric-val" id="m-net">—</div>
-    <div class="metric-unit">ADA</div>
-  </div>
-  <div class="metric-card">
-    <div class="metric-lbl">Break-Even Time</div>
-    <div class="metric-val blue" id="m-recovery">—</div>
-    <div class="metric-unit" id="m-recovery-unit">—</div>
-  </div>
 </div>
 
 <!-- ── Verdict banner ─────────────────────────────── -->
@@ -390,18 +375,9 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
     <span class="hl">Your annual reward</span>
       = epoch_reward × 73 epochs/year<br>
 
-    <span class="hl">Opportunity cost</span>
-      = 2 × max(0, new_epoch_reward − old_epoch_reward)
-      &nbsp;— For 2 epochs after switching your stake still earns old-pool rewards (no gap);
-      the cost is only the rate difference, not 2 lost epochs.<br>
-
-    <span class="hl">Break-even time</span>
-      = opportunity_cost / (new_epoch_reward − old_epoch_reward) epochs × 5 days/epoch
-      &nbsp;— always ≈ 2 epochs (~10 days) when the new pool pays more<br>
-
-    <span class="hl">Net benefit (1 yr)</span>
-      = annual_gain − opportunity_cost
-      &nbsp;|&nbsp; annual_gain = new_annual − old_annual
+    <span class="hl">Switching note</span>
+      — For 2 epochs after switching your stake still earns old-pool rewards (no earnings gap);
+      new-pool rewards begin in epoch 3. Switch freely whenever the annual gain is positive.
   </div>
 </div>
 
@@ -666,17 +642,7 @@ function computeResults() {
   const newROA    = D > 0 ? (newAnnual / D) * 100 : 0;
 
   // Switch analysis
-  const switchingCost = 2 * Math.max(0, newEpoch - oldEpoch);  // opportunity cost only
-  const annualGain    = newAnnual - oldAnnual;
-  const netBenefit1yr = annualGain - switchingCost;
-
-  let recoveryEpochs = Infinity;
-  let recoveryDays   = Infinity;
-  const extraPerEpoch = (newEpoch - oldEpoch);
-  if (extraPerEpoch > 0) {
-    recoveryEpochs = switchingCost / extraPerEpoch;
-    recoveryDays   = recoveryEpochs * 5;
-  }
+  const annualGain = newAnnual - oldAnnual;
 
   // ── Update pool info table placeholders ────────────
   document.getElementById('old-roa').textContent    = fmtPct(oldROA, 3) + ' / yr';
@@ -696,32 +662,6 @@ function computeResults() {
   const gainEl = document.getElementById('m-gain');
   gainEl.textContent  = (annualGain >= 0 ? '+' : '') + fmtADA(annualGain);
   gainEl.className    = 'metric-val ' + (annualGain > 0 ? 'green' : annualGain < 0 ? 'red' : 'muted');
-
-  document.getElementById('m-cost').textContent = fmtADA(switchingCost);
-
-  const netEl = document.getElementById('m-net');
-  netEl.textContent = (netBenefit1yr >= 0 ? '+' : '') + fmtADA(netBenefit1yr);
-  netEl.className   = 'metric-val ' + (netBenefit1yr > 0 ? 'green' : netBenefit1yr < 0 ? 'red' : 'muted');
-
-  const recEl   = document.getElementById('m-recovery');
-  const recUnit = document.getElementById('m-recovery-unit');
-  if (!isFinite(recoveryDays)) {
-    recEl.textContent  = '∞';
-    recEl.className    = 'metric-val red';
-    recUnit.textContent = 'never recoups';
-  } else if (recoveryDays < 1) {
-    recEl.textContent   = '< 1';
-    recEl.className     = 'metric-val green';
-    recUnit.textContent = 'days';
-  } else if (recoveryDays < 365) {
-    recEl.textContent   = recoveryDays.toFixed(0);
-    recEl.className     = 'metric-val ' + (recoveryDays < 90 ? 'green' : 'orange');
-    recUnit.textContent = 'days (' + recoveryEpochs.toFixed(1) + ' epochs)';
-  } else {
-    recEl.textContent   = (recoveryDays / 365).toFixed(1);
-    recEl.className     = 'metric-val red';
-    recUnit.textContent = 'years to break even';
-  }
 
   // ── Comparison table ───────────────────────────────
   document.getElementById('c-old-name').textContent   = oldPool.name;
@@ -760,13 +700,11 @@ function computeResults() {
       `staying on the current pool is better financially.`;
   } else {
     verdictEl.className    = 'verdict visible good';
-    verdictTitle.textContent = 'Worth switching — nearly immediate break-even';
+    verdictTitle.textContent = 'Worth switching';
     verdictBody.textContent  =
       `Your ${ada_s} earns ${fmtADA(annualGain)} more per year on the target pool. ` +
-      `For 2 epochs after switching you still earn old-pool rewards (no gap), ` +
-      `so the only cost is the rate difference: ${fmtADA(switchingCost)} ADA, ` +
-      `recovered in about ${isFinite(recoveryDays) ? recoveryDays.toFixed(0) + ' days' : '2 epochs'}. ` +
-      `Net benefit after one full year: +${fmtADA(netBenefit1yr)} ADA.`;
+      `For 2 epochs after switching you still earn old-pool rewards — there is no earnings gap. ` +
+      `New-pool rewards begin in epoch 3.`;
   }
 }
 
