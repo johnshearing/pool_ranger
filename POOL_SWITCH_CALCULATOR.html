@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+<!--
+  To experiment with this live calculator go to the following webpage.
+  https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html
+-->
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pool Switch Calculator — Pool Ranger</title>
+<style>
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #30363d;
+  --text:    #c9d1d9;
+  --muted:   #8b949e;
+  --accent:  #58a6ff;
+  --green:   #3fb950;
+  --orange:  #d29922;
+  --red:     #f85149;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+  padding: 1.5rem;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+h1   { color: var(--accent); font-size: 1.4rem; margin-bottom: 0.2rem; }
+.sub { color: var(--muted);  font-size: 0.88rem; margin-bottom: 1.4rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.1rem 1.4rem;
+  margin-bottom: 1.1rem;
+}
+.panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 0.9rem;
+}
+
+/* ── two-column pool lookup ────────────────────────── */
+.pools-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.1rem;
+}
+@media (max-width: 640px) { .pools-grid { grid-template-columns: 1fr; } }
+
+.pool-box {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1rem 1.1rem;
+}
+.pool-box-title {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 0.7rem;
+}
+.old-pool-title { color: var(--orange); }
+.new-pool-title { color: var(--green);  }
+
+.lookup-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 0.5rem;
+}
+.ticker-input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.9rem;
+  padding: 0.4rem 0.65rem;
+  flex: 1;
+  min-width: 8rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.ticker-input:focus { border-color: var(--accent); }
+.load-btn {
+  border: none;
+  border-radius: 6px;
+  color: #0d1117;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 0.4rem 0.85rem;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+.load-btn-old { background: var(--orange); }
+.load-btn-new { background: var(--green);  }
+.load-btn:hover   { opacity: 0.85; }
+.load-btn:active  { opacity: 0.7;  }
+.load-btn:disabled { opacity: 0.4; cursor: default; }
+
+.pool-status {
+  font-size: 0.77rem;
+  font-family: monospace;
+  min-height: 1rem;
+  margin-bottom: 0.6rem;
+}
+
+/* ── pool info table ───────────────────────────────── */
+.pool-info {
+  font-size: 0.8rem;
+  display: none;
+}
+.pool-info.visible { display: block; }
+.pool-info table { width: 100%; border-collapse: collapse; }
+.pool-info td {
+  padding: 0.2rem 0;
+  vertical-align: top;
+}
+.pool-info td:first-child {
+  color: var(--muted);
+  width: 55%;
+}
+.pool-info td:last-child {
+  color: var(--text);
+  font-family: monospace;
+  text-align: right;
+}
+
+/* ── delegation input ──────────────────────────────── */
+.delegation-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.ada-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--accent);
+  font-family: monospace;
+  font-size: 1.1rem;
+  font-weight: 700;
+  padding: 0.45rem 0.8rem;
+  width: 14rem;
+  outline: none;
+  transition: border-color 0.15s;
+  text-align: right;
+}
+.ada-input:focus { border-color: var(--accent); }
+.ada-label { color: var(--muted); font-size: 0.88rem; }
+.delegation-note { font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; }
+
+/* slider reuse */
+.slider-row label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.83rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+.slider-row label span { color: var(--accent); font-weight: 600; font-family: monospace; }
+input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+
+/* ── results cards ─────────────────────────────────── */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+  margin-bottom: 1.1rem;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  text-align: center;
+}
+.metric-lbl  { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.4rem; }
+.metric-val  { font-size: 1.25rem; font-weight: 700; font-family: monospace; line-height: 1; }
+.metric-unit { font-size: 0.65rem; color: var(--muted); margin-top: 0.25rem; }
+.green  { color: var(--green);  }
+.orange { color: var(--orange); }
+.red    { color: var(--red);    }
+.blue   { color: var(--accent); }
+.muted  { color: var(--muted);  }
+
+/* ── comparison table ──────────────────────────────── */
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.cmp-table th, .cmp-table td { padding: 0.45rem 0.7rem; border-bottom: 1px solid var(--border); }
+.cmp-table th { color: var(--muted); font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+.cmp-table th:nth-child(2) { color: var(--orange); }
+.cmp-table th:nth-child(3) { color: var(--green);  }
+.cmp-table td:first-child  { color: var(--muted); }
+.cmp-table td:not(:first-child) { font-family: monospace; text-align: right; }
+.cmp-table tr:last-child td { border-bottom: none; }
+
+/* ── verdict banner ────────────────────────────────── */
+.verdict {
+  border-radius: 8px;
+  padding: 1rem 1.4rem;
+  margin-bottom: 1.1rem;
+  font-size: 0.9rem;
+  display: none;
+  border: 1px solid transparent;
+}
+.verdict.visible { display: block; }
+.verdict-title   { font-weight: 700; font-size: 1rem; margin-bottom: 0.4rem; }
+.verdict.good    { background: rgba(63,185,80,0.08);  border-color: var(--green);  }
+.verdict.caution { background: rgba(210,153,34,0.08); border-color: var(--orange); }
+.verdict.bad     { background: rgba(248,81,73,0.08);  border-color: var(--red);    }
+
+/* ── formula box ───────────────────────────────────── */
+.formula { font-family: monospace; font-size: 0.77rem; color: var(--muted); line-height: 1.8; }
+.formula .hl { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>Pool Switch Calculator — Pool Ranger</h1>
+<p class="sub">
+  Load your current pool and a target pool, enter how much ADA you are moving,
+  and see whether and when switching pays off.
+</p>
+
+<!-- ── Pool Lookups ──────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Pool Lookup — Mainnet via Koios + corsproxy.io (no API key needed)</div>
+  <div class="pools-grid">
+
+    <!-- Old Pool -->
+    <div class="pool-box">
+      <div class="pool-box-title old-pool-title">&#9632; Current Pool (you are leaving)</div>
+      <div class="lookup-row">
+        <input class="ticker-input" id="old-ticker" placeholder="Ticker or pool1…" maxlength="60"
+               autocomplete="off" spellcheck="false">
+        <button class="load-btn load-btn-old" id="old-load-btn">Load</button>
+      </div>
+      <div class="pool-status" id="old-status">Enter a ticker or pool1… ID, then press Enter or Load.</div>
+      <div class="pool-info" id="old-info">
+        <table>
+          <tr><td>Pool</td>       <td id="old-name">—</td></tr>
+          <tr><td>Margin</td>     <td id="old-margin">—</td></tr>
+          <tr><td>Fixed Fee</td>  <td id="old-fee">—</td></tr>
+          <tr><td>Pledge</td>     <td id="old-pledge">—</td></tr>
+          <tr><td>Total Stake</td><td id="old-stake">—</td></tr>
+          <tr><td>Performance</td><td id="old-perf">—</td></tr>
+          <tr><td>Your ROA</td>   <td id="old-roa">—</td></tr>
+          <tr><td>Your Annual Reward</td><td id="old-annual">—</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <!-- New Pool -->
+    <div class="pool-box">
+      <div class="pool-box-title new-pool-title">&#9632; Target Pool (you are joining)</div>
+      <div class="lookup-row">
+        <input class="ticker-input" id="new-ticker" placeholder="Ticker or pool1…" maxlength="60"
+               autocomplete="off" spellcheck="false">
+        <button class="load-btn load-btn-new" id="new-load-btn">Load</button>
+      </div>
+      <div class="pool-status" id="new-status">Enter a ticker or pool1… ID, then press Enter or Load.</div>
+      <div class="pool-info" id="new-info">
+        <table>
+          <tr><td>Pool</td>                    <td id="new-name">—</td></tr>
+          <tr><td>Margin</td>                  <td id="new-margin">—</td></tr>
+          <tr><td>Fixed Fee</td>               <td id="new-fee">—</td></tr>
+          <tr><td>Pledge</td>                  <td id="new-pledge">—</td></tr>
+          <tr><td>Total Stake (after you join)</td><td id="new-stake">—</td></tr>
+          <tr><td>Performance</td>             <td id="new-perf">—</td></tr>
+          <tr><td>Your ROA</td>                <td id="new-roa">—</td></tr>
+          <tr><td>Your Annual Reward</td>      <td id="new-annual">—</td></tr>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Delegation Amount ───────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">ADA Amount You Are Moving</div>
+  <div class="delegation-row">
+    <input class="ada-input" id="delegation-ada" type="number" min="1" max="999999999"
+           step="1000" value="10000">
+    <span class="ada-label">ADA</span>
+  </div>
+  <div style="margin-top:0.8rem;" class="slider-row">
+    <label>Slide to adjust &nbsp;<span id="lbl-d-slider">10,000 ADA</span></label>
+    <input type="range" id="sl-delegation" min="0" max="17" step="1" value="10"
+           title="Powers of 10 × 1, 2, or 5">
+  </div>
+  <p class="delegation-note">
+    Tip: your exact wallet balance does not change the staking math much — a round number is fine.
+    The old pool calculation assumes your ADA is <em>already</em> included in its live stake;
+    the new pool calculation adds your ADA to its current live stake.
+  </p>
+</div>
+
+<!-- ── Results — top metric cards ─────────────────── -->
+<div class="results-grid" id="results-section" style="display:none">
+  <div class="metric-card">
+    <div class="metric-lbl">Annual Reward — Current Pool</div>
+    <div class="metric-val orange" id="m-old-annual">—</div>
+    <div class="metric-unit">ADA / year</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Annual Reward — Target Pool</div>
+    <div class="metric-val green" id="m-new-annual">—</div>
+    <div class="metric-unit">ADA / year</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Annual Gain from Switching</div>
+    <div class="metric-val" id="m-gain">—</div>
+    <div class="metric-unit">ADA / year</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Switching Cost (2 lost epochs)</div>
+    <div class="metric-val red" id="m-cost">—</div>
+    <div class="metric-unit">ADA</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Net Benefit After 1 Year</div>
+    <div class="metric-val" id="m-net">—</div>
+    <div class="metric-unit">ADA</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Break-Even Time</div>
+    <div class="metric-val blue" id="m-recovery">—</div>
+    <div class="metric-unit" id="m-recovery-unit">—</div>
+  </div>
+</div>
+
+<!-- ── Verdict banner ─────────────────────────────── -->
+<div class="verdict" id="verdict">
+  <div class="verdict-title" id="verdict-title"></div>
+  <div id="verdict-body"></div>
+</div>
+
+<!-- ── Detailed comparison table ──────────────────── -->
+<div class="panel" id="cmp-panel" style="display:none">
+  <div class="panel-title">Detailed Comparison</div>
+  <table class="cmp-table">
+    <thead>
+      <tr>
+        <th>Parameter</th>
+        <th>Current Pool</th>
+        <th>Target Pool</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Pool name</td>         <td id="c-old-name">—</td>    <td id="c-new-name">—</td></tr>
+      <tr><td>Margin</td>            <td id="c-old-margin">—</td>  <td id="c-new-margin">—</td></tr>
+      <tr><td>Fixed fee (ADA/epoch)</td><td id="c-old-fee">—</td>  <td id="c-new-fee">—</td></tr>
+      <tr><td>Pledge (M ADA)</td>    <td id="c-old-pledge">—</td>  <td id="c-new-pledge">—</td></tr>
+      <tr><td>Total stake (M ADA)</td><td id="c-old-stake">—</td>  <td id="c-new-stake">—</td></tr>
+      <tr><td>Performance</td>       <td id="c-old-perf">—</td>    <td id="c-new-perf">—</td></tr>
+      <tr><td>Your epoch reward (ADA)</td><td id="c-old-epoch">—</td><td id="c-new-epoch">—</td></tr>
+      <tr><td>Your annual reward (ADA)</td><td id="c-old-ann">—</td><td id="c-new-ann">—</td></tr>
+      <tr><td>Your ROA (% / year)</td><td id="c-old-roa">—</td>   <td id="c-new-roa">—</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- ── Formulas ────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">How These Numbers Are Calculated</div>
+  <div class="formula">
+    <span class="hl">gross_eff(S, P)</span>
+      = p × r × (S + a₀·P) / (1 + a₀)
+      &nbsp;|&nbsp; p = pool performance · r = <span id="formula-r">0.000400</span> (live epoch rate) · a₀ = 0.3<br>
+
+    <span class="hl">Your epoch reward</span>
+      = (D / S) × (1 − m) × max(0, gross_eff − F)
+      &nbsp;|&nbsp; D = your ADA · S = total pool stake · m = margin · F = fixed fee<br>
+
+    <span class="hl">Your annual reward</span>
+      = epoch_reward × 73 epochs/year<br>
+
+    <span class="hl">Switching cost</span>
+      = 2 × old_pool_epoch_reward
+      &nbsp;— Cardano takes ~2 epochs (~10 days) for new delegation to activate;
+      your stake earns nothing during that window.<br>
+
+    <span class="hl">Break-even time</span>
+      = switching_cost / (new_epoch_reward − old_epoch_reward) epochs × 5 days/epoch<br>
+
+    <span class="hl">Net benefit (1 yr)</span>
+      = annual_gain − switching_cost
+      &nbsp;|&nbsp; annual_gain = new_annual − old_annual
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────
+const A0            = 0.3;
+const EPOCHS_PER_YR = 73;
+const KOIOS         = 'https://api.koios.rest/api/v1';
+const PROXY         = 'https://corsproxy.io/?';
+const R_MIN         = 0.00010;
+const R_MAX         = 0.00100;
+const PERF_WINDOW   = 20;   // epochs for auto-performance
+
+// ── Slider steps: 1,2,5,10,20,50,…,500M (17 steps 0-16)
+const D_STEPS = [
+  100, 200, 500, 1000, 2000, 5000,
+  10000, 20000, 50000, 100000, 200000, 500000,
+  1000000, 2000000, 5000000, 10000000, 50000000, 500000000
+];
+
+// ── Shared network state ───────────────────────────────
+let networkR = 0.000400;
+
+// ── Pool state ─────────────────────────────────────────
+// { name, ticker, margin, fixedCost (ADA), pledge (ADA), liveStake (ADA), perf (0-1) }
+let oldPool = null;
+let newPool = null;
+
+// ── Math ───────────────────────────────────────────────
+function gross(S, P) {
+  return networkR * (S + A0 * P) / (1 + A0);
+}
+
+// D = user's ADA; S = effective total pool stake (already adjusted for joining/leaving)
+function epochRewardForD(D, S, P, m, F, perf) {
+  if (S <= 0 || D <= 0) return 0;
+  const g = gross(S, P) * perf;
+  if (g <= F) return 0;
+  return (D / S) * (1 - m) * (g - F);
+}
+
+// ── Format helpers ─────────────────────────────────────
+function fmtADA(v, dec = 2)  { return v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+function fmtPct(v, dec = 2)  { return v.toFixed(dec) + '%'; }
+function fmtM(v)             { return (v / 1e6).toFixed(2) + ' M'; }
+
+// ── Delegation slider ──────────────────────────────────
+const slD = document.getElementById('sl-delegation');
+slD.max = D_STEPS.length - 1;
+
+function syncSliderToInput() {
+  const ada = parseFloat(document.getElementById('delegation-ada').value) || 0;
+  let best = 0;
+  for (let i = 0; i < D_STEPS.length; i++) {
+    if (D_STEPS[i] <= ada) best = i;
+  }
+  slD.value = best;
+  document.getElementById('lbl-d-slider').textContent = fmtADA(D_STEPS[best], 0) + ' ADA';
+}
+
+function syncInputFromSlider() {
+  const ada = D_STEPS[parseInt(slD.value)];
+  document.getElementById('delegation-ada').value = ada;
+  document.getElementById('lbl-d-slider').textContent = fmtADA(ada, 0) + ' ADA';
+}
+
+slD.addEventListener('input', () => { syncInputFromSlider(); computeResults(); });
+document.getElementById('delegation-ada').addEventListener('input', () => { syncSliderToInput(); computeResults(); });
+
+// ── Status helpers ─────────────────────────────────────
+function setStatus(which, msg, color) {
+  const el = document.getElementById(which + '-status');
+  el.textContent = msg;
+  el.style.color = color === 'green'  ? 'var(--green)'
+                 : color === 'red'    ? 'var(--red)'
+                 : color === 'accent' ? 'var(--accent)'
+                 : 'var(--muted)';
+}
+
+function proxied(url) { return PROXY + encodeURIComponent(url); }
+
+// ── Fetch live r ───────────────────────────────────────
+async function fetchLiveR() {
+  try {
+    const resp = await fetch(
+      proxied(`${KOIOS}/epoch_info?order=epoch_no.desc&limit=9&select=epoch_no,total_rewards,active_stake`)
+    );
+    if (!resp.ok) return;
+    const epochs = await resp.json();
+    const rates = [];
+    for (const e of epochs) {
+      if (e.total_rewards == null) continue;
+      const r = Number(e.total_rewards) / Number(e.active_stake) * (1 + A0);
+      if (r >= R_MIN && r <= R_MAX) rates.push(r);
+      if (rates.length >= 5) break;
+    }
+    if (rates.length > 0) {
+      networkR = rates.reduce((a, b) => a + b, 0) / rates.length;
+      document.getElementById('formula-r').textContent = networkR.toFixed(6);
+    }
+  } catch (_) { /* use default */ }
+}
+
+// ── Compute pool performance from history arrays ───────
+function computePerf(histData, epochInfoMap, windowEpochs) {
+  const slice = histData.slice(0, windowEpochs);
+  let totExp = 0, totAct = 0;
+  for (const epoch of slice) {
+    const net = epochInfoMap[epoch.epoch_no];
+    if (!net) continue;
+    const netStake = Number(net.active_stake);
+    const netBlks  = Number(net.blk_count);
+    const poolStake = Number(epoch.active_stake);
+    const blockCnt  = Number(epoch.block_cnt ?? 0);
+    if (netStake <= 0 || netBlks <= 0 || poolStake <= 0) continue;
+    const exp = (poolStake / netStake) * netBlks;
+    if (exp < 0.5) continue;
+    totExp += exp;
+    totAct += blockCnt;
+  }
+  if (totExp === 0) return 1;
+  return Math.min(1, totAct / totExp);
+}
+
+// ── Fetch one pool (which = 'old' | 'new') ────────────
+async function loadPool(which) {
+  const inputId = which + '-ticker';
+  const btnId   = which + '-load-btn';
+  const raw = document.getElementById(inputId).value.trim();
+  if (!raw) { setStatus(which, 'Please enter a ticker or pool1… ID.', 'muted'); return; }
+
+  const isPoolId = /^pool1[a-z0-9]{50,}$/i.test(raw);
+  const ticker   = isPoolId ? null : raw.toUpperCase();
+
+  const btn = document.getElementById(btnId);
+  btn.disabled = true;
+
+  const label = isPoolId ? raw.slice(0, 16) + '…' : ticker;
+  setStatus(which, 'Searching for ' + label + '…', 'muted');
+
+  try {
+    let poolId;
+    if (isPoolId) {
+      poolId = raw.toLowerCase();
+    } else {
+      const listResp = await fetch(
+        proxied(`${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`)
+      );
+      if (!listResp.ok) throw new Error(`Koios pool_list HTTP ${listResp.status}`);
+      const pools = await listResp.json();
+      if (!Array.isArray(pools) || pools.length === 0) {
+        setStatus(which, `Pool "${ticker}" not found. Check ticker and try again.`, 'red');
+        return;
+      }
+      poolId = pools[0].pool_id_bech32;
+    }
+
+    setStatus(which, 'Found pool — fetching parameters…', 'muted');
+
+    const infoResp = await fetch(proxied(`${KOIOS}/pool_info`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ _pool_bech32_ids: [poolId] }),
+    });
+    if (!infoResp.ok) throw new Error(`Koios pool_info HTTP ${infoResp.status}`);
+    const infos = await infoResp.json();
+    if (!Array.isArray(infos) || infos.length === 0) throw new Error('No pool info returned.');
+
+    const info = infos[0];
+    const name       = info.meta_json?.name ?? ticker ?? poolId.slice(0, 20);
+    const margin     = info.margin ?? 0;
+    const fixedCost  = Number(info.fixed_cost ?? 340000000) / 1e6;
+    const pledge     = Number(info.pledge ?? 0) / 1e6;
+    const liveStake  = Number(info.live_stake ?? info.pledge ?? 0) / 1e6;
+    const delegators = info.live_delegators ?? '?';
+
+    setStatus(which, 'Fetching block history and network rate…', 'muted');
+
+    // Fetch block history
+    let histData   = [];
+    let epochInfoMap = {};
+    const histResp = await fetch(
+      proxied(
+        `${KOIOS}/pool_history?_pool_bech32=${encodeURIComponent(poolId)}` +
+        `&select=epoch_no,active_stake,block_cnt&order=epoch_no.desc&limit=73`
+      )
+    );
+    if (histResp.ok) {
+      const hj = await histResp.json();
+      if (Array.isArray(hj)) histData = hj;
+    }
+
+    if (histData.length > 0) {
+      const nums = histData.map(h => h.epoch_no).join(',');
+      const eResp = await fetch(
+        proxied(`${KOIOS}/epoch_info?epoch_no=in.(${nums})&select=epoch_no,blk_count,active_stake`)
+      );
+      if (eResp.ok) {
+        const ea = await eResp.json();
+        if (Array.isArray(ea)) for (const e of ea) epochInfoMap[e.epoch_no] = e;
+      }
+    }
+
+    // Fetch live r (once is enough, but safe to call for each pool)
+    await fetchLiveR();
+
+    const perf = computePerf(histData, epochInfoMap, PERF_WINDOW);
+    const displayTicker = ticker ?? poolId.slice(0, 16) + '…';
+    const displayTag    = `${name} [${displayTicker}]`;
+
+    const pool = { name: displayTag, margin, fixedCost, pledge, liveStake, perf };
+
+    if (which === 'old') {
+      oldPool = pool;
+      document.getElementById('old-info').classList.add('visible');
+      document.getElementById('old-name').textContent   = displayTag;
+      document.getElementById('old-margin').textContent = fmtPct(margin * 100);
+      document.getElementById('old-fee').textContent    = fmtADA(fixedCost) + ' ADA/epoch';
+      document.getElementById('old-pledge').textContent = fmtM(pledge) + ' ADA';
+      document.getElementById('old-stake').textContent  = fmtM(liveStake) + ' ADA';
+      document.getElementById('old-perf').textContent   = fmtPct(perf * 100);
+    } else {
+      newPool = pool;
+      document.getElementById('new-info').classList.add('visible');
+      document.getElementById('new-name').textContent   = displayTag;
+      document.getElementById('new-margin').textContent = fmtPct(margin * 100);
+      document.getElementById('new-fee').textContent    = fmtADA(fixedCost) + ' ADA/epoch';
+      document.getElementById('new-pledge').textContent = fmtM(pledge) + ' ADA';
+      document.getElementById('new-perf').textContent   = fmtPct(perf * 100);
+    }
+
+    setStatus(which,
+      `${displayTag} · ${delegators} delegators · ${fmtM(liveStake)} ADA live stake · perf ${fmtPct(perf * 100)} (last ${PERF_WINDOW} epochs)`,
+      'green');
+
+    computeResults();
+
+  } catch (err) {
+    setStatus(which, 'Error: ' + err.message, 'red');
+  } finally {
+    document.getElementById(btnId).disabled = false;
+  }
+}
+
+// ── Main results computation ───────────────────────────
+function computeResults() {
+  if (!oldPool || !newPool) return;
+
+  const D = parseFloat(document.getElementById('delegation-ada').value) || 0;
+  if (D <= 0) return;
+
+  // Old pool: D is already inside liveStake
+  const S_old = oldPool.liveStake;
+  const oldEpoch  = epochRewardForD(D, S_old, oldPool.pledge, oldPool.margin, oldPool.fixedCost, oldPool.perf);
+  const oldAnnual = oldEpoch * EPOCHS_PER_YR;
+  const oldROA    = D > 0 ? (oldAnnual / D) * 100 : 0;
+
+  // New pool: D is NOT yet inside liveStake — add it
+  const S_new = newPool.liveStake + D;
+  const newEpoch  = epochRewardForD(D, S_new, newPool.pledge, newPool.margin, newPool.fixedCost, newPool.perf);
+  const newAnnual = newEpoch * EPOCHS_PER_YR;
+  const newROA    = D > 0 ? (newAnnual / D) * 100 : 0;
+
+  // Switch analysis
+  const switchingCost = 2 * oldEpoch;   // 2 epochs with zero earnings
+  const annualGain    = newAnnual - oldAnnual;
+  const netBenefit1yr = annualGain - switchingCost;
+
+  let recoveryEpochs = Infinity;
+  let recoveryDays   = Infinity;
+  const extraPerEpoch = (newEpoch - oldEpoch);
+  if (extraPerEpoch > 0) {
+    recoveryEpochs = switchingCost / extraPerEpoch;
+    recoveryDays   = recoveryEpochs * 5;
+  }
+
+  // ── Update pool info table placeholders ────────────
+  document.getElementById('old-roa').textContent    = fmtPct(oldROA, 3) + ' / yr';
+  document.getElementById('old-annual').textContent = fmtADA(oldAnnual) + ' ADA';
+  document.getElementById('new-stake').textContent  = fmtM(S_new) + ' ADA';
+  document.getElementById('new-roa').textContent    = fmtPct(newROA, 3) + ' / yr';
+  document.getElementById('new-annual').textContent = fmtADA(newAnnual) + ' ADA';
+
+  // ── Show results section ───────────────────────────
+  document.getElementById('results-section').style.display = 'grid';
+  document.getElementById('cmp-panel').style.display = 'block';
+
+  // Top metric cards
+  document.getElementById('m-old-annual').textContent = fmtADA(oldAnnual);
+  document.getElementById('m-new-annual').textContent = fmtADA(newAnnual);
+
+  const gainEl = document.getElementById('m-gain');
+  gainEl.textContent  = (annualGain >= 0 ? '+' : '') + fmtADA(annualGain);
+  gainEl.className    = 'metric-val ' + (annualGain > 0 ? 'green' : annualGain < 0 ? 'red' : 'muted');
+
+  document.getElementById('m-cost').textContent = fmtADA(switchingCost);
+
+  const netEl = document.getElementById('m-net');
+  netEl.textContent = (netBenefit1yr >= 0 ? '+' : '') + fmtADA(netBenefit1yr);
+  netEl.className   = 'metric-val ' + (netBenefit1yr > 0 ? 'green' : netBenefit1yr < 0 ? 'red' : 'muted');
+
+  const recEl   = document.getElementById('m-recovery');
+  const recUnit = document.getElementById('m-recovery-unit');
+  if (!isFinite(recoveryDays)) {
+    recEl.textContent  = '∞';
+    recEl.className    = 'metric-val red';
+    recUnit.textContent = 'never recoups';
+  } else if (recoveryDays < 1) {
+    recEl.textContent   = '< 1';
+    recEl.className     = 'metric-val green';
+    recUnit.textContent = 'days';
+  } else if (recoveryDays < 365) {
+    recEl.textContent   = recoveryDays.toFixed(0);
+    recEl.className     = 'metric-val ' + (recoveryDays < 90 ? 'green' : 'orange');
+    recUnit.textContent = 'days (' + recoveryEpochs.toFixed(1) + ' epochs)';
+  } else {
+    recEl.textContent   = (recoveryDays / 365).toFixed(1);
+    recEl.className     = 'metric-val red';
+    recUnit.textContent = 'years to break even';
+  }
+
+  // ── Comparison table ───────────────────────────────
+  document.getElementById('c-old-name').textContent   = oldPool.name;
+  document.getElementById('c-new-name').textContent   = newPool.name;
+  document.getElementById('c-old-margin').textContent = fmtPct(oldPool.margin * 100);
+  document.getElementById('c-new-margin').textContent = fmtPct(newPool.margin * 100);
+  document.getElementById('c-old-fee').textContent    = fmtADA(oldPool.fixedCost);
+  document.getElementById('c-new-fee').textContent    = fmtADA(newPool.fixedCost);
+  document.getElementById('c-old-pledge').textContent = fmtM(oldPool.pledge);
+  document.getElementById('c-new-pledge').textContent = fmtM(newPool.pledge);
+  document.getElementById('c-old-stake').textContent  = fmtM(S_old);
+  document.getElementById('c-new-stake').textContent  = fmtM(S_new) + ' (after you join)';
+  document.getElementById('c-old-perf').textContent   = fmtPct(oldPool.perf * 100);
+  document.getElementById('c-new-perf').textContent   = fmtPct(newPool.perf * 100);
+  document.getElementById('c-old-epoch').textContent  = fmtADA(oldEpoch, 4);
+  document.getElementById('c-new-epoch').textContent  = fmtADA(newEpoch, 4);
+  document.getElementById('c-old-ann').textContent    = fmtADA(oldAnnual);
+  document.getElementById('c-new-ann').textContent    = fmtADA(newAnnual);
+  document.getElementById('c-old-roa').textContent    = fmtPct(oldROA, 3);
+  document.getElementById('c-new-roa').textContent    = fmtPct(newROA, 3);
+
+  // ── Verdict banner ─────────────────────────────────
+  const verdictEl    = document.getElementById('verdict');
+  const verdictTitle = document.getElementById('verdict-title');
+  const verdictBody  = document.getElementById('verdict-body');
+  verdictEl.classList.add('visible');
+
+  const ada_s = fmtADA(D, 0) + ' ADA';
+
+  if (annualGain <= 0) {
+    verdictEl.className    = 'verdict visible bad';
+    verdictTitle.textContent = 'Not recommended for financial gain';
+    verdictBody.textContent  =
+      `The target pool pays ${fmtADA(Math.abs(annualGain))} less per year for your ${ada_s}. ` +
+      `Unless you have other reasons to switch (trust, decentralization, mission alignment), ` +
+      `staying on the current pool is better financially.`;
+  } else if (!isFinite(recoveryDays) || recoveryDays > 730) {
+    verdictEl.className    = 'verdict visible caution';
+    verdictTitle.textContent = 'Caution — very long break-even period';
+    verdictBody.textContent  =
+      `Your ${ada_s} would earn ${fmtADA(annualGain)} more per year on the target pool, but ` +
+      (isFinite(recoveryDays)
+        ? `the 2-epoch switching cost takes ${recoveryDays.toFixed(0)} days (${(recoveryDays/365).toFixed(1)} years) to recoup. `
+        : `you never fully recoup the switching cost. `) +
+      `Consider non-financial reasons before switching.`;
+  } else if (recoveryDays > 180) {
+    verdictEl.className    = 'verdict visible caution';
+    verdictTitle.textContent = 'Marginally worth it — break-even in ' + recoveryDays.toFixed(0) + ' days';
+    verdictBody.textContent  =
+      `Your ${ada_s} earns ${fmtADA(annualGain)} more per year on the target pool. ` +
+      `The 2-epoch switching cost of ${fmtADA(switchingCost)} takes ${recoveryEpochs.toFixed(1)} epochs ` +
+      `(${recoveryDays.toFixed(0)} days) to recoup. ` +
+      `Net benefit after one full year: ${(netBenefit1yr >= 0 ? '+' : '') + fmtADA(netBenefit1yr)} ADA.`;
+  } else {
+    verdictEl.className    = 'verdict visible good';
+    verdictTitle.textContent = 'Worth switching — breaks even in ' + recoveryDays.toFixed(0) + ' days';
+    verdictBody.textContent  =
+      `Your ${ada_s} earns ${fmtADA(annualGain)} more per year on the target pool. ` +
+      `The 2-epoch switching cost of ${fmtADA(switchingCost)} is recovered in ` +
+      `${recoveryEpochs.toFixed(1)} epochs (${recoveryDays.toFixed(0)} days). ` +
+      `Net benefit after one full year: +${fmtADA(netBenefit1yr)} ADA.`;
+  }
+}
+
+// ── Wire up buttons and Enter key ──────────────────────
+['old', 'new'].forEach(which => {
+  document.getElementById(which + '-load-btn').addEventListener('click', () => loadPool(which));
+  document.getElementById(which + '-ticker').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loadPool(which);
+  });
+});
+
+// Ctrl+K focuses old ticker; Ctrl+J focuses new ticker
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'k') { e.preventDefault(); document.getElementById('old-ticker').focus(); }
+  if (e.ctrlKey && e.key === 'j') { e.preventDefault(); document.getElementById('new-ticker').focus(); }
+});
+
+// Auto-focus old ticker on load
+document.getElementById('old-ticker').focus();
+</script>
+</body>
+</html>
