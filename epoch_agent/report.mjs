@@ -129,9 +129,15 @@ export function formatReport(reportData) {
   ).sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
   const perfFailed = avoids.filter(c => c.classType === ClassType.ALL_GREEN && !c.perfPasses);
 
-  // Solicitation candidates sorted by highest ROA first
-  const solicit = classifications.filter(c => c.solicitCandidate)
-    .sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
+  // Solicitation candidates: AVOID pools where Pool Ranger's projected ROA beats the pool's ROA.
+  // Sorted lowest ROA first — most under-served delegators listed first (HOW_TO_RUN.md step 4).
+  const solicit = classifications
+    .filter(c => c.solicitCandidate && c.roaAtCurrent < weightedRoaAfter)
+    .sort((a, b) => a.roaAtCurrent - b.roaAtCurrent);
+  // AVOID pools excluded from solicitation because their ROA meets or beats Pool Ranger's.
+  const solicitTooHighRoa = classifications
+    .filter(c => c.solicitCandidate && c.roaAtCurrent >= weightedRoaAfter)
+    .length;
 
   // ── Header ────────────────────────────────────────────────────────────────
   push(`Pool Ranger Delegation Report — Epoch ${epochNo}`);
@@ -252,10 +258,17 @@ export function formatReport(reportData) {
   push('SOLICITATION CANDIDATES  (Phase 2 — outreach not yet implemented)');
   push(line());
   if (solicit.length === 0) {
-    push('  None identified this epoch.');
+    if (solicitTooHighRoa > 0) {
+      push(`  None this epoch — all ${solicitTooHighRoa} avoided pool(s) currently offer ROA ≥ Pool Ranger's`);
+      push(`  projected ${pct(weightedRoaAfter)} weighted ROA. No honest pitch can be made until`);
+      push('  Pool Ranger\'s ROA improves or lower-ROA pools enter the candidate list.');
+    } else {
+      push('  None identified this epoch.');
+    }
   } else {
-    push('  Delegators at these pools would benefit from joining Pool Ranger.');
-    push('  Sorted by highest Projected ROA first.');
+    push(`  Delegators at these pools earn less than Pool Ranger's projected ${pct(weightedRoaAfter)}`);
+    push('  weighted ROA and would benefit from switching. Sorted by lowest Projected ROA first');
+    push('  (most under-served delegators listed first).');
     blank();
     for (const c of solicit) {
       const label = c.ticker ? `[${c.ticker}]` : '';
