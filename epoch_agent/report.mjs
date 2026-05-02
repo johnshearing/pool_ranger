@@ -491,7 +491,7 @@ export function formatReport(reportData) {
   if (forcedWdCount > 0) {
     push(`${step}. Execute WITHDRAW transactions (unsafe pools) via _delegate.mjs for:`);
     for (const c of forcedWithdrawals) {
-      const label = c.ticker ? `[${c.ticker}]` : '';
+      const label = c.ticker ? `[${c.ticker}]` : c.poolId;
       push(`     ${label} — withdraw ${ada(c.rangerCurrentStake)}`);
     }
     step++;
@@ -500,7 +500,7 @@ export function formatReport(reportData) {
   if (rebalCount > 0) {
     push(`${step}. Review REBALANCING MOVES above. For each approved move, execute via _delegate.mjs:`);
     for (const { c, entry } of rebalanceMoves) {
-      const label = c.ticker ? `[${c.ticker}]` : '';
+      const label = c.ticker ? `[${c.ticker}]` : c.poolId;
       if (entry.moveType === 'WITHDRAW') {
         push(`     ${label} — withdraw ${ada(entry.currentAda)}  (break-even: ${beLabel(entry.breakEvenEpochs)})`);
       } else {
@@ -514,11 +514,11 @@ export function formatReport(reportData) {
   if (hasAdds) {
     push(`${step}. Execute ADD/INCREASE transactions via _delegate.mjs for:`);
     for (const { c, entry } of addMoreEntries) {
-      const label = c.ticker ? `[${c.ticker}]` : '';
+      const label = c.ticker ? `[${c.ticker}]` : c.poolId;
       push(`     ${label} — increase by ${ada(entry.netChangeAda)} to ${ada(entry.proposedAda)}`);
     }
     for (const { c, entry } of newEntries) {
-      const label = c.ticker ? `[${c.ticker}]` : '';
+      const label = c.ticker ? `[${c.ticker}]` : c.poolId;
       push(`     ${label} — add ${ada(entry.proposedAda)}`);
     }
     step++;
