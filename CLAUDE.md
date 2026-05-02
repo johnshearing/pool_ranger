@@ -1,7 +1,12 @@
 # CLAUDE.md — Pool Ranger (ranger)
 
-This file is auto-loaded by Claude Code at the start of every session for this directory.
-**Always read `ranger/epoch_agent/HOW_TO_RUN.md` at the start of each session** for the full project spec.
+These files are auto-loaded by Claude Code at the start of every session for this directory.
+
+**Always read `ranger/REQUIREMENTS.md` at the start of each session** to understand the currently defined goals of the Pool Ranger project.
+
+**Always read `ranger/epoch_agent/HOW_TO_RUN.md` at the start of each session** to understand how the Epoch Reporting System currently runs.
+
+**Always read `ranger/claude_queries/pledge_effects.md` at the start of each session** to understand proposed changes to the goals of the Pool Ranger project and the Epoch Reporting System.
 
 ---
 
@@ -32,7 +37,3 @@ The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview 
 - User's environment: Windows 10 + WSL2 (Ubuntu). Explain steps as if explaining to a child.
 
 ---
-
-## Reference
-
-See `ranger/epoch_agent/HOW_TO_RUN.md` in this directory for full requirements, phased plan, open design questions, and naming conventions.

@@ -73,6 +73,7 @@ the survivors to `candidate_pools.json`. Pre-filter thresholds (with defaults):
 | Max active stake | 100% of S_sat | Oversaturated pools that reduce delegator ROA |
 | Max margin | 5% | High-fee pools that rarely compete on ROA |
 | Min age | 30 epochs | Brand-new pools with too little history to measure |
+| Min high-pledge | 2.5 M ADA | Sets the pledge threshold for the HIGH PLEDGE OPPORTUNITIES report section (not a discovery filter — all pools are still evaluated; this controls which appear in that section) |
 
 To override any threshold, add a `discoveryConfig` block to `ranger_state.json`:
 
@@ -81,7 +82,8 @@ To override any threshold, add a `discoveryConfig` block to `ranger_state.json`:
   "minActiveStakeAda":     1000000,
   "maxMarginFraction":     0.05,
   "minEpochsOld":          30,
-  "maxSaturationFraction": 1.0
+  "maxSaturationFraction": 1.0,
+  "minHighPledgeAda":      2500000
 }
 ```
 
@@ -185,6 +187,7 @@ managed automatically by the agent and must not be edited by hand.
 | `currentDelegations` | Agent only | Auto-populated from settled `inFlightChanges` each run — do not edit. |
 | `completedChanges` | Agent only | Permanent audit trail of all settled changes — do not edit. |
 | `poolLuckHistory` | Agent only | Per-pool luck observations accumulated across runs — do not edit. |
+| `poolParamHistory` | Agent only | Per-pool last-known fee/margin/pledge and full change log — do not edit. Updated each run. |
 | `_schemaVersion` | Agent only | Internal schema version marker — do not edit. |
 | `lastUpdatedEpoch` | Agent only | Set to the current epoch on each run — do not edit. |
 
@@ -202,9 +205,11 @@ A fresh `ranger_state.json` before any delegation transactions have been submitt
     "minActiveStakeAda":     1000000,
     "maxMarginFraction":     0.05,
     "minEpochsOld":          30,
-    "maxSaturationFraction": 1.0
+    "maxSaturationFraction": 1.0,
+    "minHighPledgeAda":      2500000
   },
-  "poolLuckHistory": {}
+  "poolLuckHistory": {},
+  "poolParamHistory": {}
 }
 ```
 
@@ -284,13 +289,15 @@ The report has these sections, in order:
 
 | Section | What it means |
 |---|---|
-| **EXISTING DELEGATIONS** | Pools where Pool Ranger is currently delegating. Shows HOLD (no change), ADD MORE (increasing), REDUCE (decreasing — includes churn cost), or WITHDRAW (removing — includes churn cost) based on the global optimizer's comparison of all safe pools each epoch. |
-| **REBALANCING MOVES** | Appears only when the optimizer proposes moving stake away from one or more currently-delegated pools. Lists each move with: the freed amount, churn cost in ADA (rewards missed during the 2-epoch delay), and break-even estimate (epochs until the ROA gain recovers the cost). Includes a ⚠ warning that members who joined within the last 2 epochs face a 4-epoch delay instead of 2. The administrator decides whether to approve each move. |
-| **NEW CANDIDATES** | Pools from the candidate list not yet delegated to. Shows ADD recommendations, or explains why a qualifying pool is at saturation or the budget was exhausted this epoch. |
+| **PARAMETER CHANGES** | Appears at the top of every report after the first run. Lists any pool in the candidate list that changed its fixed fee, margin, or pledge since the previous epoch run. Pools Pool Ranger currently delegates to are marked ★. The full change history for every pool is stored permanently in `ranger_state.json → poolParamHistory`. |
+| **EXISTING DELEGATIONS** | Pools where Pool Ranger is currently delegating. Shows HOLD (no change), ADD MORE (increasing), REDUCE (decreasing — includes opportunity cost), or WITHDRAW (removing — includes opportunity cost) based on the global optimizer's comparison of all safe pools each epoch. |
+| **REBALANCING MOVES** | Appears only when the optimizer proposes moving stake away from one or more currently-delegated pools. Lists each move with: the freed amount, opportunity cost in ADA (2 epochs earning the old pool's ROA instead of the new pool's ROA — old-pool rewards continue during the transition, so nothing is missed), and break-even (always 2 epochs). The administrator decides whether to approve each move. |
+| **ELIGIBLE POOLS** | Pools with no current Pool Ranger delegation that passed all criteria: 100% performance over 20 epochs AND safe structure for the SPO (ALL_GREEN, or HAS_RED_ZONE with cursor in or clearable to the green zone). Shows ADD for pools allocated stake this epoch; QUALIFIES for pools that passed criteria but the budget was exhausted. Sorted by ROA. |
+| **HIGH PLEDGE OPPORTUNITIES** | Pools with pledge ≥ the configured `minHighPledgeAda` threshold (default 2.5 M ADA), regardless of current eligibility. High-pledge pools strengthen Sybil-resistance incentives and boost delegator ROA via the pledge bonus. Shows each pool's current recommendation so you can see which are already eligible and spot trends across the pledge spectrum. |
 | **POOLS AVOIDED** | Pools not currently delegated to where adding delegation would harm the SPO (ALL_RED) or where Pool Ranger cannot supply enough stake to clear the red zone (HAS_RED_ZONE — cannot clear). |
 | **POOLS DROPPED** | Pools that passed safety classification (ALL_GREEN) but failed the 20-epoch 100% performance requirement. |
 | **SOLICITATION CANDIDATES** | A strict subset of POOLS AVOIDED: only pools whose projected ROA is **lower than Pool Ranger's projected weighted ROA** after this epoch's proposed changes. These are delegators who are being under-served and would earn more by joining Pool Ranger. Sorted lowest ROA first — the most under-served delegators appear at the top. If every avoided pool already out-earns Pool Ranger, the section prints a single message explaining this and lists no candidates. (Phase 2 — reporting only, no outreach yet.) |
-| **SUMMARY** | Count of forced withdrawals, rebalancing moves with total churn cost, new delegations, and any undeployed stake. Weighted ROA before and after. |
+| **SUMMARY** | Count of forced withdrawals, rebalancing moves with total opportunity cost, new delegations, and any undeployed stake. Weighted ROA before and after. |
 | **LUCK Z-SCORE TREND** | Appears in every report. Shows two signals per pool: (1) **Windows** — non-overlapping 20-epoch z-scores across the full 73-epoch history, visible on the very first run; (2) **Cross-run** — headline z-scores from past agent runs, accumulating over multiple epochs. Flags any pool whose windows or cross-run readings are all consistently above +1.5σ or below −1.5σ with a `***` warning. Use this section to detect systematic performance advantages that projected ROA cannot see. |
 | **NEXT STEPS** | Numbered actions to execute, separated by type: forced withdrawals, approved rebalancing moves, and new/increased delegations. |
 
@@ -423,22 +430,26 @@ budget is filled greedily. The resulting proposed allocation is compared to the 
 allocation. Any pool whose proposed amount differs meaningfully from its current amount receives
 a REDUCE or WITHDRAW recommendation (for decreases) or ADD MORE (for increases).
 
-**Churn cost and break-even.** Moving delegation costs two missed reward epochs on the moved
-amount (the new pool's delegation does not become active until epoch N+2 after submission).
+**Opportunity cost and break-even.** Moving delegation does NOT cause missed rewards. When Pool
+Ranger submits a delegation change in epoch N, the old pool continues paying rewards in epochs
+N and N+1 — the old snapshot is still active until epoch N+2. The same is true for new members:
+their old stake pool keeps paying until Pool Ranger's delegation activates, so no rewards are
+ever lost during the transition. The only costs are:
+
+- **Transaction fee** (~0.17 ADA per transaction — negligible)
+- **Opportunity cost**: for 2 epochs the moved stake earns the old pool's ROA instead of the
+  new pool's ROA
+
 For every proposed reduction or withdrawal, the report shows:
 
 ```
-churn cost (ADA) = 2 × moved_ADA × (pool_ROA / 73 / 100)
-break-even       = 2 × old_pool_ROA / (avg_new_destination_ROA − old_pool_ROA)  [epochs]
+opportunity cost (ADA) = 2 × moved_ADA × (new_ROA − old_ROA) / 73 / 100
+break-even             = 2 epochs  (always — cost equals exactly 2 epochs of the ROA gain)
 ```
 
-Example: moving 1 M ADA from a 4.0 %/yr pool to one averaging 4.5 %/yr costs ~1,096 ADA
-and breaks even in ~16 epochs (~80 days).
-
-**New-member delay note.** For a member who just joined (within the last 2 epochs), a
-simultaneous Pool Ranger delegation move compounds to a 4-epoch delay (not 2) before their
-first rewards. The report flags this with a ⚠ warning; per-member tracking of join dates is
-not yet implemented.
+Example: moving 1 M ADA from a 2.25 %/yr pool to one averaging 2.30 %/yr costs ~14 ADA in
+opportunity cost and breaks even after 2 epochs (~10 days). The 0.17 ADA transaction fee is
+recovered in the same timeframe.
 
 #### Epoch rate `r`
 

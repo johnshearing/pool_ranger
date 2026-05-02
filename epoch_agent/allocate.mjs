@@ -128,7 +128,7 @@ export function allocateWithR(delegateCandidates, totalAvailableAda, sSat, r, co
 //     netChangeAda,    // proposedAda - currentAda
 //     roaAtProposed,   // delegROA at proposed total pool stake
 //     roaAtCurrent,    // delegROA at current total pool stake
-//     churnCostAda,    // 2 missed epochs of rewards on the moved amount (only when reducing)
+//     churnCostAda,    // opportunity cost: 2 epochs earning old ROA instead of new ROA (only when reducing)
 //     breakEvenEpochs, // epochs until ROA gain repays churn cost (null if no gain)
 //     moveType,        // 'HOLD' | 'ADD_NEW' | 'ADD_MORE' | 'REDUCE' | 'WITHDRAW'
 //   }
@@ -207,16 +207,17 @@ export function globalAllocateWithR(safePools, totalBudget, sSat, r, config = {}
       moveType = 'WITHDRAW';
     }
 
-    // Churn cost — 2 missed epochs on the stake being moved away.
-    // Break-even formula: 2 × oldROA / (avgDestROA - oldROA) epochs.
+    // Opportunity cost — old-pool rewards continue during the 2-epoch transition, so no
+    // rewards are missed. The only cost is earning oldROA instead of newROA for 2 epochs.
+    // Break-even is always 2 epochs: cost = 2 × gain/epoch, so cost / (gain/epoch) = 2.
     let churnCostAda    = 0;
     let breakEvenEpochs = null;
     if (netChangeAda < -(minMeaningfulAda) && currentAda > 0) {
       const movedAda = Math.abs(netChangeAda);
-      churnCostAda   = 2 * movedAda * (roaAtCurrent / 73 / 100);
       const roaDiff  = avgDestRoa - roaAtCurrent;
       if (roaDiff > 0) {
-        breakEvenEpochs = Math.ceil(2 * roaAtCurrent / roaDiff);
+        churnCostAda    = 2 * movedAda * roaDiff / 73 / 100;
+        breakEvenEpochs = 2;
       }
     }
 

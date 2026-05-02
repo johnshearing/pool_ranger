@@ -76,6 +76,9 @@ export function formatReport(reportData) {
     generatedAt,
     undeployedAda,
     poolLuckHistory = {},
+    minHighPledgeAda = 2_500_000,
+    paramChanges = [],
+    prevEpochNo = null,
   } = reportData;
 
   const lines = [];
@@ -147,6 +150,44 @@ export function formatReport(reportData) {
   push(`Global budget (total stake minus in-flight): ${ada(rangerAvailableAda)}`);
   blank();
 
+  // ── Parameter Changes ────────────────────────────────────────────────────
+  const sinceLabel = prevEpochNo !== null ? `  (since epoch ${prevEpochNo})` : '';
+  push(`PARAMETER CHANGES${sinceLabel}`);
+  push(line());
+  if (prevEpochNo === null) {
+    push('  First run — baseline parameters recorded. Changes will appear here from the next epoch onwards.');
+  } else if (paramChanges.length === 0) {
+    push(`  No fee, margin, or pledge changes detected this epoch.`);
+  } else {
+    push('  ★ = currently delegated by Pool Ranger.');
+    blank();
+    for (const p of paramChanges) {
+      const star  = p.rangerCurrentStake > 0 ? '★ ' : '  ';
+      const label = p.ticker ? `[${p.ticker}]` : `[${p.poolId.slice(0, 12)}…]`;
+      const nth   = p.totalChanges > 1 ? `  (change #${p.totalChanges} for this pool)` : '';
+      push(`${star}${label}  ${p.poolId}${nth}`);
+      for (const ch of p.detected) {
+        let fromStr, toStr;
+        if (ch.unit === 'pct') {
+          fromStr = `${(ch.from * 100).toFixed(2)}%`;
+          toStr   = `${(ch.to   * 100).toFixed(2)}%`;
+        } else {
+          fromStr = ada(ch.from);
+          toStr   = ada(ch.to);
+        }
+        const up     = ch.to > ch.from;
+        const arrow  = up ? '▲' : '▼';
+        const verb   = ch.unit === 'ada' && ch.field === 'Pledge'
+          ? (up ? 'increased' : 'decreased')
+          : (up ? 'raised'    : 'lowered');
+        push(`  ${ch.field.padEnd(10)} ${fromStr}  →  ${toStr}   ${arrow} ${verb}`);
+      }
+      push(`  Current recommendation:  ${p.recommendation}`);
+      blank();
+    }
+  }
+  blank();
+
   // ── Existing Delegations ──────────────────────────────────────────────────
   const existingTotal = existingEntries.length + forcedWithdrawals.length;
   if (existingTotal > 0) {
@@ -188,8 +229,8 @@ export function formatReport(reportData) {
         push(`    Proposed           : 0 ADA  (WITHDRAW — optimizer found higher-ROA opportunities)`);
       }
       push(`    Freed stake        : ${ada(movedAda)}  → redeployed to higher-ROA pools`);
-      push(`    Churn cost         : ${entry.churnCostAda.toFixed(0)} ADA  (2 missed epochs on moved amount)`);
-      push(`    Break-even         : ${beLabel(entry.breakEvenEpochs)}`);
+      push(`    Opportunity cost   : ${entry.churnCostAda.toFixed(0)} ADA  (2 epochs earning old ROA instead of new; old-pool rewards continue — nothing is missed)`);
+      push(`    Break-even         : ${beLabel(entry.breakEvenEpochs)}  (always 2 epochs: cost = 2 × gain/epoch)`);
       blank();
     }
 
@@ -199,15 +240,20 @@ export function formatReport(reportData) {
     push(`  Totals — Churn cost: ${totalChurn.toFixed(0)} ADA` +
          (avgBE !== null ? `  |  Avg break-even: ${avgBE} epochs (~${Math.round(avgBE * 5)} days)` : ''));
     blank();
-    push('  ⚠ WARNING: If any member joined within the last 2 epochs, their churn cost is');
-    push('    doubled (4 missed epochs instead of 2). Per-member tracking not yet implemented.');
+    push('  Note: New members\' old stake pools continue paying rewards during the transition,');
+    push('    so no rewards are lost for them either. The transaction fee (~0.17 ADA) is negligible.');
     blank();
   }
 
-  // ── New Candidates ────────────────────────────────────────────────────────
+  // ── Eligible Pools ────────────────────────────────────────────────────────
   if (newEntries.length > 0 || unfunded.length > 0) {
-    push('NEW CANDIDATES');
+    push('ELIGIBLE POOLS');
     push(line());
+    push('  Pools with no current Pool Ranger delegation that passed all criteria:');
+    push('  100% performance over 20 epochs AND safe structure for the SPO (ALL_GREEN, or');
+    push('  HAS_RED_ZONE with cursor in or clearable to the green zone). Sorted by ROA.');
+    push('  ADD = allocated stake this epoch. QUALIFIES = passed criteria; budget exhausted.');
+    blank();
     for (const { c, entry } of newEntries) {
       push(formatPool(c, entry));
       blank();
@@ -222,6 +268,31 @@ export function formatReport(reportData) {
       push(`  Active stake:      ${ada(c.activeStakeAda)}`);
       roaLines('  ', c).forEach(l => push(l));
       push(`  Recommendation:    QUALIFIES — ${saturated ? 'at or above saturation — no stake can be added' : 'budget exhausted this epoch'}`);
+      blank();
+    }
+  }
+
+  // ── High Pledge Opportunities ─────────────────────────────────────────────
+  const highPledgePools = classifications
+    .filter(c => c.pledgeAda >= minHighPledgeAda)
+    .sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
+
+  if (highPledgePools.length > 0) {
+    push(`HIGH PLEDGE OPPORTUNITIES  (pledge ≥ ${ada(minHighPledgeAda)})`);
+    push(line());
+    push('  Pools with meaningful pledge — potential long-term delegation targets.');
+    push('  High pledge strengthens Sybil-resistance incentives and boosts delegator ROA via the pledge bonus.');
+    push('  Current recommendation shown — eligibility may change as delegation levels shift.');
+    blank();
+    for (const c of highPledgePools) {
+      const label = c.ticker ? `[${c.ticker}]` : `[${c.poolId.slice(0, 12)}…]`;
+      push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin * 100).toFixed(1)}%`);
+      push(`  Full ID:           ${c.poolId}`);
+      push(`  Classification:    ${describeClass(c)}`);
+      push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
+      push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
+      roaLines('  ', c).forEach(l => push(l));
+      push(`  Current recommendation:  ${c.recommendation}`);
       blank();
     }
   }
@@ -308,7 +379,7 @@ export function formatReport(reportData) {
   }
   if (rebalCount > 0) {
     push(`Rebalancing moves:   ${rebalCount} pool(s) — ${ada(rebalMovedAda)} redistributed`);
-    push(`Churn cost:          ${totalChurnAda.toFixed(0)} ADA  (2 missed epochs on moved stake)`);
+    push(`Opportunity cost:    ${totalChurnAda.toFixed(0)} ADA  (2 epochs at old ROA instead of new)`);
   }
   if (addMoreEntries.length > 0) {
     push(`Increases:           ${addMoreEntries.length} existing pool(s) — ${ada(addMoreAda)} added`);

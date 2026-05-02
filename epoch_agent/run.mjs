@@ -262,6 +262,57 @@ async function main() {
     }
   }
 
+  // Detect parameter changes since last run
+  if (!state.poolParamHistory) state.poolParamHistory = {};
+  const paramChanges = [];
+  const prevEpochNo  = state.lastUpdatedEpoch > 0 ? state.lastUpdatedEpoch : null;
+
+  for (const c of classifications) {
+    if (!state.poolParamHistory[c.poolId]) {
+      // First time seeing this pool — record baseline, no change to report
+      state.poolParamHistory[c.poolId] = {
+        ticker:   c.ticker,
+        lastSeen: { fixedCostAda: c.fixedCostAda, margin: c.margin, pledgeAda: c.pledgeAda, epoch: epochNo },
+        changes:  [],
+      };
+      continue;
+    }
+
+    const entry    = state.poolParamHistory[c.poolId];
+    const prev     = entry.lastSeen;
+    const detected = [];
+
+    if (prev.fixedCostAda !== c.fixedCostAda) {
+      detected.push({ field: 'Fixed fee', from: prev.fixedCostAda, to: c.fixedCostAda, unit: 'ada' });
+      entry.changes.push({ epoch: epochNo, field: 'fixedCostAda', from: prev.fixedCostAda, to: c.fixedCostAda });
+    }
+    // Compare margin to 0.01% precision to avoid floating-point noise
+    if (Math.round(prev.margin * 10000) !== Math.round(c.margin * 10000)) {
+      detected.push({ field: 'Margin', from: prev.margin, to: c.margin, unit: 'pct' });
+      entry.changes.push({ epoch: epochNo, field: 'margin', from: prev.margin, to: c.margin });
+    }
+    // Compare pledge to nearest whole ADA
+    if (Math.round(prev.pledgeAda) !== Math.round(c.pledgeAda)) {
+      detected.push({ field: 'Pledge', from: prev.pledgeAda, to: c.pledgeAda, unit: 'ada' });
+      entry.changes.push({ epoch: epochNo, field: 'pledgeAda', from: prev.pledgeAda, to: c.pledgeAda });
+    }
+
+    // Update lastSeen regardless of whether anything changed
+    entry.ticker   = c.ticker;
+    entry.lastSeen = { fixedCostAda: c.fixedCostAda, margin: c.margin, pledgeAda: c.pledgeAda, epoch: epochNo };
+
+    if (detected.length > 0) {
+      paramChanges.push({
+        poolId:             c.poolId,
+        ticker:             c.ticker,
+        recommendation:     c.recommendation,
+        rangerCurrentStake: c.rangerCurrentStake,
+        totalChanges:       entry.changes.length,
+        detected,
+      });
+    }
+  }
+
   // Format and output report
   const generatedAt = new Date().toISOString();
   const reportText  = formatReport({
@@ -277,7 +328,10 @@ async function main() {
     weightedRoaAfter,
     generatedAt,
     undeployedAda,
-    poolLuckHistory: state.poolLuckHistory,
+    poolLuckHistory:  state.poolLuckHistory,
+    minHighPledgeAda: state.discoveryConfig?.minHighPledgeAda ?? 2_500_000,
+    paramChanges,
+    prevEpochNo,
   });
 
   console.log('\n' + reportText);
