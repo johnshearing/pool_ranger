@@ -333,7 +333,8 @@ function getParams() {
 }
 
 function gross(S, P, r) {
-  return r * (S + A0 * P) / (1 + A0);
+  const S_capped = Math.min(S, S_SAT);
+  return r * (S_capped + A0 * P) / (1 + A0);
 }
 
 // perf scales the effective rewards; when perf = 1 results are identical to original

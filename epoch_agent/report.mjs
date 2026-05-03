@@ -249,9 +249,8 @@ export function formatReport(reportData) {
   if (newEntries.length > 0 || unfunded.length > 0) {
     push('ELIGIBLE POOLS');
     push(line());
-    push('  Pools with no current Pool Ranger delegation that passed all criteria:');
-    push('  100% performance over 20 epochs AND safe structure for the SPO (ALL_GREEN, or');
-    push('  HAS_RED_ZONE with cursor in or clearable to the green zone). Sorted by ROA.');
+    push('  No current Pool Ranger delegation and 100% performance over 20 epochs.');
+    push('  Sorted by ROA.');
     push('  ADD = allocated stake this epoch. QUALIFIES = passed criteria; budget exhausted.');
     blank();
     for (const { c, entry } of newEntries) {
@@ -337,9 +336,11 @@ export function formatReport(reportData) {
       push('  None identified this epoch.');
     }
   } else {
-    push(`  Delegators at these pools earn less than Pool Ranger's projected ${pct(weightedRoaAfter)}`);
-    push('  weighted ROA and would benefit from switching. Sorted by lowest Projected ROA first');
-    push('  (most under-served delegators listed first).');
+    push('  Pool Ranger cannot delegate to these pools — adding stake pushes deeper into');
+    push('  the red zone, reducing both SPO income and delegator ROA.');
+    push(`  Their delegators currently earn less than Pool Ranger's projected ${pct(weightedRoaAfter)}`);
+    push('  weighted ROA and would benefit from switching to Pool Ranger.');
+    push('  Sorted by lowest ROA first (most under-served delegators listed first).');
     blank();
     for (const c of solicit) {
       const label = c.ticker ? `[${c.ticker}]` : '';

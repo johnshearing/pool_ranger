@@ -677,7 +677,7 @@ whose parameters you can look up.
 |------|-------------------------------|
 | **r varies over time** | Re-enter the current epoch rate (from Cardano staking calculators) periodically. Even a small change in r can eliminate or create a red zone. |
 | **a₀ = 0.3 is governable** | If Cardano governance changes a₀, the 2.7 M threshold and 23.1 % ceiling both shift. Recheck any saved pool evaluations. |
-| **Saturation cap** | The chart does not cap rewards at saturation — drag the cursor past the orange line to see idealized values, but know that real rewards are capped there. |
+| **Saturation cap** | When total pool stake exceeds S_sat ≈ 75 M ADA (the orange vertical line), the chart caps gross rewards at the saturation level. SPO income flattens and delegator ROA declines past this point, matching Cardano protocol behavior. |
 | **Performance detects blocks, not intent** | The ratio measures produced vs. expected blocks. It cannot distinguish bad luck (rare for large pools over many epochs) from downtime, misconfiguration, or latency. A single bad epoch in a 20-epoch window hurts the score more than it should — use a longer window when evaluating a pool with one obvious incident. |
 | **Missed slots leave no on-chain trace** | If a pool was scheduled for a slot but failed to mint and no other pool filled it either, the blockchain records nothing. The performance ratio captures this as a lower actual-block count, but cannot tell you *why* the block was missed. |
 | **Lucky streaks capped at 100 %** | The chart caps p at 1.0. A pool that minted more blocks than expected in a short window is simply lucky; the cap prevents this from inflating the performance card above 100 %. |
