@@ -1,10 +1,13 @@
 ## Question
 
-I am looking at the interactive chart. I notice that there is no change in either curve as they pass through the vertical saturation line. I am surprised because I have been told that there is a real disadvantage when delegating to over-saturated pools. Is the chart incorrect or is my understanding of saturation incorrect?
+I am looking at the interactive chart `ranger/SPO_REWARD_ANALYSIS_CHART.html`.  
+I notice that there is no change in either curve as they pass through the vertical saturation line.  
+I am surprised because I have been told that there is a real disadvantage when delegating to over-saturated pools.  
+Is the chart incorrect or is my understanding of saturation incorrect?  
 
 ## Answer
 
-Your understanding of saturation is correct — and the chart had a bug.
+Your understanding of saturation is correct — and the chart had a bug.  
 
 ### What Cardano Protocol Actually Does at Saturation
 
