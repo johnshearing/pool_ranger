@@ -16,6 +16,24 @@ You can leave the cooperative and withdraw all rewards without asking permission
 
 ---
 
+## How Pool Ranger Fits Into Cardano's Incentive Design
+
+The Cardano protocol is designed to converge on approximately 500 stake pools, each running near saturation. The reward formula favors near-saturated pools, the pledge bonus rewards operators who commit their own ADA, and the fixed fee structure makes large pools more cost-efficient for delegators. This design only works as intended if delegators continuously move their stake to whichever pools offer the best return.
+
+In practice, most ADA holders delegate once and never revisit the decision. Stake becomes sticky — propping up pools that may have raised their margin, reduced their pledge, or let their performance slip since the initial delegation.
+
+**Pool Ranger is the rational delegator the protocol was designed for.** It tracks pool parameters every epoch, detects changes in margin, fee, and pledge, and moves delegation to whichever pools currently offer the highest return. By acting on the incentives the protocol was built around, Pool Ranger helps push the ecosystem toward the equilibrium its designers intended: roughly 500 well-performing pools, each earning close to the return the protocol's mathematics allows.
+
+In practice the Nash Equilibrium is messier. There are currently around 3,000 registered pools, because many operators run pools for reasons beyond economics — community identity, ideological commitment to decentralization, or simply the desire to participate. Many of these pools will remain undersaturated indefinitely regardless of parameter incentives. Pool Ranger works with what the ecosystem provides. It cannot manufacture the ideal outcome, but it consistently moves delegation in the direction the protocol was designed to go.
+
+The 500-pool target is also not fixed. The Cardano community can vote to change the `k` parameter — raising it would spread rewards across more pools and incentivize greater decentralization; lowering it would concentrate rewards and push toward fewer, larger pools. If the community decides the current target is wrong, the entire equilibrium shifts. Pool Ranger adapts to whatever `k` the protocol sets.
+
+The dominant lever for delegator ROA is **margin** — the percentage of rewards the pool operator takes before sharing the rest. Pledge also matters: a larger pledge increases the gross reward pot available to all delegators. Performance multiplies everything. None of these controls belong to the delegator — only the pool operator sets them. This means Pool Ranger cannot negotiate better terms; it can only select the best terms currently available and move on when something better appears.
+
+That is exactly what it does. Operators who want Pool Ranger's delegation set parameters that attract it. The protocol's own incentives do the work.
+
+---
+
 ## Problems Pool Ranger Solves for delegators
 
 ### 1. Sticky Stake
