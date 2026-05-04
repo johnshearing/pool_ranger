@@ -20,23 +20,25 @@ export function computeSsat(networkActiveStakeAda, k = 500) {
 }
 
 // gross — total pool reward pot before fees and margin (ADA/epoch)
-export function gross(S, P, r) {
-  return r * (S + A0 * P) / (1 + A0);
+// sSat caps S at the saturation threshold; default Infinity means no cap.
+export function gross(S, P, r, sSat = Infinity) {
+  const S_capped = Math.min(S, sSat);
+  return r * (S_capped + A0 * P) / (1 + A0);
 }
 
 // spoIncome — what the SPO keeps after fixed fee + margin + pledge share (ADA/epoch)
-export function spoIncome(S, P, F, m, r, perf) {
+export function spoIncome(S, P, F, m, r, perf, sSat = Infinity) {
   if (S <= 0) return 0;
-  const g = gross(S, P, r) * perf;
+  const g = gross(S, P, r, sSat) * perf;
   if (g <= F) return g;
   const net = g - F;
   return F + m * net + (P / S) * (1 - m) * net;
 }
 
 // delegROA — annual return for delegators (%/yr, e.g. 3.04 means 3.04%)
-export function delegROA(S, P, F, m, r, perf) {
+export function delegROA(S, P, F, m, r, perf, sSat = Infinity) {
   if (S <= 0) return 0;
-  const g = gross(S, P, r) * perf;
+  const g = gross(S, P, r, sSat) * perf;
   if (g <= F) return 0;
   return (1 - m) * (g - F) / S * EPOCHS_PER_YR * 100;
 }

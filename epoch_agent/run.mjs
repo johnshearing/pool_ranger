@@ -200,7 +200,7 @@ async function main() {
 
     const result = classifyPool(
       poolInfo, poolHistory, epochInfoMap,
-      rangerCurrentStake, rangerAvailableAda, r,
+      rangerCurrentStake, rangerAvailableAda, r, sSat,
     );
     classifications.push(result);
   }

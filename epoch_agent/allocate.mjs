@@ -102,7 +102,7 @@ export function allocateWithR(delegateCandidates, totalAvailableAda, sSat, r, co
     if (maxAdd < minMeaningfulAda) continue;
 
     const totalAfterAda = activeStakeAda + maxAdd;
-    const roaAtTotal    = delegROA(totalAfterAda, P, F, m, r, perf);
+    const roaAtTotal    = delegROA(totalAfterAda, P, F, m, r, perf, sSat);
 
     result.set(poolId, { addAda: maxAdd, totalAfterAda, roaAtTotal });
     remaining -= maxAdd;
@@ -173,7 +173,7 @@ export function globalAllocateWithR(safePools, totalBudget, sSat, r, config = {}
     const { pledgeAda: P, fixedCostAda: F, margin: m,
             activeStakeAda, perf, rangerCurrentStake } = pool;
     const newS = activeStakeAda - rangerCurrentStake + allocAda;
-    const roa  = delegROA(newS, P, F, m, r, perf);
+    const roa  = delegROA(newS, P, F, m, r, perf, sSat);
     totalReceived   += allocAda;
     weightedDestRoa += allocAda * roa;
   }
@@ -191,7 +191,7 @@ export function globalAllocateWithR(safePools, totalBudget, sSat, r, config = {}
 
     const netChangeAda  = proposedAda - currentAda;
     const newS          = activeStakeAda - currentAda + proposedAda;
-    const roaAtProposed = delegROA(newS, P, F, m, r, perf);
+    const roaAtProposed = delegROA(newS, P, F, m, r, perf, sSat);
 
     // Determine move type
     let moveType;

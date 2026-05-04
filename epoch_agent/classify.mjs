@@ -70,7 +70,7 @@ export function computePerformance(poolHistory, epochInfoMap, windowEpochs = 20)
 // luckZ = luckPremium divided by its theoretical standard error (Poisson block-assignment model).
 //   |luckZ| < 1.5 → consistent with pure random variance
 //   luckZ  > 1.5 consistently → likely real systematic advantage
-export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowEpochs = 20, offset = 0) {
+export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowEpochs = 20, offset = 0, sSat = Infinity) {
   const slice = poolHistory.slice(offset, offset + windowEpochs);
   const roaValues      = [];
   const expectedValues = [];
@@ -88,12 +88,12 @@ export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowE
     // Same correction as fetchRecentR: Koios total_rewards ≈ R/(1+A₀); gross() needs R/TAS.
     const r_i    = net.totalRewardsAda / net.activeStakeAda * (1 + A0);
     const perf_i = entry.blockCnt / expected;   // intentionally uncapped
-    roaValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, perf_i));
-    expectedValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, 1.0));
+    roaValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, perf_i, sSat));
+    expectedValues.push(delegROA(entry.activeStakeAda, P, F, m, r_i, 1.0, sSat));
 
     // delegROA is exactly linear in perf when gross > F, so luck_i = C_i * (perf_i - 1).
     // Var(perf_i) = 1/expected_i (Poisson), so Var(luck_i) = C_i^2 / expected_i.
-    const g_i = gross(entry.activeStakeAda, P, r_i);
+    const g_i = gross(entry.activeStakeAda, P, r_i, sSat);
     if (g_i > F) {
       const C_i = (1 - m) * g_i / entry.activeStakeAda * EPOCHS_PER_YR * 100;
       sumC2overExp += (C_i * C_i) / expected;
@@ -122,13 +122,13 @@ export function computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, windowE
 // epochs ago they ended, e.g. "1-20" = the 20 most recent, "21-40" = the next 20, etc.
 //
 // Returns: Array<{ epochsAgo, luckZ, nEpochs }>
-export function computeLuckZWindows(poolHistory, epochInfoMap, P, F, m) {
+export function computeLuckZWindows(poolHistory, epochInfoMap, P, F, m, sSat = Infinity) {
   const WINDOW  = 20;
   const windows = [];
   for (let start = 0; start < poolHistory.length; start += WINDOW) {
     const end = Math.min(start + WINDOW, poolHistory.length);
     const { luckZ, validEpochs } = computeHistoricalROA(
-      poolHistory, epochInfoMap, P, F, m, end - start, start,
+      poolHistory, epochInfoMap, P, F, m, end - start, start, sSat,
     );
     windows.push({
       epochsAgo: `${start + 1}-${end}`,
@@ -150,7 +150,7 @@ export function computeLuckZWindows(poolHistory, epochInfoMap, P, F, m) {
 //
 // Returns: ClassificationResult
 export function classifyPool(poolInfo, poolHistory, epochInfoMap,
-                              rangerCurrentStake, rangerAvailableStake, r) {
+                              rangerCurrentStake, rangerAvailableStake, r, sSat = Infinity) {
   const { poolId, pledgeAda: P, fixedCostAda: F, margin: m, activeStakeAda } = poolInfo;
 
   // Performance over the last 20 epochs
@@ -228,13 +228,13 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
 
   // ROA at current total stake and at proposed total stake
   const currentTotalStake   = activeStakeAda;
-  const roaAtCurrent        = delegROA(currentTotalStake, P, F, m, r, perf);
+  const roaAtCurrent        = delegROA(currentTotalStake, P, F, m, r, perf, sSat);
   // 20-epoch window for historicalRoa and luckPremium (short-term signal, labelled in report)
-  const { historicalRoa, luckPremium } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20);
+  const { historicalRoa, luckPremium } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 20, 0, sSat);
   // Full available history (up to 73 ep) for the headline luckZ — more statistically reliable
-  const { luckZ, validEpochs: luckZValidEpochs } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 73);
+  const { luckZ, validEpochs: luckZValidEpochs } = computeHistoricalROA(poolHistory, epochInfoMap, P, F, m, 73, 0, sSat);
   // Non-overlapping 20-epoch windows across full history — trend visible on first run
-  const luckZWindows = computeLuckZWindows(poolHistory, epochInfoMap, P, F, m);
+  const luckZWindows = computeLuckZWindows(poolHistory, epochInfoMap, P, F, m, sSat);
 
   let proposedTotalStake = currentTotalStake;
   if (recommendation === Rec.DELEGATE) {
@@ -244,7 +244,7 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
   } else if (recommendation === Rec.WITHDRAW) {
     proposedTotalStake = Math.max(P, currentTotalStake - rangerCurrentStake);
   }
-  const roaAtProposed = delegROA(proposedTotalStake, P, F, m, r, perf);
+  const roaAtProposed = delegROA(proposedTotalStake, P, F, m, r, perf, sSat);
 
   return {
     poolId,
