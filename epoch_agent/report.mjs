@@ -636,6 +636,8 @@ function describeClass(c) {
     case ClassType.ALL_RED:
       return 'ALL_RED (m=0% — entire curve red)';
     case ClassType.HAS_RED_ZONE:
+      if (c.troughBeyondSat)
+        return `HAS_RED_ZONE — trough beyond saturation (unreachable) — increased delegation reduces SPO and delegator income`;
       if (c.cursorPastTrough)
         return `HAS_RED_ZONE — cursor PAST trough at ${ada(c.troughExtAda)} ext — in green zone`;
       if (c.canClearTrough)

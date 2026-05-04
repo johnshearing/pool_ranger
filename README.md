@@ -41,10 +41,10 @@ So small pools do not produce high returns.
 Larger pools earn more but typically the owners keep the extra gains rather than passing them on to the delgators. 
 
 
-**Pool Ranger is a coopertive with enormous delegating power.  
+**Pool Ranger is a cooperative with enormous delegating power.  
 That means we can delegate to small high performing stake pools that take little or no margin.  
-This brings the stake pool to near staturation levels, same as the whale pools, which boosts their returns and distributes them equitably to the delegators.  
-Pool operators are incentivized keep their own margins low in order to keep Pool Ranger delegation.**    
+This brings the stake pool to near saturation levels, same as the whale pools, which boosts their returns and distributes them equitably to the delegators.  
+Because Pool Ranger continuously monitors performance and parameters — moving delegation whenever a better pool is available — members always earn returns close to what the protocol's best available pools can offer.**    
 
 
 ### 2. Large pools get over-saturated

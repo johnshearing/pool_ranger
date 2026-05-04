@@ -254,8 +254,8 @@ This is the step-by-step process the cooperative administrator follows.
 ## Automation Phase (Phase 3 — Claude Code Agent)
 
 Claude Code will autonomously handle:
-- Seeking best pools (performance, community contribution, single-pool status)
-- Gathering member consensus on pool choices
+- Evaluating pools each epoch by projected ROA, block production performance, fee and pledge structure, single-pool operator status, and community contribution
+- Moving delegation to higher-ROA pools whenever the optimizer finds a better allocation
 - Last-minute delegation before epoch boundary
 - Withdrawing and distributing rewards
 

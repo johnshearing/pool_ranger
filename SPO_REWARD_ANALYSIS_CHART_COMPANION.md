@@ -406,29 +406,32 @@ External delegation at trough  =  S_trough − P
 This is the point at which the margin term and the pledge-dilution term exactly cancel.
 To the left of the trough the curve is red; to the right it is green.
 
-### Why the red zone matters for Pool Ranger
+### What the red zone means for Pool Ranger
 
-A red zone on the curve is not automatically fatal to a delegation decision. What matters
-is **where the cursor is relative to the trough**:
+The red zone is a pool configuration signal. It tells you how the pool's current parameters
+combine — pledge, margin, and fixed fee — to produce a region where SPO income declines as
+delegation grows. Whether Pool Ranger delegates to a pool depends on **where the cursor sits
+relative to the trough**:
 
 - If the pool's current delegation is already **past the trough** (cursor in the green zone),
-  Pool Ranger adding more stake moves the SPO further right and upward — clearly beneficial.
-- If the pool's current delegation is **before the trough** (cursor in the red zone),
-  every delegator arriving — including Pool Ranger — reduces the SPO's income.
-- If Pool Ranger controls enough stake to **push the pool past the trough in a single move**,
-  the net effect is still positive: the SPO passes through the dip but ends up in better shape.
-- If Pool Ranger can only push the pool deeper into the red zone without clearing the trough,
-  it is better to withhold delegation entirely and let the pool's current parameters speak
-  for themselves.
+  delegation at any higher level continues moving the SPO income curve upward.
+- If the pool's current delegation is **before the trough** and Pool Ranger can supply
+  enough stake to **push the pool past the trough in a single move**, Pool Ranger delegates.
+  The pool exits the red zone and SPO income begins recovering.
+- If Pool Ranger cannot clear the trough, adding delegation deepens the income decline for
+  the SPO without benefit to delegators. The pool is skipped for delegation.
+- If the **trough falls beyond the saturation boundary** (unreachable in the real protocol),
+  the SPO can adjust margin, fee, or pledge to compensate — those are the protocol's intended
+  controls for the SPO. Pool Ranger delegates up to saturation.
 
 ### Decision logic for Pool Ranger
 
-1. If the SPO income curve is all green: delegation is cooperative at any level.
+1. If the SPO income curve is all green: eligible at any delegation level.
 2. If a red zone exists: move the cursor to the pool's current delegation level.
-3. If the cursor marker is a **green circle** (past the trough): safe to add delegation.
+3. If the cursor marker is a **green circle** (past the trough): eligible.
 4. If the cursor marker is a **red ✕** (before the trough): check whether Pool Ranger's stake
-   can push the pool past the trough in one move. If yes, the move is net-positive. If no,
-   do not delegate.
+   can push the pool past the trough in one move. If yes, eligible. If no, skip.
+5. If the trough is beyond the saturation line: eligible — delegate up to saturation.
 
 ---
 
@@ -625,16 +628,18 @@ Then work through this checklist:
   pool's actual SPO income and delegator ROA are lower than a 100%-performing pool with the
   same parameters. Consider this a hard negative signal unless you have a clear explanation.
 
-**SPO welfare:**
+**Pool stability (red zone):**
 - [ ] Check the SPO income curve. Is any portion **red**?
-  - If **no red**: delegation is cooperative at any level. Proceed to ROA analysis.
+  - If **no red**: pool parameters produce stable SPO income at any delegation level. Proceed to ROA analysis.
   - If **red zone exists**: continue below.
 - [ ] Move the **Cursor** to the pool's current external delegation level.
-- [ ] Is the SPO income cursor marker a **green circle** (past the trough) or **red ✕** (before)?
-  - **Green circle:** more delegation helps the SPO. Safe to add.
-  - **Red ✕:** delegation is currently harming the SPO. Check whether Pool Ranger's stake
-    can push the pool past the trough in one move. If yes, the net effect is still positive.
-    If no, do not delegate.
+- [ ] Is the cursor marker a **green circle** (past the trough) or **red ✕** (before the trough)?
+  - **Green circle:** pool is already past the trough — safe to add delegation.
+  - **Red ✕:** pool is in the red zone. Check whether Pool Ranger can push the pool past the
+    trough in one move. If yes, the pool exits the decline region once the move completes.
+    If no, do not delegate — adding stake deepens the income decline without benefit.
+  - **Trough beyond saturation:** if the trough marker on the chart falls past the orange
+    saturation line, the trough is unreachable — the pool is eligible for delegation up to saturation.
 
 **Delegator ROA:**
 - [ ] Check the ROA curve cursor marker: **green circle** means ROA rises as the pool grows
@@ -650,10 +655,13 @@ Then work through this checklist:
 
 Pool Ranger delegates member stake to carefully chosen pools. Three things must be evaluated:
 
-1. **SPO welfare (SPO income curve):** The cooperative must not harm the SPO economically by
-   arriving. A pool in the red zone at its current delegation level has an SPO whose income is
-   falling with each new delegator — an adversarial relationship that may incentivize lower
-   performance or pool closure, directly hurting member rewards.
+1. **Pool stability (SPO income curve):** A pool in the red zone at its current delegation
+   level has an SPO whose income declines with each additional delegator. This is a pool
+   configuration signal — the SPO controls margin, fee, and pledge and can adjust them at any
+   time. For Pool Ranger, the red zone determines whether delegation is currently moving the
+   pool toward better or worse SPO income. Adding stake to a pool already past its trough is
+   constructive; adding stake that deepens a red zone without clearing it reduces SPO income
+   without benefit, and may eventually prompt the SPO to adjust parameters or reduce commitment.
 
 2. **Delegator ROA awareness (blue curve):** Members should understand that even on a pool
    with an all-green income curve, joining a high-pledge pool dilutes the pledge bonus

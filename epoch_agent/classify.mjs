@@ -176,6 +176,13 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     ? troughExtDeleg(P, F, m, r, perf)
     : (classType === ClassType.ALL_RED ? Infinity : -1);
 
+  // True when the trough is at or beyond the saturation boundary — unreachable in practice.
+  // gross() is capped at S_sat, so SPO income never recovers past that point.
+  const troughBeyondSat = sSat !== Infinity
+    && classType === ClassType.HAS_RED_ZONE
+    && troughExtAda !== Infinity
+    && troughExtAda >= (sSat - P);
+
   // External delegation excluding Pool Ranger's current stake.
   // We need the "other delegators only" position to judge cursor vs. trough.
   const totalExtAda             = activeStakeAda - P;
@@ -203,6 +210,14 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     if (externalExcludingRanger > troughExtAda) {
       // Already past trough — we're in the green zone
       cursorPastTrough = true;
+      if (rangerCurrentStake > 0) {
+        recommendation = Rec.HOLD;
+      } else {
+        recommendation = perfPasses ? Rec.DELEGATE : Rec.AVOID;
+      }
+    } else if (troughBeyondSat) {
+      // Trough is beyond saturation — unreachable in the real protocol.
+      // Delegation is still valid; the SPO can adjust fee/margin/pledge if needed.
       if (rangerCurrentStake > 0) {
         recommendation = Rec.HOLD;
       } else {
@@ -265,6 +280,7 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     externalExcludingRanger,
     cursorPastTrough,
     canClearTrough,
+    troughBeyondSat,
     rangerCurrentStake,
     recommendation,
     proposedTotalStake,
