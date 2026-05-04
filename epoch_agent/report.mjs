@@ -408,16 +408,23 @@ export function formatReport(reportData) {
   //   Trend is visible on the very first run — no need to wait for multiple reports.
   // CROSS-RUN: z-score accumulated from previous epoch reports.
   //
-  // Shown: pools with 2+ cross-run observations, OR pools whose within-run windows
-  // are ALL consistently above +1.5σ or ALL below −1.5σ (systematic signal on run 1).
+  // Shown: pools with non-negative latest luckZ and projected ROA ≥ 1%/yr, that have
+  // either 2+ cross-run observations OR within-run windows ALL consistently above +1.5σ.
+  // Negative-luck data is still tracked in state — just not displayed here.
   const trendPools = Object.entries(poolLuckHistory)
     .filter(([, h]) => {
       if (!h.observations || h.observations.length === 0) return false;
-      if (h.observations.length >= 2) return true;
+      // Positive luck only — negative luck stays in ranger_state.json but not shown
+      if (h.observations.length >= 2)
+        return (h.observations[h.observations.length - 1]?.luckZ ?? 0) >= 0;
       const wins = (h.observations[h.observations.length - 1]?.luckZ_windows ?? [])
         .map(w => w.luckZ).filter(z => z !== null);
       if (wins.length < 2) return false;
-      return wins.every(z => z > 1.5) || wins.every(z => z < -1.5);
+      return wins.every(z => z > 1.5);
+    })
+    .filter(([id]) => {
+      const roa = classMap.get(id)?.roaAtCurrent;
+      return roa === undefined || roa >= 0.01;
     })
     .sort(([idA], [idB]) => {
       const roaA = classMap.get(idA)?.roaAtCurrent ?? 0;
