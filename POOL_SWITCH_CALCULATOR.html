@@ -385,6 +385,7 @@ input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
 // ── Constants ──────────────────────────────────────────
 const A0            = 0.3;
 const EPOCHS_PER_YR = 73;
+const S_SAT         = 75e6;
 const KOIOS         = 'https://api.koios.rest/api/v1';
 const PROXY         = 'https://corsproxy.io/?';
 const R_MIN         = 0.00010;
@@ -408,7 +409,8 @@ let newPool = null;
 
 // ── Math ───────────────────────────────────────────────
 function gross(S, P) {
-  return networkR * (S + A0 * P) / (1 + A0);
+  const S_capped = Math.min(S, S_SAT);
+  return networkR * (S_capped + A0 * P) / (1 + A0);
 }
 
 // D = user's ADA; S = effective total pool stake (already adjusted for joining/leaving)
