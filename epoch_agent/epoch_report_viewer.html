@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pool Ranger — Epoch Report Viewer</title>
+<style>
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --surface2:#1c2128;
+  --border:  #30363d;
+  --text:    #c9d1d9;
+  --muted:   #8b949e;
+  --accent:  #58a6ff;
+  --green:   #3fb950;
+  --orange:  #d29922;
+  --red:     #f85149;
+  --yellow:  #e3b341;
+  --purple:  #bc8cff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px;
+  min-height: 100vh;
+}
+
+/* ── Drop zone ────────────────────────────────────────── */
+#dropzone {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  min-height: 100vh; padding: 2rem; text-align: center;
+}
+.dz-box {
+  border: 2px dashed var(--border); border-radius: 12px;
+  padding: 3rem 4rem; cursor: pointer; max-width: 480px;
+  transition: border-color .2s, background .2s;
+}
+.dz-box:hover, .dz-box.drag-over { border-color: var(--accent); background: var(--surface); }
+.dz-icon { font-size: 3rem; margin-bottom: 1rem; }
+.dz-title { font-size: 1.2rem; color: var(--accent); margin-bottom: .5rem; }
+.dz-sub   { color: var(--muted); font-size: .88rem; }
+#file-input { display: none; }
+
+/* ── Dashboard ───────────────────────────────────────── */
+#dashboard { display: none; padding: 1rem 1.5rem; max-width: 1700px; margin: 0 auto; }
+
+/* ── Banner ──────────────────────────────────────────── */
+.banner {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: .8rem 1.2rem; margin-bottom: .8rem;
+  display: flex; flex-wrap: wrap; gap: .8rem; align-items: center;
+}
+.banner-epoch { font-size: 1.2rem; color: var(--accent); font-weight: 600; }
+.banner-meta  { display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; }
+.banner-stat  { font-size: .82rem; color: var(--muted); }
+.banner-stat b { color: var(--text); font-weight: normal; }
+.banner-roa   { color: var(--green); font-weight: 600; }
+.btn-new {
+  margin-left: auto; background: none; border: 1px solid var(--border);
+  border-radius: 6px; color: var(--muted); padding: .28rem .8rem;
+  cursor: pointer; font-size: .82rem; transition: color .15s, border-color .15s;
+}
+.btn-new:hover { color: var(--text); border-color: var(--text); }
+
+/* ── Filter bar ──────────────────────────────────────── */
+.filter-bar {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: .8rem 1.2rem; margin-bottom: .8rem;
+  display: flex; flex-wrap: wrap; gap: .7rem; align-items: flex-end;
+}
+.fg { display: flex; flex-direction: column; gap: .25rem; }
+.fl { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.pill-row { display: flex; flex-wrap: wrap; gap: .25rem; }
+
+.pill {
+  padding: .18rem .55rem; border-radius: 20px; border: 1px solid var(--border);
+  background: none; color: var(--muted); font-size: .75rem;
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.pill:hover { border-color: var(--text); color: var(--text); }
+.pill.active { border-color: var(--accent); color: var(--accent); background: rgba(88,166,255,.1); }
+
+.pill.s-eligible.active  { border-color:var(--green);  color:var(--green);  background:rgba(63,185,80,.1); }
+.pill.s-dropped.active   { border-color:var(--orange); color:var(--orange); background:rgba(210,153,34,.1); }
+.pill.s-avoided.active   { border-color:var(--red);    color:var(--red);    background:rgba(248,81,73,.1); }
+.pill.s-luck.active      { border-color:var(--yellow); color:var(--yellow); background:rgba(227,179,65,.1); }
+.pill.s-pledge.active    { border-color:var(--purple); color:var(--purple); background:rgba(188,140,255,.1); }
+.pill.s-solic.active     { border-color:var(--muted);  color:var(--text);   background:rgba(139,148,158,.1); }
+
+.pill.r-add.active      { border-color:var(--green);  color:var(--green);  background:rgba(63,185,80,.12); }
+.pill.r-qualifies.active{ border-color:var(--muted);  color:var(--text);   background:rgba(139,148,158,.1); }
+.pill.r-avoid.active    { border-color:var(--red);    color:var(--red);    background:rgba(248,81,73,.12); }
+.pill.r-dropped.active  { border-color:var(--orange); color:var(--orange); background:rgba(210,153,34,.12); }
+.pill.r-hold.active     { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,.1); }
+
+.pill.c-green.active  { border-color:var(--green);  color:var(--green);  background:rgba(63,185,80,.1); }
+.pill.c-red.active    { border-color:var(--red);     color:var(--red);    background:rgba(248,81,73,.1); }
+.pill.c-zone.active   { border-color:var(--orange);  color:var(--orange); background:rgba(210,153,34,.1); }
+
+.txt-input {
+  background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--text); padding: .28rem .6rem; font-size: .82rem; outline: none;
+}
+.txt-input:focus { border-color: var(--accent); }
+#search-input { width: 155px; }
+#min-roa, #min-z { width: 72px; }
+
+/* toggle */
+.tog-wrap { display: flex; align-items: center; gap: .4rem; }
+.tog {
+  position: relative; width: 36px; height: 20px;
+  display: inline-block; cursor: pointer;
+}
+.tog input { display: none; }
+.tog-track {
+  position: absolute; inset: 0; border-radius: 20px;
+  background: var(--border); transition: background .2s;
+}
+.tog input:checked + .tog-track { background: var(--accent); }
+.tog-thumb {
+  position: absolute; top: 2px; left: 2px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #fff; transition: left .2s; pointer-events: none;
+}
+.tog input:checked ~ .tog-thumb { left: 18px; }
+.tog-label { font-size: .78rem; color: var(--muted); }
+
+.btn-reset {
+  background: none; border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); padding: .25rem .7rem; cursor: pointer; font-size: .78rem;
+  transition: all .15s;
+}
+.btn-reset:hover { color: var(--red); border-color: var(--red); }
+#rec-count { font-size: .78rem; color: var(--muted); white-space: nowrap; padding-bottom: .1rem; }
+
+/* ── Table ───────────────────────────────────────────── */
+.tbl-wrap {
+  overflow-x: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: .8rem;
+}
+table { width: 100%; border-collapse: collapse; font-size: .8rem; white-space: nowrap; }
+thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--surface2); color: var(--muted);
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+  padding: .55rem .65rem; text-align: left;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer; user-select: none; transition: color .15s;
+}
+thead th:hover { color: var(--text); }
+thead th.sorted { color: var(--accent); }
+thead th.col-roa  { color: var(--accent); }
+thead th.col-luckz{ color: var(--yellow); }
+thead th.col-roa.sorted  { color: var(--accent); }
+thead th.col-luckz.sorted{ color: var(--yellow); }
+
+tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; transition: background .1s; }
+tbody tr:hover:not(.sec-hdr):not(.det-row) { background: var(--surface2); }
+tbody tr.expanded-row { background: var(--surface2); }
+
+tbody td { padding: .42rem .65rem; vertical-align: middle; }
+
+/* section group header */
+.sec-hdr { cursor: default; }
+.sec-hdr td {
+  padding: .38rem .65rem; color: var(--muted); font-size: .7rem;
+  text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+  border-top: 2px solid var(--border); background: var(--surface2);
+}
+.sec-hdr:hover { background: var(--surface2) !important; }
+
+/* detail row */
+.det-row { cursor: default; }
+.det-row td { padding: 0; }
+.det-panel {
+  background: var(--bg); border-top: 1px solid var(--border);
+  padding: .75rem 1.1rem;
+  display: grid; grid-template-columns: 1fr 1fr; gap: .5rem 2rem;
+  font-size: .8rem;
+}
+.det-item { display: flex; flex-direction: column; gap: .15rem; }
+.det-lbl { font-size: .66rem; text-transform: uppercase; color: var(--muted); }
+.det-val { color: var(--text); font-family: monospace; font-size: .78rem; word-break: break-all; white-space: normal; }
+.det-val.flag-val { color: var(--yellow); font-family: inherit; font-size: .8rem; }
+.copy-btn {
+  background: none; border: 1px solid var(--border); border-radius: 4px;
+  color: var(--muted); font-size: .68rem; padding: .08rem .38rem;
+  cursor: pointer; margin-left: .4rem; transition: all .15s; vertical-align: middle;
+}
+.copy-btn:hover { color: var(--text); border-color: var(--text); }
+
+/* badges */
+.b {
+  display: inline-block; padding: .08rem .42rem; border-radius: 4px;
+  font-size: .68rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+}
+.b-eligible  { background:rgba(63,185,80,.15);  color:var(--green); }
+.b-dropped   { background:rgba(210,153,34,.15); color:var(--orange); }
+.b-avoided   { background:rgba(248,81,73,.15);  color:var(--red); }
+.b-luck      { background:rgba(227,179,65,.15); color:var(--yellow); }
+.b-pledge    { background:rgba(188,140,255,.15);color:var(--purple); }
+.b-solic     { background:rgba(139,148,158,.15);color:var(--muted); }
+.b-existing  { background:rgba(88,166,255,.15); color:var(--accent); }
+
+.b-add      { background:rgba(63,185,80,.2);  color:var(--green); }
+.b-qualifies{ background:rgba(139,148,158,.15);color:var(--muted); }
+.b-avoid    { background:rgba(248,81,73,.2);  color:var(--red); }
+.b-rec-drop { background:rgba(210,153,34,.2); color:var(--orange); }
+.b-hold     { background:rgba(88,166,255,.2); color:var(--accent); }
+.b-reduce   { background:rgba(210,153,34,.2); color:var(--orange); }
+.b-withdraw { background:rgba(248,81,73,.2);  color:var(--red); }
+
+.b-agreen  { background:rgba(63,185,80,.1);  color:var(--green);  font-size:.64rem; }
+.b-ared    { background:rgba(248,81,73,.1);  color:var(--red);    font-size:.64rem; }
+.b-rzone   { background:rgba(210,153,34,.1); color:var(--orange); font-size:.64rem; }
+
+/* cell styles */
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.roa-val { color: var(--accent); font-weight: 600; }
+.z-hi { color: var(--yellow); }
+.z-lo { color: var(--red); }
+.perf-ok  { color: var(--green); }
+.perf-bad { color: var(--orange); }
+.ticker-cell { font-weight: 600; }
+.tag-luck  { color: var(--yellow); font-size: .65rem; margin-left: .25rem; }
+.tag-pledge{ color: var(--purple); font-size: .65rem; margin-left: .25rem; }
+
+/* pagination */
+.pagination {
+  display: flex; align-items: center; justify-content: center;
+  gap: .4rem; margin-bottom: .8rem;
+}
+.pg-btn {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  color: var(--muted); padding: .28rem .65rem; cursor: pointer; font-size: .8rem;
+  transition: all .15s; min-width: 34px; text-align: center;
+}
+.pg-btn:hover:not(:disabled) { color: var(--text); border-color: var(--text); }
+.pg-btn.pg-active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pg-btn:disabled  { opacity: .3; cursor: default; }
+.pg-dots { color: var(--muted); font-size: .8rem; padding: 0 .2rem; }
+
+/* summary footer */
+.sum-bar {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: .7rem 1.2rem; margin-bottom: 1rem;
+  display: flex; flex-wrap: wrap; gap: 1.2rem; font-size: .8rem; color: var(--muted);
+}
+.sum-bar b { color: var(--text); font-weight: normal; }
+</style>
+</head>
+<body>
+
+<!-- Drop zone -->
+<div id="dropzone">
+  <div class="dz-box" id="dz-box">
+    <div class="dz-icon">📋</div>
+    <div class="dz-title">Pool Ranger — Epoch Report Viewer</div>
+    <div class="dz-sub">Drop an epoch_NNN.txt report here<br>or click to browse</div>
+    <input type="file" id="file-input" accept=".txt">
+  </div>
+</div>
+
+<!-- Dashboard -->
+<div id="dashboard">
+  <div class="banner">
+    <span class="banner-epoch" id="b-epoch">—</span>
+    <div class="banner-meta" id="b-meta"></div>
+    <button class="btn-new" id="btn-new">↩ Load new report</button>
+  </div>
+
+  <div class="filter-bar">
+    <div class="fg">
+      <div class="fl">Section</div>
+      <div class="pill-row" id="sec-pills"></div>
+    </div>
+    <div class="fg">
+      <div class="fl">Recommendation</div>
+      <div class="pill-row" id="rec-pills"></div>
+    </div>
+    <div class="fg">
+      <div class="fl">Classification</div>
+      <div class="pill-row" id="cls-pills"></div>
+    </div>
+    <div class="fg">
+      <div class="fl">Search</div>
+      <input type="text" id="search-input" class="txt-input" placeholder="ticker or pool ID…">
+    </div>
+    <div class="fg">
+      <div class="fl">Min Proj.ROA %</div>
+      <input type="number" id="min-roa" class="txt-input" step="0.01" min="0" placeholder="—">
+    </div>
+    <div class="fg">
+      <div class="fl">Min Luck Z (σ)</div>
+      <input type="number" id="min-z" class="txt-input" step="0.1" placeholder="—">
+    </div>
+    <div class="fg">
+      <div class="fl">Group</div>
+      <div class="tog-wrap">
+        <label class="tog">
+          <input type="checkbox" id="grp-toggle">
+          <div class="tog-track"></div>
+          <div class="tog-thumb"></div>
+        </label>
+        <span class="tog-label">by Section</span>
+      </div>
+    </div>
+    <button class="btn-reset" id="btn-reset">Reset</button>
+    <span id="rec-count"></span>
+  </div>
+
+  <div class="tbl-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th data-col="ticker">Ticker</th>
+          <th data-col="section">Section</th>
+          <th data-col="recommendation">Rec.</th>
+          <th data-col="classShort">Class.</th>
+          <th data-col="pledge"  class="num">P (M₳)</th>
+          <th data-col="fixedFee" class="num">F (₳)</th>
+          <th data-col="margin"  class="num">m%</th>
+          <th data-col="activeStake" class="num">Active ₳M</th>
+          <th data-col="poolRangerStake" class="num">PR ₳M</th>
+          <th data-col="projectedROA"  class="num col-roa">Proj.ROA%</th>
+          <th data-col="historicalROA" class="num">Hist.ROA%</th>
+          <th data-col="luckPremium"   class="num">Luck±%</th>
+          <th data-col="luckZ"         class="num col-luckz">Luck Z σ</th>
+          <th data-col="performance"   class="num">Perf%</th>
+          <th data-col="poolAge"       class="num">Age(ep)</th>
+        </tr>
+      </thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
+  </div>
+
+  <div class="pagination" id="pagination"></div>
+  <div class="sum-bar" id="sum-bar"></div>
+</div>
+
+<script>
+// ─── Parser ────────────────────────────────────────────────────
+
+const SEC_MAP = {
+  'ELIGIBLE POOLS':           'ELIGIBLE',
+  'HIGH PLEDGE OPPORTUNITIES':'HIGH_PLEDGE',
+  'POOLS AVOIDED':            'AVOIDED',
+  'POOLS DROPPED':            'DROPPED',
+  'SOLICITATION CANDIDATES':  'SOLICITATION',
+  'LUCK Z-SCORE TREND':       'LUCK_TREND',
+  'EXISTING DELEGATIONS':     'EXISTING',
+  'REBALANCING MOVES':        'REBALANCING',
+  'PARAMETER CHANGES':        'PARAM_CHANGES',
+};
+
+const SKIP_SECS = new Set(['PARAM_CHANGES','SUMMARY','NEXT_STEPS','REBALANCING','']);
+
+const SEC_RE   = /^(ELIGIBLE POOLS|HIGH PLEDGE OPPORTUNITIES|POOLS AVOIDED|POOLS DROPPED|SOLICITATION CANDIDATES|LUCK Z-SCORE TREND|EXISTING DELEGATIONS|REBALANCING MOVES|PARAMETER CHANGES)\b/;
+const POOL_RE  = /^\s*(?:\[([^\]]+)\]\s+)?P=([\d.]+)\s*M\s*ADA,\s*F=(\d+)\s*ADA,\s*m=([\d.]+)%/;
+
+function parseReport(txt) {
+  const lines = txt.split('\n');
+  const meta  = {};
+
+  // header
+  const em = txt.match(/Epoch\s+(\d+)/);          if (em) meta.epoch = +em[1];
+  const gm = txt.match(/Generated:\s+(.+)/);       if (gm) meta.generated = gm[1].trim();
+  const rm = txt.match(/\br\s*=\s*([\d.]+)/);      if (rm) meta.r = +rm[1];
+  const sm = txt.match(/S_sat\s*≈\s*([\d.]+)\s*M/);if (sm) meta.sSat = +sm[1];
+  const pm = txt.match(/Pool Ranger stake:\s*([\d.]+)\s*M/); if (pm) meta.prStake = +pm[1];
+  const bm = txt.match(/Global budget[^:]*:\s*([\d.]+)\s*M/); if (bm) meta.budget = +bm[1];
+  // summary
+  const ra = txt.match(/ROA before changes:\s*([\d.]+)/); if (ra) meta.roaBefore = +ra[1];
+  const rb = txt.match(/ROA after changes:\s*([\d.]+)/);  if (rb) meta.roaAfter  = +rb[1];
+  const nd = txt.match(/New delegations:\s*(\d+)/);       if (nd) meta.newDel = +nd[1];
+  const qu = txt.match(/Qualifies\/unfunded:\s*(\d+)/);   if (qu) meta.qualifies = +qu[1];
+  const ud = txt.match(/Undeployed:\s*([\d.]+)/);         if (ud) meta.undeployed = +ud[1];
+
+  const pools = [];
+  const byId  = {};
+  let curSec  = '';
+  let cur     = null;
+
+  function flush() {
+    if (!cur || !cur.fullId) { cur = null; return; }
+    if (byId[cur.fullId]) {
+      const e = byId[cur.fullId];
+      if (cur.windows)  e.windows  = cur.windows;
+      if (cur.crossRun) e.crossRun = cur.crossRun;
+      if (cur.flag)     e.flag     = cur.flag;
+      if (cur.section === 'LUCK_TREND')   e.inLuck   = true;
+      if (cur.section === 'HIGH_PLEDGE')  e.inPledge = true;
+      if (cur.section === 'SOLICITATION') e.inSolic  = true;
+    } else {
+      if (cur.section === 'LUCK_TREND')   cur.inLuck   = true;
+      if (cur.section === 'HIGH_PLEDGE')  cur.inPledge = true;
+      if (cur.section === 'SOLICITATION') cur.inSolic  = true;
+      byId[cur.fullId] = cur;
+      pools.push(cur);
+    }
+    cur = null;
+  }
+
+  function newPool(m, sec) {
+    return {
+      ticker: m[1] ? m[1].trim() : null,
+      pledge: +m[2], fixedFee: +m[3], margin: +m[4],
+      section: sec,
+      fullId: null, classification: null, classShort: null,
+      performance: null, performanceEpochs: null,
+      activeStake: null, poolRangerStake: null,
+      projectedROA: null, historicalROA: null, historicalEpochs: null,
+      luckPremium: null, luckPremiumEpochs: null,
+      luckZ: null, luckZEpochs: null,
+      poolAge: null,
+      currentAda: null, currentNote: null,
+      proposedAda: null, proposedROA: null,
+      recommendation: null, reason: null,
+      windows: null, crossRun: null, flag: null,
+      inLuck: false, inPledge: false, inSolic: false,
+    };
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const ln = lines[i];
+
+    const secM = ln.match(SEC_RE);
+    if (secM) { flush(); curSec = SEC_MAP[secM[1]] || ''; continue; }
+    if (SKIP_SECS.has(curSec)) continue;
+
+    const hdrM = ln.match(POOL_RE);
+    if (hdrM) { flush(); cur = newPool(hdrM, curSec); continue; }
+    if (!cur) continue;
+
+    let m;
+    if      ((m = ln.match(/Full ID:\s+(\S+)/)))
+      { cur.fullId = m[1]; if (!cur.ticker) cur.ticker = m[1].slice(0,12)+'…'; }
+    else if ((m = ln.match(/Classification:\s+(.+)/))) {
+      cur.classification = m[1].trim();
+      if      (cur.classification.startsWith('ALL_GREEN'))    cur.classShort = 'ALL_GREEN';
+      else if (cur.classification.startsWith('ALL_RED'))      cur.classShort = 'ALL_RED';
+      else if (cur.classification.startsWith('HAS_RED_ZONE')) cur.classShort = 'HAS_RED_ZONE';
+      else cur.classShort = cur.classification.slice(0,14);
+    }
+    else if ((m = ln.match(/Performance:\s+([\d.]+)%\s*\((\d+)/)))
+      { cur.performance = +m[1]; cur.performanceEpochs = +m[2]; }
+    else if ((m = ln.match(/Active stake:\s+([\d.]+)\s*M\s*ADA(?:\s*\(Pool Ranger:\s*([\d.]+))?/)))
+      { cur.activeStake = +m[1]; cur.poolRangerStake = m[2] ? +m[2] : 0; }
+    else if ((m = ln.match(/Projected ROA:\s+([\d.]+)/)))
+      { cur.projectedROA = +m[1]; }
+    else if ((m = ln.match(/Historical ROA\s*\((\d+)\s*ep\):\s+([\d.]+)/)))
+      { cur.historicalEpochs = +m[1]; cur.historicalROA = +m[2]; }
+    else if ((m = ln.match(/Luck premium\s*\((\d+)\s*ep\):\s+([+-]?[\d.]+)/)))
+      { cur.luckPremiumEpochs = +m[1]; cur.luckPremium = +m[2]; }
+    else if ((m = ln.match(/Luck z-score\s*\((\d+)\s*ep\):\s+([+-]?[\d.]+)/)))
+      { cur.luckZEpochs = +m[1]; cur.luckZ = +m[2]; }
+    else if ((m = ln.match(/Pool age:\s+(\d+)/)))
+      { cur.poolAge = +m[1]; }
+    else if ((m = ln.match(/Current:\s+(.+)/))) {
+      const ct = m[1].trim();
+      const ca = ct.match(/([\d.]+)\s*M?\s*ADA/);
+      cur.currentAda = ca ? +ca[1] : 0;
+      const cn = ct.match(/\(([^)]+)\)/);
+      cur.currentNote = cn ? cn[1] : '';
+    }
+    else if ((m = ln.match(/Proposed:\s+([\d.]+)\s*M\s*ADA\s*@\s*([\d.]+)/)))
+      { cur.proposedAda = +m[1]; cur.proposedROA = +m[2]; }
+    else if ((m = ln.match(/Recommendation:\s+(.+)/)))
+      { cur.recommendation = m[1].trim().split(/[\s—]+/)[0].toUpperCase(); }
+    else if ((m = ln.match(/Dropped:\s+(.+)/)))
+      { cur.recommendation = 'DROPPED'; cur.reason = m[1].trim(); }
+    else if ((m = ln.match(/Reason:\s+(.+)/)))
+      { cur.reason = m[1].trim(); }
+    else if ((m = ln.match(/Note:\s+(.+)/)))
+      { if (!cur.reason) cur.reason = m[1].trim(); }
+    else if ((m = ln.match(/Windows\s*\([^)]*\):\s+(.+)/)))
+      { cur.windows = m[1].trim(); }
+    else if ((m = ln.match(/Cross-run\s+—\s+(.+)/)))
+      { cur.crossRun = m[1].trim(); }
+    else if (ln.match(/^\s+\*\*\*/))
+      { cur.flag = ln.trim(); }
+  }
+  flush();
+
+  return { meta, pools };
+}
+
+// ─── State ─────────────────────────────────────────────────────
+
+let allPools = [], meta = {}, expandedId = null;
+let sortCol = 'projectedROA', sortDir = -1;
+const PAGE = 50;
+let page = 0;
+const F = { secs: new Set(), recs: new Set(), cls: new Set(), q: '', minRoa: null, minZ: null };
+let grouped = false;
+
+// ─── Filter + Sort ─────────────────────────────────────────────
+
+function filtered() {
+  return allPools.filter(p => {
+    if (F.secs.size > 0) {
+      let ok = false;
+      for (const s of F.secs) {
+        if (s==='LUCK_TREND'   && p.inLuck)   { ok=true; break; }
+        if (s==='HIGH_PLEDGE'  && p.inPledge) { ok=true; break; }
+        if (s==='SOLICITATION' && p.inSolic)  { ok=true; break; }
+        if (p.section===s) { ok=true; break; }
+      }
+      if (!ok) return false;
+    }
+    if (F.recs.size > 0 && !F.recs.has(p.recommendation)) return false;
+    if (F.cls.size  > 0 && !F.cls.has(p.classShort))      return false;
+    if (F.q) {
+      const q = F.q.toLowerCase();
+      if (!(p.ticker||'').toLowerCase().includes(q) &&
+          !(p.fullId||'').toLowerCase().includes(q)) return false;
+    }
+    if (F.minRoa !== null && (p.projectedROA === null || p.projectedROA < F.minRoa)) return false;
+    if (F.minZ   !== null && (p.luckZ         === null || p.luckZ         < F.minZ)) return false;
+    return true;
+  });
+}
+
+function sorted(arr) {
+  return [...arr].sort((a,b) => {
+    let av = a[sortCol], bv = b[sortCol];
+    if (av===null && bv===null) return 0;
+    if (av===null) return 1;
+    if (bv===null) return -1;
+    return sortDir * (typeof av==='string' ? av.localeCompare(bv) : av-bv);
+  });
+}
+
+// ─── Helpers ───────────────────────────────────────────────────
+
+const SEC_ORDER = ['EXISTING','ELIGIBLE','HIGH_PLEDGE','AVOIDED','DROPPED','SOLICITATION','LUCK_TREND','REBALANCING'];
+const SEC_LABEL = {
+  ELIGIBLE:'ELIGIBLE POOLS', HIGH_PLEDGE:'HIGH PLEDGE', AVOIDED:'POOLS AVOIDED',
+  DROPPED:'POOLS DROPPED', SOLICITATION:'SOLICITATION', LUCK_TREND:'LUCK Z-SCORE TREND',
+  EXISTING:'EXISTING DELEGATIONS', REBALANCING:'REBALANCING',
+};
+
+function secBadge(s) {
+  const cls = {ELIGIBLE:'b-eligible',HIGH_PLEDGE:'b-pledge',AVOIDED:'b-avoided',
+    DROPPED:'b-dropped',SOLICITATION:'b-solic',LUCK_TREND:'b-luck',EXISTING:'b-existing'}[s]||'';
+  return `<span class="b ${cls}">${SEC_LABEL[s]||s}</span>`;
+}
+function recBadge(r) {
+  const cls = {ADD:'b-add',QUALIFIES:'b-qualifies',AVOID:'b-avoid',DROPPED:'b-rec-drop',
+    HOLD:'b-hold',REDUCE:'b-reduce',WITHDRAW:'b-withdraw'}[r]||'b-qualifies';
+  return r ? `<span class="b ${cls}">${r}</span>` : '—';
+}
+function clsBadge(c) {
+  const cls = {ALL_GREEN:'b-agreen',ALL_RED:'b-ared',HAS_RED_ZONE:'b-rzone'}[c]||'';
+  const lbl = c==='ALL_GREEN'?'ALL GREEN':c==='ALL_RED'?'ALL RED':c==='HAS_RED_ZONE'?'RED ZONE':(c||'—');
+  return c ? `<span class="b ${cls}">${lbl}</span>` : '—';
+}
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmt(v,d=2) { return v===null||v===undefined ? '—' : (+v).toFixed(d); }
+function fmtZ(v) { return v===null ? '—' : (v>=0?'+':'')+v.toFixed(2); }
+function fmtSign(v) { return v===null ? '—' : (v>=0?'+':'')+v.toFixed(2); }
+
+// ─── Render ────────────────────────────────────────────────────
+
+function render() {
+  const vis = sorted(filtered());
+  document.getElementById('rec-count').textContent = `${vis.length} of ${allPools.length} pools`;
+
+  const totalPages = Math.max(1, Math.ceil(vis.length / PAGE));
+  if (page >= totalPages) page = totalPages - 1;
+
+  // Build flat display list
+  let flat;
+  if (grouped) {
+    const grps = {}, order = [];
+    for (const p of vis) {
+      const s = p.section;
+      if (!grps[s]) { grps[s]=[]; order.push(s); }
+      grps[s].push(p);
+    }
+    flat = [];
+    // Ordered sections first, then any remainder
+    const seen = new Set();
+    for (const s of SEC_ORDER) {
+      if (grps[s]) { flat.push({type:'hdr',s,n:grps[s].length}); grps[s].forEach(p=>flat.push({type:'pool',p})); seen.add(s); }
+    }
+    for (const s of order) {
+      if (!seen.has(s)) { flat.push({type:'hdr',s,n:grps[s].length}); grps[s].forEach(p=>flat.push({type:'pool',p})); }
+    }
+  } else {
+    flat = vis.map(p => ({type:'pool',p}));
+  }
+
+  // Determine which pool-rows belong to current page
+  const vis2 = new Set();
+  let pc = 0;
+  for (let i=0; i<flat.length; i++) {
+    if (flat[i].type==='pool') {
+      if (pc >= page*PAGE && pc < (page+1)*PAGE) vis2.add(i);
+      pc++;
+    }
+  }
+
+  // Collect page rows (pool rows + their group headers)
+  const rows = [];
+  let lastHdr = -1;
+  for (let i=0; i<flat.length; i++) {
+    if (flat[i].type==='hdr') { lastHdr=i; }
+    else if (vis2.has(i)) {
+      if (lastHdr>=0 && (rows.length===0 || rows[rows.length-1]!==flat[lastHdr])) rows.push(flat[lastHdr]);
+      rows.push(flat[i]);
+    }
+  }
+
+  // Render tbody
+  const tbody = document.getElementById('tbl-body');
+  tbody.innerHTML = '';
+
+  for (const row of rows) {
+    if (row.type==='hdr') {
+      const tr = document.createElement('tr');
+      tr.className = 'sec-hdr';
+      tr.innerHTML = `<td colspan="15">── ${SEC_LABEL[row.s]||row.s} (${row.n}) ──</td>`;
+      tbody.appendChild(tr);
+    } else {
+      appendPoolRow(tbody, row.p);
+    }
+  }
+
+  // Sort indicators
+  document.querySelectorAll('thead th').forEach(th => {
+    th.classList.remove('sorted');
+    th.querySelectorAll('.si').forEach(e=>e.remove());
+    if (th.dataset.col === sortCol) {
+      th.classList.add('sorted');
+      const si = document.createElement('span');
+      si.className = 'si'; si.textContent = sortDir===-1?' ▼':' ▲';
+      th.appendChild(si);
+    }
+  });
+
+  renderPagination(totalPages, vis.length);
+}
+
+function appendPoolRow(tbody, p) {
+  const tr = document.createElement('tr');
+  if (p.fullId === expandedId) tr.classList.add('expanded-row');
+
+  const zc = p.luckZ===null ? '' : p.luckZ>=1.5 ? 'z-hi' : p.luckZ<=-1.5 ? 'z-lo' : '';
+  const pc2 = p.performance===100 ? 'perf-ok' : (p.performance!==null && p.performance<99) ? 'perf-bad' : '';
+  const lk = p.inLuck   ? '<span class="tag-luck"  title="Luck Z-Score Trend">★</span>' : '';
+  const pl = p.inPledge ? '<span class="tag-pledge" title="High Pledge">♦</span>'        : '';
+  const prSt = p.poolRangerStake ? fmt(p.poolRangerStake) : '—';
+
+  tr.innerHTML = `
+    <td class="ticker-cell">${esc(p.ticker||'—')}${lk}${pl}</td>
+    <td>${secBadge(p.section)}</td>
+    <td>${recBadge(p.recommendation)}</td>
+    <td>${clsBadge(p.classShort)}</td>
+    <td class="num">${fmt(p.pledge)}</td>
+    <td class="num">${p.fixedFee!==null?p.fixedFee:'—'}</td>
+    <td class="num">${fmt(p.margin,1)}</td>
+    <td class="num">${fmt(p.activeStake)}</td>
+    <td class="num">${prSt}</td>
+    <td class="num roa-val">${fmt(p.projectedROA)}</td>
+    <td class="num">${fmt(p.historicalROA)}</td>
+    <td class="num">${p.luckPremium!==null ? fmtSign(p.luckPremium) : '—'}</td>
+    <td class="num ${zc}">${fmtZ(p.luckZ)}</td>
+    <td class="num ${pc2}">${p.performance!==null ? fmt(p.performance,1) : '—'}</td>
+    <td class="num">${p.poolAge!==null ? p.poolAge+'+' : '—'}</td>`;
+
+  tr.addEventListener('click', () => {
+    expandedId = (expandedId===p.fullId) ? null : p.fullId;
+    render();
+  });
+  tbody.appendChild(tr);
+
+  if (p.fullId === expandedId) appendDetailRow(tbody, p);
+}
+
+function appendDetailRow(tbody, p) {
+  const tr = document.createElement('tr');
+  tr.className = 'det-row';
+  const td = document.createElement('td');
+  td.colSpan = 15;
+
+  const item = (lbl, val, cls='') =>
+    val ? `<div class="det-item"><div class="det-lbl">${lbl}</div><div class="det-val ${cls}">${val}</div></div>` : '';
+
+  const idVal = `<span style="font-family:monospace;font-size:.76rem">${esc(p.fullId||'')}</span>`+
+    `<button class="copy-btn" onclick="doCopy('${esc(p.fullId||'')}',this)">Copy</button>`;
+
+  td.innerHTML = `<div class="det-panel">
+    <div class="det-item"><div class="det-lbl">Full Pool ID</div><div class="det-val">${idVal}</div></div>
+    ${item('Classification (full)', esc(p.classification))}
+    ${item('Proposed', p.proposedAda!==null ? `${fmt(p.proposedAda)} M ADA @ ${fmt(p.proposedROA)} %/yr` : '')}
+    ${item('Current', p.currentAda!==null ? `${fmt(p.currentAda)} M ADA${p.currentNote?' ('+esc(p.currentNote)+')':''}` : '')}
+    ${item('Reason / Note', esc(p.reason))}
+    ${item('Luck Z Windows (epochs ago → z)', esc(p.windows))}
+    ${item('Cross-run History', esc(p.crossRun))}
+    ${item('Signal', esc(p.flag), 'flag-val')}
+  </div>`;
+  tbody.appendChild(tr);
+}
+
+function renderPagination(total, count) {
+  const el = document.getElementById('pagination');
+  el.innerHTML = '';
+  if (total<=1) return;
+
+  function btn(label, pg, disabled=false, active=false) {
+    const b = document.createElement('button');
+    b.className = 'pg-btn' + (active?' pg-active':'');
+    b.textContent = label; b.disabled = disabled;
+    b.addEventListener('click', ()=>{ page=pg; expandedId=null; render(); });
+    el.appendChild(b);
+  }
+  function dots() {
+    const s = document.createElement('span');
+    s.className='pg-dots'; s.textContent='…'; el.appendChild(s);
+  }
+
+  btn('‹', page-1, page===0);
+  const win=3, start=Math.max(0,Math.min(page-win, total-2*win-1)), end=Math.min(total,start+2*win+1);
+  if (start>0) { btn(1,0); if(start>1) dots(); }
+  for (let i=start;i<end;i++) btn(i+1,i,false,i===page);
+  if (end<total) { if(end<total-1) dots(); btn(total,total-1); }
+  btn('›', page+1, page>=total-1);
+}
+
+// ─── Banner + Summary ──────────────────────────────────────────
+
+function renderBanner() {
+  document.getElementById('b-epoch').textContent = meta.epoch ? `Epoch ${meta.epoch}` : 'Pool Ranger Report';
+  const stats = [];
+  if (meta.generated) stats.push(`Generated: <b>${esc(meta.generated)}</b>`);
+  if (meta.r!==undefined) stats.push(`r = <b>${meta.r.toFixed(6)}</b>`);
+  if (meta.sSat!==undefined) stats.push(`S_sat ≈ <b>${meta.sSat.toFixed(2)} M ADA</b>`);
+  if (meta.prStake!==undefined) stats.push(`PR stake: <b>${meta.prStake.toFixed(2)} M ADA</b>`);
+  if (meta.roaAfter!==undefined) {
+    const bef = meta.roaBefore!==undefined ? meta.roaBefore.toFixed(2)+' → ' : '';
+    stats.push(`ROA: <b>${bef}</b><b class="banner-roa">${meta.roaAfter.toFixed(2)} %/yr</b>`);
+  }
+  document.getElementById('b-meta').innerHTML = stats.map(s=>`<span class="banner-stat">${s}</span>`).join('');
+}
+
+function renderSummary() {
+  const addP = allPools.filter(p=>p.recommendation==='ADD');
+  const addM = addP.reduce((s,p)=>s+(p.proposedAda||0),0);
+  const lkN  = allPools.filter(p=>p.inLuck).length;
+  const parts = [
+    `ADD pools: <b>${addP.length}</b>`,
+    `Total allocated: <b>${addM.toFixed(2)} M ADA</b>`,
+  ];
+  if (meta.undeployed!==undefined) parts.push(`Undeployed: <b>${meta.undeployed.toFixed(2)} M ADA</b>`);
+  if (meta.qualifies!==undefined)  parts.push(`QUALIFIES (unfunded): <b>${meta.qualifies}</b>`);
+  if (lkN>0) parts.push(`★ Luck trend pools: <b>${lkN}</b>`);
+  document.getElementById('sum-bar').innerHTML = parts.join('');
+}
+
+// ─── Filter pills ──────────────────────────────────────────────
+
+function buildPills(id, defs, fset) {
+  const el = document.getElementById(id);
+  el.innerHTML = '';
+  for (const d of defs) {
+    const btn = document.createElement('button');
+    btn.className = 'pill ' + (d.cls||'');
+    btn.textContent = d.label;
+    btn.classList.toggle('active', d.key==='' ? fset.size===0 : fset.has(d.key));
+    btn.addEventListener('click', ()=>{
+      if (d.key==='') fset.clear();
+      else { if(fset.has(d.key)) fset.delete(d.key); else fset.add(d.key); }
+      el.querySelectorAll('.pill').forEach((b,i)=>b.classList.toggle('active', defs[i].key==='' ? fset.size===0 : fset.has(defs[i].key)));
+      page=0; expandedId=null; render();
+    });
+    el.appendChild(btn);
+  }
+}
+
+function setupPills() {
+  const hasSec = s => allPools.some(p=>p.section===s);
+  const secDefs = [
+    {key:'', label:'ALL', cls:''},
+    {key:'ELIGIBLE',    label:'Eligible',     cls:'s-eligible',  show:hasSec('ELIGIBLE')},
+    {key:'HIGH_PLEDGE', label:'High Pledge',  cls:'s-pledge',    show:allPools.some(p=>p.inPledge)},
+    {key:'AVOIDED',     label:'Avoided',      cls:'s-avoided',   show:hasSec('AVOIDED')},
+    {key:'DROPPED',     label:'Dropped',      cls:'s-dropped',   show:hasSec('DROPPED')},
+    {key:'SOLICITATION',label:'Solicitation', cls:'s-solic',     show:allPools.some(p=>p.inSolic)},
+    {key:'LUCK_TREND',  label:'Luck Trend',   cls:'s-luck',      show:allPools.some(p=>p.inLuck)},
+    {key:'EXISTING',    label:'Existing',     cls:'',            show:hasSec('EXISTING')},
+  ].filter(d=>d.key===''||d.show);
+
+  const recs = [...new Set(allPools.map(p=>p.recommendation).filter(Boolean))].sort();
+  const recCls = {ADD:'r-add',QUALIFIES:'r-qualifies',AVOID:'r-avoid',DROPPED:'r-dropped',HOLD:'r-hold',REDUCE:'r-hold',WITHDRAW:'r-avoid'};
+  const recDefs = [{key:'',label:'ALL',cls:''},
+    ...recs.map(r=>({key:r,label:r,cls:recCls[r]||''}))];
+
+  const clsDefs = [
+    {key:'',           label:'ALL',       cls:''},
+    {key:'ALL_GREEN',  label:'ALL GREEN', cls:'c-green'},
+    {key:'HAS_RED_ZONE',label:'RED ZONE', cls:'c-zone'},
+    {key:'ALL_RED',    label:'ALL RED',   cls:'c-red'},
+  ];
+
+  buildPills('sec-pills', secDefs,  F.secs);
+  buildPills('rec-pills', recDefs,  F.recs);
+  buildPills('cls-pills', clsDefs,  F.cls);
+}
+
+// ─── File loading ──────────────────────────────────────────────
+
+function loadReport(txt) {
+  const res = parseReport(txt);
+  meta = res.meta; allPools = res.pools;
+  expandedId=null; page=0; sortCol='projectedROA'; sortDir=-1;
+  F.secs.clear(); F.recs.clear(); F.cls.clear();
+  F.q=''; F.minRoa=null; F.minZ=null; grouped=false;
+  document.getElementById('search-input').value='';
+  document.getElementById('min-roa').value='';
+  document.getElementById('min-z').value='';
+  document.getElementById('grp-toggle').checked=false;
+  document.getElementById('dropzone').style.display='none';
+  document.getElementById('dashboard').style.display='block';
+  renderBanner(); setupPills(); renderSummary(); render();
+}
+
+// ─── Global helpers (called from onclick) ─────────────────────
+
+function doCopy(text, btn) {
+  navigator.clipboard.writeText(text).then(()=>{
+    const orig=btn.textContent; btn.textContent='Copied!';
+    setTimeout(()=>btn.textContent=orig, 1500);
+  });
+}
+
+// ─── Event wiring ──────────────────────────────────────────────
+
+const dzBox = document.getElementById('dz-box');
+const fi    = document.getElementById('file-input');
+
+dzBox.addEventListener('click',    ()=>fi.click());
+dzBox.addEventListener('dragover', e=>{ e.preventDefault(); dzBox.classList.add('drag-over'); });
+dzBox.addEventListener('dragleave',  ()=>dzBox.classList.remove('drag-over'));
+dzBox.addEventListener('drop',     e=>{ e.preventDefault(); dzBox.classList.remove('drag-over'); if(e.dataTransfer.files[0]) readF(e.dataTransfer.files[0]); });
+fi.addEventListener('change', e=>{ if(e.target.files[0]) readF(e.target.files[0]); });
+
+function readF(f) {
+  const r=new FileReader();
+  r.onload=e=>loadReport(e.target.result);
+  r.readAsText(f);
+}
+
+document.getElementById('btn-new').addEventListener('click',()=>{
+  document.getElementById('dropzone').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+  fi.value='';
+});
+
+document.querySelectorAll('thead th[data-col]').forEach(th=>{
+  th.addEventListener('click',()=>{
+    const c=th.dataset.col;
+    if(sortCol===c) sortDir=-sortDir;
+    else { sortCol=c; sortDir=c==='ticker'?1:-1; }
+    page=0; expandedId=null; render();
+  });
+});
+
+document.getElementById('search-input').addEventListener('input', e=>{ F.q=e.target.value.trim(); page=0; expandedId=null; render(); });
+document.getElementById('min-roa').addEventListener('input', e=>{ F.minRoa=e.target.value?+e.target.value:null; page=0; expandedId=null; render(); });
+document.getElementById('min-z').addEventListener('input',   e=>{ F.minZ  =e.target.value?+e.target.value:null; page=0; expandedId=null; render(); });
+document.getElementById('grp-toggle').addEventListener('change', e=>{ grouped=e.target.checked; page=0; expandedId=null; render(); });
+
+document.getElementById('btn-reset').addEventListener('click',()=>{
+  F.secs.clear(); F.recs.clear(); F.cls.clear();
+  F.q=''; F.minRoa=null; F.minZ=null;
+  document.getElementById('search-input').value='';
+  document.getElementById('min-roa').value='';
+  document.getElementById('min-z').value='';
+  page=0; expandedId=null;
+  setupPills(); render();
+});
+</script>
+</body>
+</html>

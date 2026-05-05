@@ -8,35 +8,15 @@ Agent - This is the ai or the human that is does the work of running the reports
 
 Administrator - Reviews the reports and unsigned transactions and signs the transactions and posts these at his or her discretion.
 
+**Pool Ranger's core goal is maximizing member ROA.**
 
-## How The Epoch Reporting system Is Supposed to work
-
-This is a work in progress. The following numbered items represent the plan.  
-Most of these requirements are already implemented by the scripts here in the ranger/epoch_agent directory.  
-The current implementation is only a start and may vary from the plan below.  
-As work proceeds, both the plan and the implementation will change as knowledge and experience are gained.  
-The goal is to find the optimal plan and the make the implementation match the plan.  
-Work will proceed step by step with small changes and evaluation until the goal is achived.  
-
-
-1. The Agent, using the Epoch Reporting system, creates a candidate list that contains every Cardano stake pool that has been running for at least 20 epochs.  
-One of Pool Ranger's goals is to help newer pools. Pool Ranger intentionally considers newer pools (those in the 20–73 epoch range) as candidates.  
-Older pools are also considered. Supporting newer, smaller pools promotes Cardano decentralization — one of Pool Ranger's core goals alongside maximizing member ROA.  
-2. The Agent, using the Epoch Reporting system, pulls ticker, bech32 pool IDs, current parameters and delegation levels for every pool in the candidate list via Koios.
-3. The Agent, using the Epoch Reporting system, works through the reward math on each pool to determine whether or not there is a red zone on the SPO income curve. A red zone exists when adding delegation reduces the SPO's income — this happens when the pool's pledge bonus exceeds its fixed fee and the margin is below the minimum needed to offset the effect. The red zone is a pool configuration signal: it tells Pool Ranger where on the delegation curve SPO income is declining. If the current delegation is already past the trough, the pool is in the green zone and delegation at any higher level is constructive. If the current delegation is before the trough, Pool Ranger evaluates whether it can supply enough stake to push the pool past the trough in one move. A pool pushed past the trough exits the red zone and SPO income begins recovering. A pool where the trough falls beyond the saturation boundary is a special case: the trough is physically unreachable because gross rewards are capped at saturation. Pool Ranger treats these pools as eligible for delegation up to saturation — the SPO holds the controls (margin, fee, pledge) to respond as they see fit. A pool where the trough cannot be cleared and is not beyond saturation is skipped for delegation: adding stake deepens the income decline without benefit. These skipped pools are added to a solicitation list, because convincing their current delegators to join Pool Ranger removes stake from the pool, which may bring the remaining delegators out of the red zone. Only pools with 100% block production performance over the last 20 qualifying epochs are eligible for delegation.
-4. Next the agent, using the Epoch Reporting system, should sort both lists. The list of pools selected for delegation (the list of pools for which both SPOs and delegators will benefit from increased delegation) must be sorted from highest to lowest according to which pools will produce the highest ROA for delegators. The list of pools selected for solicitation of delegators must be sorted from lowest to highest according to which delegators are receiving the lowest ROA. The intention is to reach out first to those delegators who will benefit the most by staking with Pool Ranger. Critically, only pools whose current projected ROA is **lower than Pool Ranger's current projected weighted ROA** are included in the solicitation list. A pool that already out-earns Pool Ranger is not a valid solicitation target — there is no honest pitch to make to delegators who are already doing better than they would be with Pool Ranger. If Pool Ranger's ROA does not yet beat any avoided pool's ROA (for example, early in the cooperative's life when the member stake is still small), the solicitation list is empty and the report says so explicitly.
-5. Next the agent, using the Epoch Reporting system, determines the amount of ADA to be delegated to the stake pools such that maximum ROA is accomplished for Pool Ranger delegators and a report is provided to the administrator for approval. The Agent, using the Epoch Reporting system, produces a ranked recommendation list. The administrator reviews the list and approves execution. Then the Agent, using the Epoch Reporting system creates the unsigned transactions. It would be best if as many delegations as possible were bundled into as few transactions as possible.
-6. Next the agent, using the Epoch Reporting system, examines the stake pool delegation for those stake pools which are listed to solicit delegation. The staking address of the delegators is identifed and used to open a channel of communication and a solicitation is made by the Agent, using the Epoch Reporting system to stake with the Pool Ranger cooperative.
-
-
-Run this process once per Cardano epoch (every ~5 days).  
-Currently, the Agent never signes transactions — it only advises.  
-The human administrator reviews the report, decides whether to sign and post transactions, to move delegation.  
-In the future an ai agent will not only run the report but may also sign and post transactions.  
-
-
-
+ 
 ## How The Epoch Reporting system Works Currently
+
+We will run this report once per Cardano epoch (every ~5 days).  
+Currently, the Agent never signes transactions — it only advises which pools are most likely to produce the highest ROA.  
+The human administrator reviews the report, decides whether to sign and post transactions, to move delegation.  
+In the future an ai agent will not only run the report but may also sign and post transactions. 
 
 ---
 
@@ -652,20 +632,11 @@ state. The following table maps each goal step to what is actually built today.
 
 | Goal step | What the goal says | What is currently implemented | Gap |
 |---|---|---|---|
-| **1 — Candidate list** | Auto-discover every pool on mainnet that has been running for at least 30 epochs. | ✓ `discover_pools.mjs` (added 2026-04-27) queries all registered mainnet pools from Koios, applies pre-filters (age, stake, saturation, margin), and writes the survivors to `candidate_pools.json`. Supports `--merge` to preserve hand-picked pools. Filter thresholds are configurable via `discoveryConfig` in `ranger_state.json`. | None.|
-| **2 — Pull pool data** | Fetch ticker, bech32 ID, parameters, and delegation levels for every candidate. | ✓ Implemented — one batched Koios POST fetches all pool parameters; 73 epochs of history fetched per pool in parallel. | None. |
-| **3 — Reward math and two lists** | Classify pools by red-zone math; produce a delegation list and a solicitation list; drop pools below 100% performance over 20 epochs. | ✓ Classification, cursor logic, and both lists are implemented. Performance threshold is **100%**. Trough-beyond-saturation pools (`troughBeyondSat` flag) are correctly classified as eligible — the trough is physically unreachable due to the saturation cap, so Pool Ranger delegates up to saturation. The check that SPO and delegator earnings are *restored to their pre-addition level* after clearing the trough is not done — only that the post-add delegation is past the trough. | Partial — trough-clearing earnings restoration not verified. |
-| **4 — Sort both lists** | Delegation list: highest to lowest ROA. Solicitation list: lowest to highest ROA (most harmed first). The goal also implies that there is no point soliciting from pools whose delegators already earn more than Pool Ranger members do. | ✓ Both sorts are implemented correctly. The solicitation list also applies a ROA comparison filter: only pools whose projected ROA is below Pool Ranger's projected weighted ROA are shown as solicitation candidates. The report explains the empty case when no avoided pool has lower ROA than Pool Ranger. | None. |
-| **5 — Amounts, report, unsigned transactions, bundling** | Compute optimal ADA amounts, produce a ranked report for the administrator, then create unsigned transactions bundled as few as possible. | ✓ Amounts computed; ✓ report produced and saved. Unsigned transactions **not created** — `_delegate.mjs` does not exist. No bundling. | Partial — advisory report works; transaction creation and bundling are not implemented. |
-| **6 — Solicitation outreach** | Identify staking addresses of delegators at solicitation pools; open a communication channel; make a solicitation to join Pool Ranger. | The report identifies solicitation candidates and sorts them. No staking addresses are looked up. No outreach of any kind occurs. | Full gap — Phase 2 is entirely unimplemented beyond the report section. |
+| **1 — Amounts, report, unsigned transactions, bundling** | Compute optimal ADA amounts, produce a ranked report for the administrator, then create unsigned transactions bundled as few as possible. | ✓ Amounts computed; ✓ report produced and saved. Unsigned transactions **not created** — `_delegate.mjs` does not exist. No bundling. | Partial — advisory report works; transaction creation and bundling are not implemented. |
+| **2 — Solicitation outreach** | Identify staking addresses of delegators at solicitation pools; open a communication channel; make a solicitation to join Pool Ranger. | The report identifies solicitation candidates and sorts them. No staking addresses are looked up. No outreach of any kind occurs. | Full gap — Phase 2 is entirely unimplemented beyond the report section. |
 
 ### Additional gaps not explicitly described in the goal
 
-- **S_sat computed from total supply, not active stake: CLOSED (2026-04-28).** The original code passed `activeStakeAda` (from Koios `/epoch_info`) to `computeSsat()`. Only ~57% of ADA supply is actively staked, so this produced an S_sat of ~43.6 M instead of the correct ~77.1 M — silently filtering out any pool between those two values (e.g. TERM at 88% of true S_sat) as "oversaturated." Fixed by adding `fetchSupply()` to `koios.mjs` (queries `/totals`) and passing supply to `computeSsat()` in both `run.mjs` and `discover_pools.mjs`.
-- **Minimum pool age check: CLOSED (2026-04-27).** `discover_pools.mjs` filters out any pool whose `active_epoch_no` is within 30 epochs of the current epoch. Pools that pre-date this check by entering `candidate_pools.json` manually are still not age-checked by `run.mjs` itself — `run.mjs` trusts the list it is given.
-- **HOLD pools re-evaluated against new candidates: CLOSED (2026-04-26).** The global allocator (`globalAllocateWithR` in `allocate.mjs`) now treats HOLD and DELEGATE pools identically each epoch. Stake flows toward better ROA opportunities automatically; every proposed reduction or withdrawal includes a churn cost and break-even estimate in the REBALANCING MOVES section. Remaining gap: no configurable minimum ROA-difference threshold before a move is recommended — even a 0.01 %/yr difference can generate a REDUCE recommendation.
-- **Trough-clearing allocation is not minimum-precise.** For HAS_RED_ZONE pools that can be cleared, the plan implies delegating the minimum amount needed to push past the trough and restore earnings. The current allocator fills up to 20% of available stake or room-to-saturation — whichever is smaller — without targeting the trough minimum specifically.
-- **Solicitation sort order reversed and ROA filter missing: CLOSED (2026-04-30).** The report previously sorted solicitation candidates by *highest* ROA first — the opposite of what goal step 4 specifies. More seriously, the section showed pools whose delegators were already earning *more* than Pool Ranger members, meaning the section header's claim that "delegators would benefit from joining" was false. Fixed in `report.mjs` by (1) reversing the sort to lowest-ROA-first and (2) adding a filter: a pool only appears in SOLICITATION CANDIDATES if its projected ROA is less than Pool Ranger's projected weighted ROA after all proposed changes this epoch. Pools that are avoided for safety reasons but offer ROA equal to or better than Pool Ranger appear in POOLS AVOIDED only. When no avoided pool has a lower ROA than Pool Ranger, the section prints a clear explanation rather than an empty list.
 - **No epoch cadence enforcement.** The plan says to run once per Cardano epoch (~5 days). Nothing in the code or the environment enforces or schedules this.
 
 ---
@@ -676,22 +647,7 @@ The following suggestions are offered based on a close reading of both the goal 
 the current code. They are not criticisms — they are offered to help the goals become more precise
 and more achievable as the project matures.
 
-### 1 — Reconsider the performance threshold: 99% vs. 100%
-
-The goal says 99%, the code uses 100%. The 100% threshold is arguably more correct for the
-following reason: delegator ROA math already incorporates the `perf` factor — a pool producing
-95% of expected blocks earns proportionally less. The classification and ROA calculations are
-accurate at any `perf` value. The performance *gate* (99% or 100%) is a separate binary pass/fail
-filter on top of that math. A 99% gate allows pools that have missed ~1% of expected blocks over 20
-epochs, which is hard to distinguish from normal slot-lottery variance for small pools. A 100%
-gate catches any deviation but may over-penalize pools for statistical noise.
-
-**Recommendation:** Keep 100% as the threshold but add an explicit note in the goal that epochs
-with fewer than 0.5 expected blocks are excluded. Consider increasing the performance window to
-30 epochs (matching the minimum pool age) for a more statistically reliable measurement. Make
-the goal and the code agree on the same number.
-
-### 2 — Narrow the scope of auto-discovery before fetching history — IMPLEMENTED (2026-04-27)
+### 1 — Narrow the scope of auto-discovery before fetching history — IMPLEMENTED (2026-04-27)
 
 **Implemented:** `discover_pools.mjs` applies a pre-filter stage before any expensive per-pool
 history fetches occur. It queries all registered mainnet pools via Koios `/pool_list` and
@@ -707,20 +663,7 @@ All thresholds are configurable in `ranger_state.json` under `discoveryConfig`. 
 `discover_pools.mjs` before `run.mjs`, rather than discovery happening automatically inside
 each epoch run.
 
-### 3 — Specify the trough-clearing delegation amount more precisely
-
-The goal says: "delegate enough ADA to bring overall delegation out of the red zone and at least
-back up to the level of earnings the SPO and the current pool delegators now enjoy." The current
-allocator does not do this — it allocates up to 20% of available stake regardless of how much is
-actually needed to clear the trough.
-
-**Recommendation:** Add a step to the goal and the allocator: for each HAS_RED_ZONE pool that can
-be cleared, compute the *minimum* ADA needed to push past the trough (this is `troughExtAda`
-minus `externalExcludingRanger`). Allocate that minimum first, plus a small buffer (e.g., 5%),
-then deploy remaining stake to other pools. Only fall back to the 20% cap if the trough-clearing
-minimum exceeds it.
-
-### 4 — Re-evaluation of HOLD pools — IMPLEMENTED (2026-04-26)
+### 2 — Re-evaluation of HOLD pools — IMPLEMENTED (2026-04-26)
 
 The old system never moved stake away from a HOLD pool unless it became unsafe. The global
 allocator introduced in this session closes that gap.
@@ -737,7 +680,7 @@ unnecessary churn. Adding a threshold (e.g., only recommend a move when `newROA 
 or `breakEvenEpochs < 20`) would filter out marginal moves. This threshold should be configurable
 in `ranger_state.json`.
 
-### 5 — Clarify what "bundle transactions" means for Pool Ranger's staking model
+### 3 — Clarify what "bundle transactions" means for Pool Ranger's staking model
 
 The goal says delegations should be bundled into as few transactions as possible. This is
 worth clarifying because of how Pool Ranger works: each *member* has their own staking key
@@ -750,7 +693,7 @@ member staking key delegation certificates as possible into each transaction, up
 protocol's per-transaction certificate limit. The target is one transaction per destination pool
 change, not one transaction per member.
 
-### 6 — Define "open a channel of communication" for solicitation concretely
+### 4 — Define "open a channel of communication" for solicitation concretely
 
 Goal step 6 says the agent will identify delegator staking addresses and "open a channel of
 communication." Staking addresses are public on-chain, but there is no on-chain mechanism to
@@ -769,7 +712,7 @@ send a message to a staking address directly. Contacting delegators requires a c
 The on-chain metadata approach is the most practical to implement and requires no off-chain
 infrastructure. It is recommended as the Phase 2 target.
 
-### 7 — Add member stake key tracking as a future goal
+### 5 — Add member stake key tracking as a future goal
 
 `ranger_state.json` currently stores `totalMemberStakeAda` as a single manually-maintained
 number. In practice, Pool Ranger has multiple members each with a distinct staking key. As
