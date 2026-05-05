@@ -295,10 +295,10 @@ The report has these sections, in order:
 | **ELIGIBLE POOLS** | Pools with no current Pool Ranger delegation that passed all criteria: 100% performance over 20 epochs AND safe structure for the SPO (ALL_GREEN, or HAS_RED_ZONE with cursor in or clearable to the green zone). Shows ADD for pools allocated stake this epoch; QUALIFIES for pools that passed criteria but the budget was exhausted. Sorted by ROA. |
 | **HIGH PLEDGE OPPORTUNITIES** | Pools with pledge ≥ the configured `minHighPledgeAda` threshold (default 2.5 M ADA), regardless of current eligibility. High-pledge pools strengthen Sybil-resistance incentives and boost delegator ROA via the pledge bonus. Shows each pool's current recommendation so you can see which are already eligible and spot trends across the pledge spectrum. |
 | **POOLS AVOIDED** | Pools not currently delegated to where Pool Ranger cannot improve the situation: ALL_RED pools (zero margin, pledge bonus exceeds fixed fee — SPO income declines at every delegation level up to saturation) and HAS_RED_ZONE pools where Pool Ranger cannot supply enough stake to push past the trough. Adding delegation to either type deepens the SPO income decline without benefit to delegators. |
-| **POOLS DROPPED** | Pools that passed safety classification (ALL_GREEN) but failed the 20-epoch 100% performance requirement. |
+| **POOLS DROPPED** | Pools classified ALL_GREEN that failed the 20-epoch 100% performance requirement. Note: HAS_RED_ZONE pools that fail the performance filter are not shown in any section — they fall between POOLS AVOIDED (safety-based) and POOLS DROPPED (performance-based). This is a known gap; only ALL_GREEN perf-failures appear here. |
 | **SOLICITATION CANDIDATES** | A strict subset of POOLS AVOIDED: only pools whose projected ROA is **lower than Pool Ranger's projected weighted ROA** after this epoch's proposed changes. These are delegators who are being under-served and would earn more by joining Pool Ranger. Sorted lowest ROA first — the most under-served delegators appear at the top. If every avoided pool already out-earns Pool Ranger, the section prints a single message explaining this and lists no candidates. (Phase 2 — reporting only, no outreach yet.) |
 | **SUMMARY** | Count of forced withdrawals, rebalancing moves with total opportunity cost, new delegations, and any undeployed stake. Weighted ROA before and after. |
-| **LUCK Z-SCORE TREND** | Appears in every report. Shows two signals per pool: (1) **Windows** — non-overlapping 20-epoch z-scores across the full 73-epoch history, visible on the very first run; (2) **Cross-run** — headline z-scores from past agent runs, accumulating over multiple epochs. Flags any pool whose windows or cross-run readings are all consistently above +1.5σ or below −1.5σ with a `***` warning. Use this section to detect systematic performance advantages that projected ROA cannot see. |
+| **LUCK Z-SCORE TREND** | Appears in every report. Shows only pools **consistently above +1.5σ** with projected ROA ≥ 2%/yr: either all within-run 20-epoch windows exceed +1.5σ, or all cross-run observations from past reports exceed +1.5σ. Every pool shown carries the `*** Consistently above +1.5σ ***` flag. The ROA floor filters out tiny pools whose near-zero expected block counts inflate z-scores through statistical noise. Use this section to identify pools with likely real systematic performance advantages worth investigating. |
 | **NEXT STEPS** | Numbered actions to execute, separated by type: forced withdrawals, approved rebalancing moves, and new/increased delegations. |
 
 ---
@@ -576,29 +576,35 @@ The LUCK Z-SCORE TREND section near the end of each report shows up to two rows 
   each past agent run, stored in `ranger_state.json → poolLuckHistory`. This row appears only
   once a pool has 2 or more recorded observations.
 
-A pool is shown in this section if it has 2+ cross-run observations **or** if all of its
-within-run windows are consistently above +1.5σ or below −1.5σ.
+A pool appears in this section only when **both** of these conditions are met:
+
+1. **Consistently above +1.5σ** — either (a) every within-run 20-epoch window from the current
+   epoch run exceeds +1.5σ (at least 2 windows required), or (b) every cross-run observation from
+   past runs exceeds +1.5σ (at least 2 observations required).
+2. **Projected ROA ≥ 2%/yr** — pools below this threshold are excluded. Tiny pools with near-zero
+   expected block counts can produce z-scores in the double digits from a single minted block —
+   pure statistical noise, not real advantage.
+
+Every pool that appears in the section already has the `*** Consistently above +1.5σ ***` flag.
+Negative-luck data (consistently below −1.5σ) is tracked in `ranger_state.json` but not displayed.
 
 | Pattern | What it likely means | Suggested action |
 |---------|---------------------|-----------------|
-| All windows bounce between −1.5 and +1.5 | Normal random variance across the pool's full history | No action — expected behaviour |
-| All windows consistently above +1.5 | Likely real systematic advantage throughout the pool's history | Favour this pool when projected ROA is competitive |
-| All windows consistently below −1.5 | Possible systematic disadvantage throughout history | Monitor; consider removing if cross-run trend confirms |
-| Recent windows high, older windows near zero | Advantage may be recent — earlier history was unremarkable | Watch cross-run trend before acting |
-| Recent windows near zero, older windows high | Lucky early history; recent performance now average | Do not chase; the advantage may have faded |
-| Cross-run z consistently above +1.5 for 4+ runs | Persistent advantage confirmed across multiple runs | Strong candidate — pair with projected ROA |
-| Cross-run z consistently below −1.5 for 4+ runs | Persistent disadvantage confirmed across multiple runs | Consider removing if trend persists beyond 6 runs |
+| All windows above +1.5; no cross-run row (< 2 runs recorded) | Strong first-run signal — advantage spread across the pool's full history | Favour when projected ROA is competitive; confirm over subsequent epochs |
+| All windows above +1.5; cross-run mixed (some epochs near or below +1.5) | Full history looks lucky but recent cross-run samples are less consistent | Monitor; advantage may be normalising |
+| All windows above +1.5 and cross-run z also consistently above +1.5 | Strongest signal — advantage confirmed both historically and in recent runs | Strong candidate — pair with projected ROA |
+| Cross-run z consistently above +1.5 for 4+ runs | Persistent advantage confirmed across multiple epoch runs | Strong candidate — pair with projected ROA |
 
-**Practical decision rule.** On the **first run**, look for pools where all or most 20-epoch
-windows are above +1.5σ — this suggests a systematic advantage spread across the pool's full
-history, not a recent lucky streak. After **6 or more cross-run observations**, also require the
-average cross-run z to exceed +1.0 before treating the signal as confirmed.
+**Practical decision rule.** A pool appearing in this section on the **first run** already satisfies
+the full filter: all 20-epoch windows are above +1.5σ. That alone is a meaningful signal — a
+systematic advantage spread across the pool's entire 73-epoch history, not a recent lucky streak.
+After **6 or more cross-run observations**, a cross-run average persistently above +1.5σ is the
+strongest confirmation available.
 
-The `***` warning is a prompt to look more carefully — not an automatic recommendation to add or
-remove stake. Pair it with the projected ROA: a pool with consistent z > +1.5 *and* a high
-projected ROA is a genuinely attractive candidate. A pool with z > +1.5 but a low projected ROA
-(due to high fees or undersaturation) is benefiting from luck without translating it into better
-member returns.
+The `***` flag (carried by every pool in this section) is a prompt to look more carefully — not an
+automatic delegation recommendation. Pair it with the projected ROA: a pool with consistent z > +1.5
+and competitive projected ROA is a genuinely attractive candidate. Because projected ROA must be
+≥ 2%/yr to appear here, the "lucky but low-ROA" case is filtered out before you see it.
 
 ---
 

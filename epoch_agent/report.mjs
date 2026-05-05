@@ -408,23 +408,22 @@ export function formatReport(reportData) {
   //   Trend is visible on the very first run — no need to wait for multiple reports.
   // CROSS-RUN: z-score accumulated from previous epoch reports.
   //
-  // Shown: pools with non-negative latest luckZ and projected ROA ≥ 1%/yr, that have
-  // either 2+ cross-run observations OR within-run windows ALL consistently above +1.5σ.
-  // Negative-luck data is still tracked in state — just not displayed here.
+  // Shown: pools consistently above +1.5σ in either all within-run windows or all
+  // cross-run observations, AND projected ROA ≥ 2%/yr. Eliminates statistical noise
+  // from tiny pools where near-zero expected block counts inflate z-scores artificially.
   const trendPools = Object.entries(poolLuckHistory)
     .filter(([, h]) => {
       if (!h.observations || h.observations.length === 0) return false;
-      // Positive luck only — negative luck stays in ranger_state.json but not shown
-      if (h.observations.length >= 2)
-        return (h.observations[h.observations.length - 1]?.luckZ ?? 0) >= 0;
-      const wins = (h.observations[h.observations.length - 1]?.luckZ_windows ?? [])
-        .map(w => w.luckZ).filter(z => z !== null);
-      if (wins.length < 2) return false;
-      return wins.every(z => z > 1.5);
+      const latest = h.observations[h.observations.length - 1];
+      const wins   = (latest?.luckZ_windows ?? []).map(w => w.luckZ).filter(z => z !== null);
+      const crossZ = h.observations.filter(o => o.luckZ != null).map(o => o.luckZ);
+      const winPos   = wins.length   >= 2 && wins.every(z => z > 1.5);
+      const crossPos = crossZ.length >= 2 && crossZ.every(z => z > 1.5);
+      return winPos || crossPos;
     })
     .filter(([id]) => {
       const roa = classMap.get(id)?.roaAtCurrent;
-      return roa === undefined || roa >= 0.01;
+      return roa === undefined || roa >= 2.0;
     })
     .sort(([idA], [idB]) => {
       const roaA = classMap.get(idA)?.roaAtCurrent ?? 0;
@@ -439,7 +438,7 @@ export function formatReport(reportData) {
   push('  z > +1.5 consistently → likely real advantage; z < -1.5 → possible disadvantage.');
   blank();
   if (trendPools.length === 0) {
-    push('  No pools with 2+ cross-run reports or consistently extreme windows yet.');
+    push('  No pools consistently above +1.5σ in windows or cross-run observations yet.');
   } else {
     for (const [poolId, hist] of trendPools) {
       const label  = hist.ticker ? `[${hist.ticker}]` : `[${poolId.slice(0, 12)}…]`;
