@@ -194,4 +194,4 @@ To see rewards that have built up but not yet been sent to you:
 
 - [SPO and Delegator Reward Analysis](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
 - [Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)
-
+- [View and Analyze All Pools](https://johnshearing.github.io/pool_ranger/epoch_agent/epoch_report_viewer.html)
