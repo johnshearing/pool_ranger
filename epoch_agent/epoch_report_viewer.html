@@ -490,6 +490,9 @@ function parseReport(txt) {
   return { meta, pools };
 }
 
+// ← Update this path each epoch to point at the latest report
+const DEFAULT_REPORT = './reports/epoch_629.txt';
+
 // ─── State ─────────────────────────────────────────────────────
 
 let allPools = [], meta = {}, expandedId = null;
@@ -877,6 +880,12 @@ document.getElementById('search-input').addEventListener('input', e=>{ F.q=e.tar
 document.getElementById('min-roa').addEventListener('input', e=>{ F.minRoa=e.target.value?+e.target.value:null; page=0; expandedId=null; render(); });
 document.getElementById('min-z').addEventListener('input',   e=>{ F.minZ  =e.target.value?+e.target.value:null; page=0; expandedId=null; render(); });
 document.getElementById('grp-toggle').addEventListener('change', e=>{ grouped=e.target.checked; page=0; expandedId=null; render(); });
+
+// Auto-load on GitHub Pages; silently falls back to drop zone locally (file://)
+fetch(DEFAULT_REPORT)
+  .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
+  .then(txt => loadReport(txt))
+  .catch(() => {});  // drop zone already visible — no action needed
 
 document.getElementById('btn-reset').addEventListener('click',()=>{
   F.secs.clear(); F.recs.clear(); F.cls.clear();
