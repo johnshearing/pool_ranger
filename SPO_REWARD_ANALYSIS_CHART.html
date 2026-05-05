@@ -380,6 +380,7 @@ function troughExtDelegIndex(P, F, m, r, perf) {
   const mm = mMin(P, F, r, perf);
   if (m >= mm) return -1;
   const Sstar = Math.sqrt(P * (1 - m) * (A - F) / (m * perf * r / (1 + A0)));
+  if (Sstar >= S_SAT) return STEPS;   // trough beyond saturation → slope negative everywhere → all red
   const extAtTrough = Sstar - P;
   if (extAtTrough <= 0) return 0;
   return Math.min(Math.round(extAtTrough / 0.5e6), STEPS - 1);

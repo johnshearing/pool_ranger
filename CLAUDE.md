@@ -1,9 +1,8 @@
 # CLAUDE.md — Pool Ranger (ranger)
 
 These files are auto-loaded by Claude Code at the start of every session for this directory.
-**Always read `ranger/claude_queries/saturation_cap_fix.md` at the start of each session** to get background information about a bug that was fixed.
-**Always read `ranger/SPO_REWARD_ANALYSIS_CHART.html` at the start of each session** to get background information about a bug that was fixed.
-**Always read `ranger/POOL_SWITCH_CALCULATOR.html` at the start of each session** to see the webpage that likely needs the same fix.
+**Always read `SPO_REWARD_ANALYSIS_CHART_COMPANION.md` at the start of each session** to get background information about `SPO_REWARD_ANALYSIS_CHART.html`.
+**Always read `SPO_REWARD_ANALYSIS_CHART.html` at the start of each session** to get see the file that contains the bug that needs to be fixed.
 
 
 ---
