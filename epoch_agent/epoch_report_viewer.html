@@ -261,7 +261,7 @@ tbody td { padding: .42rem .65rem; vertical-align: middle; }
   <div class="dz-box" id="dz-box">
     <div class="dz-icon">📋</div>
     <div class="dz-title">Pool Ranger — Epoch Report Viewer</div>
-    <div class="dz-sub">Drop an epoch_NNN.txt report here<br>or click to browse</div>
+    <div class="dz-sub" id="dz-sub">Drop an epoch_NNN.txt report here<br>or click to browse</div>
     <input type="file" id="file-input" accept=".txt">
   </div>
 </div>
@@ -881,11 +881,15 @@ document.getElementById('min-roa').addEventListener('input', e=>{ F.minRoa=e.tar
 document.getElementById('min-z').addEventListener('input',   e=>{ F.minZ  =e.target.value?+e.target.value:null; page=0; expandedId=null; render(); });
 document.getElementById('grp-toggle').addEventListener('change', e=>{ grouped=e.target.checked; page=0; expandedId=null; render(); });
 
-// Auto-load on GitHub Pages; silently falls back to drop zone locally (file://)
+// Auto-load on GitHub Pages; falls back to drop zone locally (file://)
+const dzSub = document.getElementById('dz-sub');
+dzSub.textContent = 'Loading report…';
 fetch(DEFAULT_REPORT)
   .then(r => { if (!r.ok) throw new Error(r.status); return r.text(); })
   .then(txt => loadReport(txt))
-  .catch(() => {});  // drop zone already visible — no action needed
+  .catch(() => {
+    dzSub.innerHTML = 'Drop an epoch_NNN.txt report here<br>or click to browse';
+  });
 
 document.getElementById('btn-reset').addEventListener('click',()=>{
   F.secs.clear(); F.recs.clear(); F.cls.clear();
