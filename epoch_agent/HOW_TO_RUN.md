@@ -2,7 +2,7 @@
 This document is for humans and ai agents that need to make good decisions regarding how to delegate Pool Ranger's ADA to various stake pools. 
 
 ## Terms
-Epoch Reporting system - This is the collection of documents containing general instructions, computer scripts, and data files in this directory (ranger/epoch_agent) which together are used to accomplish the task of intelligent stake pool delegation for the benefit of Pool Ranger cooperative members, stake pool operators, and Cardano protocol health.  
+Epoch Reporting system - This is the collection of documents containing general instructions, computer scripts, and data files in this directory (ranger/epoch_agent) which together are used to accomplish the task of intelligent stake pool delegation for the benefit of Pool Ranger members, stake pool operators, and Cardano protocol health.  
 
 Agent - This is the ai or the human that is does the work of running the reports and creating the required unsigned transactions.
 
@@ -107,7 +107,7 @@ removing any pools you placed in the file manually.
 ### Step 2 — Update `ranger_state.json`
 
 Open `ranger/epoch_agent/ranger_state.json` and set `totalMemberStakeAda` to the combined
-ADA balance of all cooperative members. This is the total stake available for delegation.
+ADA balance of all Pool Ranger members. This is the total stake available for delegation.
 
 ```json
 {
@@ -161,7 +161,7 @@ managed automatically by the agent and must not be edited by hand.
 
 | Field | Who sets it | Notes |
 |---|---|---|
-| `totalMemberStakeAda` | **Admin** | Update whenever the cooperative's total ADA balance changes. Whole ADA only. |
+| `totalMemberStakeAda` | **Admin** | Update whenever the Pool Ranger's total ADA balance changes. Whole ADA only. |
 | `inFlightChanges` | **Admin** | Add one entry per submitted-but-not-yet-settled transaction (see format above). |
 | `discoveryConfig` | **Admin (optional)** | Override auto-discovery filter thresholds. Omit the entire block to use all defaults. |
 | `currentDelegations` | Agent only | Auto-populated from settled `inFlightChanges` each run — do not edit. |

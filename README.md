@@ -195,7 +195,7 @@ To see rewards that have built up but not yet been sent to you:
 - [MeshJS SDK](https://meshjs.dev/)
 - [Cardano staking documentation](https://docs.cardano.org/stake-pool-operators/about-stake-pools)
 
-## Pool Ranger literature
+## Pool Ranger Literature
 
 - [The Pool Ranger Specification, Roadmap, and ToDo List](https://github.com/johnshearing/pool_ranger/blob/main/REQUIREMENTS.md)
 - [How to Use The Epoch Reporting System](https://github.com/johnshearing/pool_ranger/blob/main/epoch_agent/HOW_TO_RUN.md)

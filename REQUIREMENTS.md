@@ -11,10 +11,11 @@
 
 ## What Pool Ranger Is
 
-A Cardano staking cooperative. Members join by moving their ADA to a cooperative base address
+Pool Ranger is a Cardano staking management platform built on Plutus V3 smart contracts.  
+Members join by moving their ADA to a Pool Ranger base address
 where:
 - The **payment credential** is the member's own spending key — they always control their funds.
-- The **stake credential** is a cooperative Plutus script, parameterized with both the admin's
+- The **stake credential** is a Pool Ranger Plutus script, parameterized with both the admin's
   and the member's key hash.
 
 Because the stake credential is a script, the administrator controls delegation. Because the
@@ -151,16 +152,16 @@ and **no `0_member_N.sk`**.
 
 ## Member Workflow (End-to-End)
 
-This is the step-by-step process a cooperative member follows, from joining to withdrawing rewards.
+This is the step-by-step process a Pool Ranger member follows, from joining to withdrawing rewards.
 
 ### One-time setup
 1. Get a Ledger hardware wallet. Install the **Cardano app** on it.
 2. Install the **Eternl browser extension** in Chrome or Edge. Connect your Ledger to Eternl.
 3. In Eternl: switch the network to **Preview testnet** (Settings → General → Network).
 4. Send your wallet address (from your `0_member_N.addr` file) to the admin so they know your
-   public key hash and can parameterize your cooperative stake script.
+   public key hash and can parameterize your Pool Ranger stake script.
 
-### Joining the cooperative
+### Joining the Pool Ranger
 5. Run `_register_stake.mjs` to build the stake registration transaction:
    ```
    MEMBER_ADDR_PATH=./0_member_N.addr node _register_stake.mjs
@@ -172,9 +173,9 @@ This is the step-by-step process a cooperative member follows, from joining to w
    ```
    node _submit_tx.mjs <signed-tx-hex>
    ```
-8. Move your ADA to your **coop base address** (printed in step 5). This is the address where
-   your ADA lives inside the cooperative. Your spending key still controls the funds — the
-   cooperative cannot take them.
+8. Move your ADA to your **Pool Ranger base address** (printed in step 5). This is the address where
+   your ADA lives while staking with Pool Ranger. Your spending key still controls the funds —  
+   Pool Ranger cannot take them.
 
 ### Ongoing participation
 - The admin will delegate your stake to a pool each epoch and push reward distributions after each epoch.
@@ -186,7 +187,7 @@ This is the step-by-step process a cooperative member follows, from joining to w
 99% is sent to you, the member. 1% is sent to the administrator.  
 *(Script not yet built.)*
 
-### Leaving the cooperative
+### Leaving Pool Ranger
 10. Run `_revoke_membership.mjs` to deregister your coop stake credential and recover your
     2 ADA deposit.  
    Move your ADA back to a plain address.  
@@ -196,7 +197,7 @@ This is the step-by-step process a cooperative member follows, from joining to w
 
 ## Administrator Workflow (End-to-End)
 
-This is the step-by-step process the cooperative administrator follows.
+This is the step-by-step process the Pool Ranger administrator follows.
 
 ### One-time setup
 1. Admin wallet is a **Ledger hardware wallet**. Address is in `0_admin_0.addr`. No `.sk` file.
@@ -237,7 +238,7 @@ This is the step-by-step process the cooperative administrator follows.
 ### Member WebUI
 
 - Connect wallet (CIP-30: Eternl, Nami, Lace, Flint, Yoroi)
-- Join cooperative: generate coop base address, move ADA to it
+- Join Pool Ranger: generate coop base address, move ADA to it
 - View staking rewards
 - Revoke membership
 - Withdraw rewards. 99% goes to member and 1% goes to the administrator
