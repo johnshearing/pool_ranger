@@ -6,24 +6,31 @@
 
 ## What Is Pool Ranger?
 
-Pool Ranger is a Cardano staking cooperative built on Plutus V3 smart contracts.  
-Members delegate their stake to the cooperative, which pools that delegation to carefully chosen stake pools for maximum return.  
-Rewards destributed at the end of every epoch.  
+Pool Ranger is a Cardano staking management platform built on Plutus V3 smart contracts.  
+Members delegate their stake to Pool Ranger, which routes the delegation to stake pools carefully chosen every epoch for maximum return.  
+Rewards are destributed at the end of every epoch.  
+Members receive 99% of their maximized staking rewards and Pool Ranger receives 1% for ensuring delegators the highest possible return.  
 
 The key insight: **You never give up control of your ADA.**  
-You only share your stake credential — never your spending key.
+You only share your stake credential — never your spending key.  
 Spend your ADA anytime you want - it's never locked.  
-You can leave the cooperative and withdraw all rewards anytime without asking permission.  
+You can leave Pool Ranger and withdraw all rewards anytime without asking permission.  
+You are in control.    
 
 ---
 
 ## How Pool Ranger Fits Into Cardano's Incentive Design
 
-The Cardano protocol is designed to converge on approximately 500 stake pools, each running near saturation. The reward formula favors near-saturated pools, the pledge bonus rewards operators who commit their own ADA, and the fixed fee structure makes large pools more profitable for delegators. This design only works as intended if delegators continuously move their stake to whichever pools offer the best return.
+The Cardano protocol is designed to converge on approximately 500 stake pools, each running near saturation.  
+The reward formula favors near-saturated pools, the pledge bonus rewards operators who commit their own ADA, and the fixed fee structure makes large pools more profitable for delegators.  
+This design only works as intended if delegators continuously move their stake to whichever pools offer the best return.
 
-In practice, most ADA holders delegate once and never revisit the decision. Stake becomes sticky — propping up pools that may have raised their margin, reduced their pledge, or let their performance slip since the initial delegation.
+In practice however, most ADA holders delegate once and never revisit their decision.   
+Stake becomes sticky — propping up pools that may have raised their margin, reduced their pledge, or let their performance slip since the initial delegation.  
 
-**Pool Ranger is the rational delegator the protocol was designed for.** It tracks pool parameters every epoch, detects changes in margin, fee, and pledge, and moves delegation to whichever pools currently offer the highest return. By acting on the incentives the protocol was built around, Pool Ranger helps push the ecosystem toward the equilibrium its designers intended: roughly 500 well-performing pools, each earning close to the return the protocol's mathematics allows.
+**Pool Ranger is the rational delegator the protocol was designed for.**  
+It tracks pool parameters every epoch, detects changes in margin, fee, and pledge, and moves delegation to whichever pools currently offer the highest return.  
+By acting on the incentives the protocol was built around, Pool Ranger helps push the ecosystem toward the equilibrium its designers intended: roughly 500 well-performing pools, each earning close to the highest return the protocol's mathematics allows.
 
 In practice the Nash Equilibrium is messier. There are currently around 3,000 registered pools, because many operators run pools for reasons beyond economics — community identity, ideological commitment to decentralization, or simply the desire to participate. Many of these pools will remain undersaturated indefinitely regardless of parameter incentives. Pool Ranger works with what the ecosystem provides. It cannot manufacture the ideal outcome, but it consistently moves delegation in the direction the protocol was designed to go.
 
@@ -52,19 +59,19 @@ When too much ADA piles into one pool, rewards decline for everyone.
 member's stake to a *different* pool independently, spreading the load and maximizing yields.**  
 
 
-### 3. You can't trust a cooperative that holds your funds
+### 3. You can't trust a fund manager that holds your funds
 
 Traditional staking services require you to send your ADA to an address they control.  
 
 **With Pool Ranger no trust is required. We don't hold your funds.    
 Your private keys remain in your possession at all times.  
-Only the stake credential is shared with the cooperative.  
+Only the stake credential is shared with the Pool Ranger.  
 The smart contract cannot lock or move your funds.   
 You can spend your ADA any time you like.  
 
-The `publish` handler lets **either** the admin **or** the member deregister the cooperative stake credential.  
+The `publish` handler lets **either** the admin **or** the member deregister the Pool Ranger stake credential.  
 You never need the administrator's permission to leave.  
-You can withdraw your delegation and leave the cooperative at any time.**
+You can withdraw your delegation and leave Pool Ranger at any time.**
 
 ### 4. Staking Rewards Are Distributed Automatically 
 
@@ -98,8 +105,7 @@ By pooling our delegation, small ADA holders can have big influence on stake poo
 ---
 
 ## How It Works (Overview)
-
-### Understanding Your Cooperative Address
+### Understanding Your Pool Ranger Address
 
 Every Cardano address has two parts:
 - A **spending credential** — controls who can send your ADA. Only the holder of your private key can do this.
@@ -107,27 +113,27 @@ Every Cardano address has two parts:
 
 Normally both parts come from the same wallet. Pool Ranger creates a special address for you where:
 - The **spending credential** is still your own key — only you can ever send your ADA.
-- The **staking credential** is the cooperative script — this lets the administrator delegate your stake to the best pools on your behalf.
+- The **staking credential** is the Pool Ranger smart contract — this lets the administrator delegate your stake to the best pools on your behalf.
 
 This is the only way Cardano allows a third party to manage delegation for you.  
-Because the staking credential must be part of your address, you do need to send your ADA to your new cooperative member address.  
-But your ADA never enters cooperative custody — no one else can spend it.
+Because the staking credential must be part of your address, you do need to send your ADA to your new Pool Ranger member address.  
+But your ADA never enters Pool Ranger custody — no one else can spend it.
 
 ---
 
 ### Step-by-Step Member Flow
 
 **1. Join**  
-Pool Ranger generates a unique **cooperative member address** for you. It is a standard Cardano address built from your own wallet's payment key (your spending control) combined with the cooperative stake script (the administrator's delegation control). You send your ADA to this address. It is exclusively yours to spend — the administrator cannot touch it.
+Pool Ranger generates a unique **member address** for you. It is a standard Cardano address built from your own wallet's payment key (your spending control) combined with the Pool Ranger stake script (the administrator's delegation control). You send your ADA to this address. It is exclusively yours to spend — the administrator cannot touch it.
 
 **2. Register**  
-The cooperative stake credential is registered on-chain. This requires a refundable 2 ADA deposit, which is returned to you when you leave the cooperative. Registration is what ties your address into the cooperative's delegation system.
+Your Pool Ranger stake credential is registered on-chain. This requires a refundable 2 ADA deposit, which is returned to you when you leave Pool Ranger. Registration is what ties your address into Pool Ranger's delegation system.
 
 **3. Delegate**  
-The administrator delegates your stake to the best available pool. Each member's stake is delegated independently, so you may be assigned to a different pool than other members. This prevents any one pool from becoming over-saturated, which would reduce returns for everyone.
+The administrator delegates your stake to the best available pool. Each member's stake is delegated independently, so you may be assigned to a different pool than other members. This prevents any one pool from becoming over-saturated, which would reduce returns for everyone. Delegation for all members is rotated up through the highest yielding pools at every epoch. So all members get equal in the very highest yielding pools.   
 
 **4. Earn**  
-Staking rewards accumulate at your **stake address** — a separate on-chain account linked to your cooperative stake credential. Rewards do not appear in your ADA balance; they live at the stake address until they are withdrawn. See *Viewing Your Rewards* below.
+Staking rewards accumulate at your **stake address** — a separate on-chain account linked to your Pool Ranger stake credential. Rewards do not appear in your ADA balance; they live at the stake address until they are withdrawn. See *Viewing Your Rewards* below.
 
 **5. Withdraw**  
 - Either you or the administrator can withdraw accumulated rewards at any time.  
@@ -136,28 +142,28 @@ Staking rewards accumulate at your **stake address** — a separate on-chain acc
 - The smart contract enforces these rules. No trust is required.
 
 **6. Leave**  
-Either you or the administrator can deregister the cooperative stake credential at any time. Your 2 ADA deposit is returned to you. Your ADA stays at your cooperative member address and remains yours to spend whenever you like.
+Either you or the administrator can deregister the Pool Ranger stake credential at any time. Your 2 ADA deposit is returned to you. Your ADA stays at your Pool Ranger member address and remains yours to spend or move whenever you like.
 
 ---
 
 ### Spending Your ADA While Staked
 
-You never lose access to your ADA. Spending a UTxO only requires satisfying the **spending credential** — your private key. The cooperative stake script plays absolutely no role in spending transactions. As far as Cardano is concerned, sending ADA from your cooperative address is identical to sending from any other address you own.
+You never lose access to your ADA. Spending a UTxO only requires satisfying the **spending credential** — your private key. The Pool Ranger stake script plays absolutely no role in spending transactions. As far as Cardano is concerned, sending ADA from your Pool Ranger address is identical to sending from any other address you own.
 
 - **Phase 1 (current):** Use Pool Ranger's CLI scripts to build and sign spending transactions. If you use a Ledger hardware wallet, the device signs exactly as it would for any ordinary Cardano address — it sees a normal transaction that requires your payment key, nothing more.
-- **Phase 2 (planned):** The Pool Ranger web UI will let you connect your CIP-30 wallet (e.g. Eternl) and spend directly from your cooperative address in the browser.
+- **Phase 2 (planned):** The Pool Ranger web UI will let you connect your CIP-30 wallet (e.g. Eternl) and spend directly from your Pool Ranger address in the browser.
 
-> **Important note for hardware wallet users:** Most hardware wallet companion apps (such as Ledger Live) derive and display only addresses where both the spending key *and* the staking key come from your device's seed phrase. Your cooperative address uses a script for the staking credential instead of your device's staking key, so it will not appear in your hardware wallet's normal address list or balance display. You will use Pool Ranger's interface — CLI in Phase 1, web dashboard in Phase 2 — to view your balance and initiate transactions.
+> **Important note for hardware wallet users:** Most hardware wallet companion apps (such as Ledger Live) derive and display only addresses where both the spending key *and* the staking key come from your device's seed phrase. Your Pool Ranger address uses a script for the staking credential instead of your device's staking key, so it will not appear in your hardware wallet's normal address list or balance display. You will use Pool Ranger's interface — CLI in Phase 1, web dashboard in Phase 2 — to view your balance and initiate spending transactions.
 
 ---
 
 ### Viewing Your ADA Balance
 
-Your ADA balance is the total ADA sitting in UTxOs at your cooperative member address. It does not include unclaimed staking rewards (those are at a separate stake address — see below).
+Your ADA balance is the total ADA sitting in UTxOs at your Pool Ranger member address. It does not include unclaimed staking rewards (those are at a separate stake address — see below).
 
-- **CLI (Phase 1):** Run `node _view_wallet_balances.mjs` — this queries your cooperative address via Blockfrost and prints your current ADA balance.
+- **CLI (Phase 1):** Run `node _view_wallet_balances.mjs` — this queries your Pool Ranger address via Blockfrost and prints your current ADA balance.
 - **Web UI (Phase 2):** Your balance will be shown on your member dashboard whenever you log in.
-- **Cardano explorer:** You can look up your cooperative member address directly on [cardanoscan.io](https://cardanoscan.io) (use Preview testnet for testing) to see every UTxO it holds.
+- **Cardano explorer:** You can look up your Pool Ranger member address directly on [cardanoscan.io](https://cardanoscan.io) (use Preview testnet for testing) to see every UTxO it holds.
 
 ---
 
@@ -177,7 +183,7 @@ To see rewards that have built up but not yet been sent to you:
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | Aiken smart contract + CLI scripts (`.mjs`) for all cooperative operations | In progress |
+| 1 | Aiken smart contract + CLI scripts (`.mjs`) for all Pool Ranger operations | In progress |
 | 2 | Web UI for members (CIP-30 wallet connect) and admin dashboard | Planned |
 | 3 | Claude Code automation — autonomous pool selection, epoch-boundary delegation, reward distribution, solicitation for new members | Planned |
 
