@@ -189,15 +189,20 @@ To see rewards that have built up but not yet been sent to you:
 
 ---
 
-## Resources
+## Foundational Resources
 
-- [The Pool Ranger Specification, Roadmap, and ToDo List](https://github.com/johnshearing/pool_ranger/blob/main/REQUIREMENTS.md)
 - [Aiken language](https://aiken-lang.org)
 - [MeshJS SDK](https://meshjs.dev/)
 - [Cardano staking documentation](https://docs.cardano.org/stake-pool-operators/about-stake-pools)
 
+## Pool Ranger literature
+
+- [The Pool Ranger Specification, Roadmap, and ToDo List](https://github.com/johnshearing/pool_ranger/blob/main/REQUIREMENTS.md)
+- [How to Use The Epoch Reporting System](https://github.com/johnshearing/pool_ranger/blob/main/epoch_agent/HOW_TO_RUN.md)
+- [How To Use The SPO and Delegator Reward Analysis - Interactive Chart](https://github.com/johnshearing/pool_ranger/blob/main/SPO_REWARD_ANALYSIS_CHART_COMPANION.md)
+
 ## Pool Ranger Interactive Tools
 
-- [SPO and Delegator Reward Analysis](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
+- [SPO and Delegator Reward Analysis - Interactive Chart](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
 - [Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)
 - [View and Analyze All Pools](https://johnshearing.github.io/pool_ranger/epoch_agent/epoch_report_viewer.html)
