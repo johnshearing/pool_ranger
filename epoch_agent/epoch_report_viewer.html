@@ -777,18 +777,19 @@ function appendPoolRow(tbody, p) {
   const pc = p.inParam  ? `<span class="tag-param" title="Parameter change this epoch${p.paramChangeCount?` (total #${p.paramChangeCount})`:''}">✎</span>` : '';
   const prSt = p.poolRangerStake ? fmt(p.poolRangerStake) : '—';
 
-  // Detect when the parser fell back to fullId-as-ticker (pool has no ticker).
-  // Show "(no ticker)" in muted italic plus an inline copy button so the user
-  // can grab the full pool ID without expanding the detail panel.
+  // Every row gets a 📋 copy button next to its ticker — even pools with a real
+  // ticker may share that ticker with another pool, so the full pool ID is the
+  // only unambiguous identifier. Pools without any ticker show "(no ticker)" in
+  // muted italic in place of the ticker text.
   const tickerIsFallback = !!(p.fullId && p.ticker && p.ticker === p.fullId.slice(0,12)+'…');
-  let tickerHtml;
-  if (tickerIsFallback) {
-    const copyBtn = `<button class="copy-btn copy-btn-inline" title="Copy full pool ID"`
-      + ` onclick="event.stopPropagation(); doCopy('${esc(p.fullId)}', this)">📋</button>`;
-    tickerHtml = `<span class="ticker-fallback">(no ticker)</span> ${copyBtn}`;
-  } else {
-    tickerHtml = esc(p.ticker||'—');
-  }
+  const tickerLabel = tickerIsFallback
+    ? `<span class="ticker-fallback">(no ticker)</span>`
+    : esc(p.ticker||'—');
+  const copyBtn = p.fullId
+    ? ` <button class="copy-btn copy-btn-inline" title="Copy full pool ID"`
+      + ` onclick="event.stopPropagation(); doCopy('${esc(p.fullId)}', this)">📋</button>`
+    : '';
+  const tickerHtml = tickerLabel + copyBtn;
 
   tr.innerHTML = `
     <td class="ticker-cell" title="${esc(p.fullId||'')}">${tickerHtml}${lk}${pl}${pc}</td>
