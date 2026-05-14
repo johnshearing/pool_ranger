@@ -3,3 +3,9 @@ export PS1="\w> "
 
 # Before pushing to github to pass tests
 aiken fmt
+
+# Remove a typically ignored file from the remote without deleting it from the local computer.
+# This is how I remove last epochs report from the github remote.
+git rm --cached epoch_agent/reports/epoch_629.txt
+git commit -m "Remove epoch_629.txt from remote tracking"
+git push origin main
