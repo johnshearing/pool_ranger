@@ -1,0 +1,148 @@
+{
+  "_README": [
+    "This is a SAMPLE ranger_state.json. It is not read by any script — it exists",
+    "purely as documentation. Every top-level field that run.mjs reads or writes",
+    "is shown below with one or two illustrative entries so a person or AI agent",
+    "can quickly see the schema and example values.",
+    "",
+    "Real numbers: pledge / fixedCost / stakeAda are in WHOLE ADA (not lovelace).",
+    "margin is a fraction (0.01 = 1%). ROA / luckZ values are floats.",
+    "",
+    "Fields whose 'Who sets it' column in HOW_TO_RUN.md says 'Agent only' are",
+    "managed by run.mjs — do not edit them by hand in the real file.",
+    "",
+    "See HOW_TO_RUN.md → 'Complete ranger_state.json reference' for full docs."
+  ],
+
+  "_schemaVersion": 1,
+
+  "lastUpdatedEpoch": 629,
+
+  "lastRunAt": "2026-05-08T14:22:31.412Z",
+
+  "totalMemberStakeAda": 50000000,
+
+  "discoveryConfig": {
+    "_comment": "Optional. Omit the whole block to use all defaults shown.",
+    "minActiveStakeAda":     1000000,
+    "maxMarginFraction":     0.05,
+    "minEpochsOld":          30,
+    "maxSaturationFraction": 1.0,
+    "minHighPledgeAda":      2500000
+  },
+
+  "currentDelegations": {
+    "_comment_for_currentDelegations": "Agent-managed. Keyed by bech32 poolId. One entry per pool currently receiving Pool Ranger stake. stakeAda is the snapshot amount that became active at activeFromEpoch.",
+    "pool1abc1111111111111111111111111111111111111111111111111111": {
+      "ticker":           "ALPHA",
+      "stakeAda":         15000000,
+      "delegatedAtEpoch": 626,
+      "activeFromEpoch":  628
+    },
+    "pool1def2222222222222222222222222222222222222222222222222222": {
+      "ticker":           "BETA",
+      "stakeAda":         10000000,
+      "delegatedAtEpoch": 627,
+      "activeFromEpoch":  629
+    }
+  },
+
+  "inFlightChanges": [
+    {
+      "_comment":         "Admin-edited. One entry per submitted-but-not-yet-active tx. changeType is ADD or WITHDRAW.",
+      "poolId":           "pool1ghi3333333333333333333333333333333333333333333333333333",
+      "ticker":           "GAMMA",
+      "changeType":       "ADD",
+      "stakeAda":         5000000,
+      "submittedAtEpoch": 629,
+      "activeFromEpoch":  631,
+      "rewardsFromEpoch": 632,
+      "note":             "Approved 2026-05-08, tx 9f3a...e201"
+    },
+    {
+      "poolId":           "pool1abc1111111111111111111111111111111111111111111111111111",
+      "ticker":           "ALPHA",
+      "changeType":       "WITHDRAW",
+      "stakeAda":         3000000,
+      "submittedAtEpoch": 629,
+      "activeFromEpoch":  631,
+      "rewardsFromEpoch": 632,
+      "note":             "Partial rebalance toward GAMMA"
+    }
+  ],
+
+  "completedChanges": [
+    {
+      "_comment":         "Agent-managed audit trail. Entries from inFlightChanges are auto-moved here when activeFromEpoch <= currentEpoch. settledAtEpoch is added at migration time.",
+      "poolId":           "pool1def2222222222222222222222222222222222222222222222222222",
+      "ticker":           "BETA",
+      "changeType":       "ADD",
+      "stakeAda":         10000000,
+      "submittedAtEpoch": 627,
+      "activeFromEpoch":  629,
+      "rewardsFromEpoch": 630,
+      "note":             "Initial BETA delegation",
+      "settledAtEpoch":   629
+    }
+  ],
+
+  "poolLuckHistory": {
+    "_comment_for_poolLuckHistory": "Agent-managed. One entry per evaluated pool. observations[] grows by one item per run; oldest entries are pruned beyond 20. luckZ_windows is non-overlapping 20-epoch slices of the pool's full 73-epoch history; epochsAgo='1-20' is the most recent slice.",
+    "pool1abc1111111111111111111111111111111111111111111111111111": {
+      "ticker": "ALPHA",
+      "observations": [
+        {
+          "epoch":       628,
+          "luckZ":       1.46,
+          "luckPremium": 0.1558,
+          "nEpochs":     73,
+          "luckZ_windows": [
+            { "epochsAgo": "1-20",  "luckZ":  2.09, "nEpochs": 20 },
+            { "epochsAgo": "21-40", "luckZ":  0.16, "nEpochs": 20 },
+            { "epochsAgo": "41-60", "luckZ":  0.03, "nEpochs": 20 },
+            { "epochsAgo": "61-73", "luckZ":  0.65, "nEpochs": 13 }
+          ]
+        },
+        {
+          "epoch":       629,
+          "luckZ":       1.53,
+          "luckPremium": 0.1708,
+          "nEpochs":     73,
+          "luckZ_windows": [
+            { "epochsAgo": "1-20",  "luckZ":  2.29, "nEpochs": 20 },
+            { "epochsAgo": "21-40", "luckZ":  0.29, "nEpochs": 20 },
+            { "epochsAgo": "41-60", "luckZ": -0.48, "nEpochs": 20 },
+            { "epochsAgo": "61-73", "luckZ":  1.03, "nEpochs": 13 }
+          ]
+        }
+      ]
+    }
+  },
+
+  "poolParamHistory": {
+    "_comment_for_poolParamHistory": "Agent-managed. lastSeen is the most recent epoch-boundary snapshot of fee / margin / pledge. changes[] is the permanent log of every detected change. Same-epoch reruns (with --force) do NOT advance lastSeen, so the prior-epoch baseline survives for next-epoch detection.",
+    "pool1abc1111111111111111111111111111111111111111111111111111": {
+      "ticker": "ALPHA",
+      "lastSeen": {
+        "fixedCostAda": 340,
+        "margin":       0.01,
+        "pledgeAda":    712000,
+        "epoch":        629
+      },
+      "changes": [
+        { "epoch": 624, "field": "margin",       "from": 0.02, "to": 0.01 },
+        { "epoch": 627, "field": "pledgeAda",    "from": 500000, "to": 712000 }
+      ]
+    },
+    "pool1def2222222222222222222222222222222222222222222222222222": {
+      "ticker": "BETA",
+      "lastSeen": {
+        "fixedCostAda": 170,
+        "margin":       0.005,
+        "pledgeAda":    50000,
+        "epoch":        629
+      },
+      "changes": []
+    }
+  }
+}

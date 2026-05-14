@@ -167,7 +167,7 @@ managed automatically by the agent and must not be edited by hand.
 | `currentDelegations` | Agent only | Auto-populated from settled `inFlightChanges` each run — do not edit. |
 | `completedChanges` | Agent only | Permanent audit trail of all settled changes — do not edit. |
 | `poolLuckHistory` | Agent only | Per-pool luck observations accumulated across runs — do not edit. |
-| `poolParamHistory` | Agent only | Per-pool last-known fee/margin/pledge and full change log — do not edit. Updated each run. |
+| `poolParamHistory` | Agent only | Per-pool last-known fee/margin/pledge and full change log — do not edit. `lastSeen` is advanced only when the epoch actually advances; same-epoch reruns (with `--force`) leave it unchanged so cross-epoch detection still works. |
 | `_schemaVersion` | Agent only | Internal schema version marker — do not edit. |
 | `lastUpdatedEpoch` | Agent only | Set to the current epoch on each run — do not edit. |
 
@@ -242,10 +242,30 @@ To preview without updating `ranger_state.json`:
 node epoch_agent/run.mjs --dry-run
 ```
 
+To force a re-run within the same epoch (rarely needed — see below):
+
+```bash
+node epoch_agent/run.mjs --force
+```
+
 The report is printed to the terminal and also saved to:
 ```
 ranger/epoch_agent/reports/epoch_NNNN.txt
 ```
+
+**Same-epoch guard.** A normal run refuses to proceed if `ranger_state.lastUpdatedEpoch`
+already equals the current epoch. Re-running within the same epoch would otherwise overwrite
+the existing `epoch_<N>.txt` report and clobber the per-pool parameter baselines used to
+detect fee, margin, and pledge changes at the next epoch. To override the guard, pass
+`--force`. When forced:
+
+- Parameter baselines (`poolParamHistory[poolId].lastSeen`) are **not** advanced — the
+  prior-epoch values are preserved so the next epoch's run can still detect changes.
+- The report is written to `reports/epoch_<N>_rerun_<timestamp>.txt` so the original
+  first-of-epoch report is preserved.
+
+Use `--dry-run` instead of `--force` whenever you just want to preview the current state
+without touching anything on disk.
 
 What the agent does on each run, in order:
 1. Reads `candidate_pools.json` (pool IDs to evaluate)
@@ -269,7 +289,7 @@ The report has these sections, in order:
 
 | Section | What it means |
 |---|---|
-| **PARAMETER CHANGES** | Appears at the top of every report after the first run. Lists any pool in the candidate list that changed its fixed fee, margin, or pledge since the previous epoch run. Pools Pool Ranger currently delegates to are marked ★. The full change history for every pool is stored permanently in `ranger_state.json → poolParamHistory`. |
+| **PARAMETER CHANGES** | Appears at the top of every report after the first run. Lists any pool in the candidate list whose fixed fee, margin, or pledge changed since the previous epoch run (all three fields compared to whole-ADA / 0.01%-margin precision so floating-point noise cannot produce false positives or negatives). Pools Pool Ranger currently delegates to are marked ★. The full change history for every pool is stored permanently in `ranger_state.json → poolParamHistory`. The agent refuses to re-run within the same epoch by default; pass `--force` to override (the original report and the prior-epoch baseline are preserved — see Step 3). |
 | **EXISTING DELEGATIONS** | Pools where Pool Ranger is currently delegating. Shows HOLD (no change), ADD MORE (increasing), REDUCE (decreasing — includes opportunity cost), or WITHDRAW (removing — includes opportunity cost) based on the global optimizer's comparison of all safe pools each epoch. |
 | **REBALANCING MOVES** | Appears only when the optimizer proposes moving stake away from one or more currently-delegated pools. Lists each move with: the freed amount, opportunity cost in ADA (2 epochs earning the old pool's ROA instead of the new pool's ROA — old-pool rewards continue during the transition, so nothing is missed), and break-even (always 2 epochs). The administrator decides whether to approve each move. |
 | **ELIGIBLE POOLS** | Pools with no current Pool Ranger delegation that passed all criteria: 100% performance over 20 epochs AND safe structure for the SPO (ALL_GREEN, or HAS_RED_ZONE with cursor in or clearable to the green zone). Shows ADD for pools allocated stake this epoch; QUALIFIES for pools that passed criteria but the budget was exhausted. Sorted by ROA. |

@@ -3,6 +3,10 @@
 // Usage (from ranger/ directory):
 //   node epoch_agent/run.mjs
 //   node epoch_agent/run.mjs --dry-run    (skip writing/updating ranger_state.json)
+//   node epoch_agent/run.mjs --force      (allow re-running within the same epoch;
+//                                          preserves parameter baselines and writes
+//                                          the report to a suffixed filename so the
+//                                          original epoch_<N>.txt is not overwritten)
 //
 // What it does:
 //   1. Reads candidate_pools.json → list of mainnet pool entries ({ id, ticker }) to evaluate
@@ -32,6 +36,7 @@ const RANGER_STATE_PATH    = path.join(__dir, 'ranger_state.json');
 const REPORTS_DIR          = path.join(__dir, 'reports');
 
 const DRY_RUN = process.argv.includes('--dry-run');
+const FORCE   = process.argv.includes('--force');
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -130,6 +135,19 @@ async function main() {
   const epochInfo = await fetchCurrentEpoch();
   const { epochNo } = epochInfo;
   console.log(`[run] Current epoch: ${epochNo}`);
+
+  // Refuse to re-run inside the same epoch unless --force.
+  // A same-epoch re-run otherwise overwrites reports/epoch_<N>.txt and (worse)
+  // clobbers the per-pool parameter baselines used to detect changes next epoch.
+  if (!FORCE && !DRY_RUN && state.lastUpdatedEpoch === epochNo) {
+    console.error(`ERROR: state.lastUpdatedEpoch is already ${epochNo}.`);
+    console.error(`Re-running in the same epoch would overwrite reports/epoch_${epochNo}.txt`);
+    console.error('and clobber the parameter baselines used to detect changes next epoch.');
+    console.error('Pass --force to re-run anyway (preserves baselines; writes a suffixed report).');
+    console.error('Pass --dry-run to preview without touching state.');
+    process.exit(1);
+  }
+  const epochAdvanced = state.lastUpdatedEpoch === 0 || epochNo > state.lastUpdatedEpoch;
 
   // Settle any in-flight changes that are now active
   state = settleInFlight(state, epochNo);
@@ -282,7 +300,9 @@ async function main() {
     const prev     = entry.lastSeen;
     const detected = [];
 
-    if (prev.fixedCostAda !== c.fixedCostAda) {
+    // Compare fixed cost to nearest whole ADA (consistent with pledge / margin
+    // comparisons below; avoids spurious diffs from float division of lovelace).
+    if (Math.round(prev.fixedCostAda) !== Math.round(c.fixedCostAda)) {
       detected.push({ field: 'Fixed fee', from: prev.fixedCostAda, to: c.fixedCostAda, unit: 'ada' });
       entry.changes.push({ epoch: epochNo, field: 'fixedCostAda', from: prev.fixedCostAda, to: c.fixedCostAda });
     }
@@ -297,9 +317,13 @@ async function main() {
       entry.changes.push({ epoch: epochNo, field: 'pledgeAda', from: prev.pledgeAda, to: c.pledgeAda });
     }
 
-    // Update lastSeen regardless of whether anything changed
-    entry.ticker   = c.ticker;
-    entry.lastSeen = { fixedCostAda: c.fixedCostAda, margin: c.margin, pledgeAda: c.pledgeAda, epoch: epochNo };
+    // Only advance the baseline when the epoch advances. Re-running in the same
+    // epoch (with --force) must preserve the prior-epoch lastSeen so next epoch's
+    // run still compares against it.
+    if (epochAdvanced) {
+      entry.ticker   = c.ticker;
+      entry.lastSeen = { fixedCostAda: c.fixedCostAda, margin: c.margin, pledgeAda: c.pledgeAda, epoch: epochNo };
+    }
 
     if (detected.length > 0) {
       paramChanges.push({
@@ -336,9 +360,15 @@ async function main() {
 
   console.log('\n' + reportText);
 
-  // Write to reports/epoch_NNNN.txt
+  // Write to reports/epoch_NNNN.txt. If an epoch_<N>.txt already exists (i.e. we
+  // are running again in the same epoch under --force), suffix the filename so
+  // the original first-of-epoch report is preserved.
   fs.mkdirSync(REPORTS_DIR, { recursive: true });
-  const reportPath = path.join(REPORTS_DIR, `epoch_${epochNo}.txt`);
+  let reportPath = path.join(REPORTS_DIR, `epoch_${epochNo}.txt`);
+  if (fs.existsSync(reportPath)) {
+    const ts   = generatedAt.replace(/[:.]/g, '-');
+    reportPath = path.join(REPORTS_DIR, `epoch_${epochNo}_rerun_${ts}.txt`);
+  }
   fs.writeFileSync(reportPath, reportText, 'utf8');
   console.log(`[run] Report saved to: ${reportPath}`);
 

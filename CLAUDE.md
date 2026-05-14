@@ -1,15 +1,16 @@
 # CLAUDE.md — Pool Ranger (ranger)
 
 These files are auto-loaded by Claude Code at the start of every session for this directory.
-**Always read `SPO_REWARD_ANALYSIS_CHART_COMPANION.md` at the start of each session** to get background information about `SPO_REWARD_ANALYSIS_CHART.html`.
-**Always read `SPO_REWARD_ANALYSIS_CHART.html` at the start of each session** to get see the file that contains the bug that needs to be fixed.
+**Always read `README.md` at the start of each session** to get background information about the `Pool Ranger` project.  
+**Always read `REQUIREMENTS.md` at the start of each session** to get background information about the `Pool Ranger` project.    
 
 
 ---
 
 ## Project Summary
 
-Pool Ranger is a Cardano staking cooperative. Members share their **staking key** (never their
+Pool Ranger is a Cardano staking management platform built on Plutus V3 smart contracts.   
+Members share their **staking key** (never their
 spending/private key) with a cooperative administrator. The administrator delegates the
 combined stake to carefully chosen pools. Members can revoke at any time. 99% of rewards flow back
 to members, with the administrator earning 1%.
