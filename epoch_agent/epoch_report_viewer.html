@@ -90,6 +90,7 @@ body {
 .pill.s-luck.active      { border-color:var(--yellow); color:var(--yellow); background:rgba(227,179,65,.1); }
 .pill.s-pledge.active    { border-color:var(--purple); color:var(--purple); background:rgba(188,140,255,.1); }
 .pill.s-solic.active     { border-color:var(--muted);  color:var(--text);   background:rgba(139,148,158,.1); }
+.pill.s-param.active     { border-color:var(--accent); color:var(--accent); background:rgba(88,166,255,.12); }
 
 .pill.r-add.active      { border-color:var(--green);  color:var(--green);  background:rgba(63,185,80,.12); }
 .pill.r-qualifies.active{ border-color:var(--muted);  color:var(--text);   background:rgba(139,148,158,.1); }
@@ -229,6 +230,11 @@ tbody td { padding: .42rem .65rem; vertical-align: middle; }
 .ticker-cell { font-weight: 600; }
 .tag-luck  { color: var(--yellow); font-size: .65rem; margin-left: .25rem; }
 .tag-pledge{ color: var(--purple); font-size: .65rem; margin-left: .25rem; }
+.tag-param { color: var(--accent); font-size: .65rem; margin-left: .25rem; }
+.b-param   { background:rgba(88,166,255,.18);color:var(--accent); }
+.pc-list   { font-family: monospace; font-size: .78rem; white-space: pre; color: var(--text); }
+.pc-up   { color: var(--green); }
+.pc-down { color: var(--orange); }
 
 /* pagination */
 .pagination {
@@ -358,10 +364,13 @@ const SEC_MAP = {
   'PARAMETER CHANGES':        'PARAM_CHANGES',
 };
 
-const SKIP_SECS = new Set(['PARAM_CHANGES','SUMMARY','NEXT_STEPS','REBALANCING','']);
+const SKIP_SECS = new Set(['SUMMARY','NEXT_STEPS','REBALANCING','']);
 
 const SEC_RE   = /^(ELIGIBLE POOLS|HIGH PLEDGE OPPORTUNITIES|POOLS AVOIDED|POOLS DROPPED|SOLICITATION CANDIDATES|LUCK Z-SCORE TREND|EXISTING DELEGATIONS|REBALANCING MOVES|PARAMETER CHANGES)\b/;
 const POOL_RE  = /^\s*(?:\[([^\]]+)\]\s+)?P=([\d.]+)\s*M\s*ADA,\s*F=(\d+)\s*ADA,\s*m=([\d.]+)%/;
+// PARAMETER CHANGES pool header: optional ★, [TICKER or pool1xx…], full poolId, optional change-count suffix
+const PC_HDR_RE   = /^\s*(★\s+)?\[([^\]]+)\]\s+(pool1\S+?)(?:\s+\(change #(\d+).*?\))?\s*$/;
+const PC_CHG_RE   = /^\s+(Fixed fee|Margin|Pledge)\s+(.+?)\s+→\s+(.+?)\s+(▲|▼)\s+(\w+)\s*$/;
 
 function parseReport(txt) {
   const lines = txt.split('\n');
@@ -393,13 +402,16 @@ function parseReport(txt) {
       if (cur.windows)  e.windows  = cur.windows;
       if (cur.crossRun) e.crossRun = cur.crossRun;
       if (cur.flag)     e.flag     = cur.flag;
-      if (cur.section === 'LUCK_TREND')   e.inLuck   = true;
-      if (cur.section === 'HIGH_PLEDGE')  e.inPledge = true;
-      if (cur.section === 'SOLICITATION') e.inSolic  = true;
+      if (cur.paramChanges?.length) { e.paramChanges = cur.paramChanges; e.paramChangeCount = cur.paramChangeCount; }
+      if (cur.section === 'LUCK_TREND')    e.inLuck   = true;
+      if (cur.section === 'HIGH_PLEDGE')   e.inPledge = true;
+      if (cur.section === 'SOLICITATION')  e.inSolic  = true;
+      if (cur.section === 'PARAM_CHANGES') e.inParam  = true;
     } else {
-      if (cur.section === 'LUCK_TREND')   cur.inLuck   = true;
-      if (cur.section === 'HIGH_PLEDGE')  cur.inPledge = true;
-      if (cur.section === 'SOLICITATION') cur.inSolic  = true;
+      if (cur.section === 'LUCK_TREND')    cur.inLuck   = true;
+      if (cur.section === 'HIGH_PLEDGE')   cur.inPledge = true;
+      if (cur.section === 'SOLICITATION')  cur.inSolic  = true;
+      if (cur.section === 'PARAM_CHANGES') cur.inParam  = true;
       byId[cur.fullId] = cur;
       pools.push(cur);
     }
@@ -422,7 +434,32 @@ function parseReport(txt) {
       proposedAda: null, proposedROA: null,
       recommendation: null, reason: null,
       windows: null, crossRun: null, flag: null,
-      inLuck: false, inPledge: false, inSolic: false,
+      inLuck: false, inPledge: false, inSolic: false, inParam: false,
+      paramChanges: null, paramChangeCount: null,
+    };
+  }
+
+  // Lightweight pool record used when a poolId appears only in PARAMETER CHANGES
+  // (no header line from another section). Most fields stay null — the dashboard
+  // tolerates that and shows "—" in those columns.
+  function newParamPool(ticker, fullId, section) {
+    return {
+      ticker: ticker || (fullId ? fullId.slice(0,12)+'…' : null),
+      pledge: null, fixedFee: null, margin: null,
+      section, fullId,
+      classification: null, classShort: null,
+      performance: null, performanceEpochs: null,
+      activeStake: null, poolRangerStake: null,
+      projectedROA: null, historicalROA: null, historicalEpochs: null,
+      luckPremium: null, luckPremiumEpochs: null,
+      luckZ: null, luckZEpochs: null,
+      poolAge: null,
+      currentAda: null, currentNote: null,
+      proposedAda: null, proposedROA: null,
+      recommendation: null, reason: null,
+      windows: null, crossRun: null, flag: null,
+      inLuck: false, inPledge: false, inSolic: false, inParam: false,
+      paramChanges: [], paramChangeCount: null,
     };
   }
 
@@ -432,6 +469,40 @@ function parseReport(txt) {
     const secM = ln.match(SEC_RE);
     if (secM) { flush(); curSec = SEC_MAP[secM[1]] || ''; continue; }
     if (SKIP_SECS.has(curSec)) continue;
+
+    // PARAMETER CHANGES uses a different line shape than the classification
+    // sections — branch first, collect changes into either an existing pool
+    // record (if one was already parsed from another section) or a new stub.
+    if (curSec === 'PARAM_CHANGES') {
+      const pm = ln.match(PC_HDR_RE);
+      if (pm) {
+        flush();
+        const ticker = pm[2].includes('…') || pm[2].startsWith('pool1') ? null : pm[2];
+        const fullId = pm[3];
+        cur = byId[fullId] ? byId[fullId] : newParamPool(ticker, fullId, curSec);
+        cur.inParam = true;
+        if (!cur.paramChanges) cur.paramChanges = [];
+        if (pm[4]) cur.paramChangeCount = +pm[4];
+        // If pool already known from another section, merge — but DON'T push
+        // it again. We achieve this by clearing cur after this so the flush()
+        // at the next header / section end leaves byId untouched.
+        // We still want to capture subsequent change lines, so keep cur set
+        // but mark it as "alreadyKnown" via the byId lookup at flush time.
+        continue;
+      }
+      if (!cur) continue;
+      const cm = ln.match(PC_CHG_RE);
+      if (cm) {
+        cur.paramChanges.push({
+          field: cm[1], from: cm[2].trim(), to: cm[3].trim(),
+          arrow: cm[4], verb: cm[5],
+        });
+      }
+      // "Current recommendation:" line is ignored here — the recommendation
+      // was already captured from whichever classification section listed
+      // the pool. If the pool is param-only, we leave recommendation null.
+      continue;
+    }
 
     const hdrM = ln.match(POOL_RE);
     if (hdrM) { flush(); cur = newPool(hdrM, curSec); continue; }
@@ -509,9 +580,10 @@ function filtered() {
     if (F.secs.size > 0) {
       let ok = false;
       for (const s of F.secs) {
-        if (s==='LUCK_TREND'   && p.inLuck)   { ok=true; break; }
-        if (s==='HIGH_PLEDGE'  && p.inPledge) { ok=true; break; }
-        if (s==='SOLICITATION' && p.inSolic)  { ok=true; break; }
+        if (s==='LUCK_TREND'    && p.inLuck)   { ok=true; break; }
+        if (s==='HIGH_PLEDGE'   && p.inPledge) { ok=true; break; }
+        if (s==='SOLICITATION'  && p.inSolic)  { ok=true; break; }
+        if (s==='PARAM_CHANGES' && p.inParam)  { ok=true; break; }
         if (p.section===s) { ok=true; break; }
       }
       if (!ok) return false;
@@ -541,16 +613,18 @@ function sorted(arr) {
 
 // ─── Helpers ───────────────────────────────────────────────────
 
-const SEC_ORDER = ['EXISTING','ELIGIBLE','HIGH_PLEDGE','AVOIDED','DROPPED','SOLICITATION','LUCK_TREND','REBALANCING'];
+const SEC_ORDER = ['EXISTING','ELIGIBLE','HIGH_PLEDGE','AVOIDED','DROPPED','SOLICITATION','LUCK_TREND','PARAM_CHANGES','REBALANCING'];
 const SEC_LABEL = {
   ELIGIBLE:'ELIGIBLE POOLS', HIGH_PLEDGE:'HIGH PLEDGE', AVOIDED:'POOLS AVOIDED',
   DROPPED:'POOLS DROPPED', SOLICITATION:'SOLICITATION', LUCK_TREND:'LUCK Z-SCORE TREND',
   EXISTING:'EXISTING DELEGATIONS', REBALANCING:'REBALANCING',
+  PARAM_CHANGES:'PARAMETER CHANGES',
 };
 
 function secBadge(s) {
   const cls = {ELIGIBLE:'b-eligible',HIGH_PLEDGE:'b-pledge',AVOIDED:'b-avoided',
-    DROPPED:'b-dropped',SOLICITATION:'b-solic',LUCK_TREND:'b-luck',EXISTING:'b-existing'}[s]||'';
+    DROPPED:'b-dropped',SOLICITATION:'b-solic',LUCK_TREND:'b-luck',EXISTING:'b-existing',
+    PARAM_CHANGES:'b-param'}[s]||'';
   return `<span class="b ${cls}">${SEC_LABEL[s]||s}</span>`;
 }
 function recBadge(r) {
@@ -660,10 +734,11 @@ function appendPoolRow(tbody, p) {
   const pc2 = p.performance===100 ? 'perf-ok' : (p.performance!==null && p.performance<99) ? 'perf-bad' : '';
   const lk = p.inLuck   ? '<span class="tag-luck"  title="Luck Z-Score Trend">★</span>' : '';
   const pl = p.inPledge ? '<span class="tag-pledge" title="High Pledge">♦</span>'        : '';
+  const pc = p.inParam  ? `<span class="tag-param" title="Parameter change this epoch${p.paramChangeCount?` (total #${p.paramChangeCount})`:''}">✎</span>` : '';
   const prSt = p.poolRangerStake ? fmt(p.poolRangerStake) : '—';
 
   tr.innerHTML = `
-    <td class="ticker-cell">${esc(p.ticker||'—')}${lk}${pl}</td>
+    <td class="ticker-cell">${esc(p.ticker||'—')}${lk}${pl}${pc}</td>
     <td>${secBadge(p.section)}</td>
     <td>${recBadge(p.recommendation)}</td>
     <td>${clsBadge(p.classShort)}</td>
@@ -700,6 +775,24 @@ function appendDetailRow(tbody, p) {
   const idVal = `<span style="font-family:monospace;font-size:.76rem">${esc(p.fullId||'')}</span>`+
     `<button class="copy-btn" onclick="doCopy('${esc(p.fullId||'')}',this)">Copy</button>`;
 
+  // Build a monospace block listing each parameter change (Fixed fee / Margin /
+  // Pledge), color-coded ▲ green / ▼ orange so deltas are scannable.
+  let pcBlock = '';
+  if (p.paramChanges && p.paramChanges.length) {
+    const fieldW = Math.max(...p.paramChanges.map(c => c.field.length));
+    const fromW  = Math.max(...p.paramChanges.map(c => c.from.length));
+    const toW    = Math.max(...p.paramChanges.map(c => c.to.length));
+    const rows = p.paramChanges.map(c => {
+      const arrowCls = c.arrow === '▲' ? 'pc-up' : 'pc-down';
+      return `${esc(c.field).padEnd(fieldW)}  ${esc(c.from).padStart(fromW)}  →  ${esc(c.to).padEnd(toW)}  <span class="${arrowCls}">${c.arrow} ${esc(c.verb)}</span>`;
+    }).join('\n');
+    const countNote = p.paramChangeCount ? `  (total recorded: ${p.paramChangeCount})` : '';
+    pcBlock = `<div class="det-item" style="grid-column:1/-1">
+      <div class="det-lbl">Parameter changes this epoch${countNote}</div>
+      <div class="det-val pc-list">${rows}</div>
+    </div>`;
+  }
+
   td.innerHTML = `<div class="det-panel">
     <div class="det-item"><div class="det-lbl">Full Pool ID</div><div class="det-val">${idVal}</div></div>
     ${item('Classification (full)', esc(p.classification))}
@@ -709,6 +802,7 @@ function appendDetailRow(tbody, p) {
     ${item('Luck Z Windows (epochs ago → z)', esc(p.windows))}
     ${item('Cross-run History', esc(p.crossRun))}
     ${item('Signal', esc(p.flag), 'flag-val')}
+    ${pcBlock}
   </div>`;
   tbody.appendChild(tr);
 }
@@ -798,6 +892,7 @@ function setupPills() {
     {key:'DROPPED',     label:'Dropped',      cls:'s-dropped',   show:hasSec('DROPPED')},
     {key:'SOLICITATION',label:'Solicitation', cls:'s-solic',     show:allPools.some(p=>p.inSolic)},
     {key:'LUCK_TREND',  label:'Luck Trend',   cls:'s-luck',      show:allPools.some(p=>p.inLuck)},
+    {key:'PARAM_CHANGES',label:'Param Changes',cls:'s-param',    show:allPools.some(p=>p.inParam)},
     {key:'EXISTING',    label:'Existing',     cls:'',            show:hasSec('EXISTING')},
   ].filter(d=>d.key===''||d.show);
 
