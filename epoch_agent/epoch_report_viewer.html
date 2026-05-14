@@ -236,6 +236,30 @@ tbody td { padding: .42rem .65rem; vertical-align: middle; }
 .pc-up   { color: var(--green); }
 .pc-down { color: var(--orange); }
 
+/* inline param-change preview row (always visible beneath any pool that
+   has parameter changes this epoch) */
+.pc-inline { cursor: default; }
+.pc-inline td {
+  padding: .35rem .65rem .5rem 2.2rem;
+  background: rgba(88,166,255,.04);
+  border-left: 2px solid var(--accent);
+  font-family: monospace;
+  font-size: .76rem;
+  white-space: pre;
+  color: var(--text);
+}
+.pc-inline:hover { background: rgba(88,166,255,.06) !important; }
+
+/* ticker shown for a pool that has no ticker assigned (parser fell back
+   to the truncated pool ID). Italic + muted so it's clearly not a ticker. */
+.ticker-fallback { font-style: italic; color: var(--muted); font-weight: 400; }
+
+/* compact variant of .copy-btn — sized for inline use inside the ticker cell */
+.copy-btn-inline {
+  padding: 0 .3rem; font-size: .72rem; margin-left: .25rem;
+  vertical-align: middle; line-height: 1.2;
+}
+
 /* pagination */
 .pagination {
   display: flex; align-items: center; justify-content: center;
@@ -753,8 +777,21 @@ function appendPoolRow(tbody, p) {
   const pc = p.inParam  ? `<span class="tag-param" title="Parameter change this epoch${p.paramChangeCount?` (total #${p.paramChangeCount})`:''}">✎</span>` : '';
   const prSt = p.poolRangerStake ? fmt(p.poolRangerStake) : '—';
 
+  // Detect when the parser fell back to fullId-as-ticker (pool has no ticker).
+  // Show "(no ticker)" in muted italic plus an inline copy button so the user
+  // can grab the full pool ID without expanding the detail panel.
+  const tickerIsFallback = !!(p.fullId && p.ticker && p.ticker === p.fullId.slice(0,12)+'…');
+  let tickerHtml;
+  if (tickerIsFallback) {
+    const copyBtn = `<button class="copy-btn copy-btn-inline" title="Copy full pool ID"`
+      + ` onclick="event.stopPropagation(); doCopy('${esc(p.fullId)}', this)">📋</button>`;
+    tickerHtml = `<span class="ticker-fallback">(no ticker)</span> ${copyBtn}`;
+  } else {
+    tickerHtml = esc(p.ticker||'—');
+  }
+
   tr.innerHTML = `
-    <td class="ticker-cell">${esc(p.ticker||'—')}${lk}${pl}${pc}</td>
+    <td class="ticker-cell" title="${esc(p.fullId||'')}">${tickerHtml}${lk}${pl}${pc}</td>
     <td>${secBadge(p.section)}</td>
     <td>${recBadge(p.recommendation)}</td>
     <td>${clsBadge(p.classShort)}</td>
@@ -776,7 +813,30 @@ function appendPoolRow(tbody, p) {
   });
   tbody.appendChild(tr);
 
+  // Always show a compact inline preview of this epoch's parameter changes
+  // beneath any pool that has them. Skipped when the row is expanded because
+  // the detail panel already shows the same data.
+  if (p.paramChanges && p.paramChanges.length && p.fullId !== expandedId) {
+    appendParamInlineRow(tbody, p);
+  }
+
   if (p.fullId === expandedId) appendDetailRow(tbody, p);
+}
+
+function appendParamInlineRow(tbody, p) {
+  const tr = document.createElement('tr');
+  tr.className = 'pc-inline';
+  const td = document.createElement('td');
+  td.colSpan = 15;
+  const fieldW = Math.max(...p.paramChanges.map(c => c.field.length));
+  const fromW  = Math.max(...p.paramChanges.map(c => c.from.length));
+  const toW    = Math.max(...p.paramChanges.map(c => c.to.length));
+  td.innerHTML = p.paramChanges.map(c => {
+    const cls = c.arrow === '▲' ? 'pc-up' : 'pc-down';
+    return `${esc(c.field).padEnd(fieldW)}  ${esc(c.from).padStart(fromW)}  →  ${esc(c.to).padEnd(toW)}  <span class="${cls}">${c.arrow} ${esc(c.verb)}</span>`;
+  }).join('\n');
+  tr.appendChild(td);
+  tbody.appendChild(tr);
 }
 
 function appendDetailRow(tbody, p) {
