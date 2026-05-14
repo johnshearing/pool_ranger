@@ -399,14 +399,30 @@ function parseReport(txt) {
     if (!cur || !cur.fullId) { cur = null; return; }
     if (byId[cur.fullId]) {
       const e = byId[cur.fullId];
-      if (cur.windows)  e.windows  = cur.windows;
-      if (cur.crossRun) e.crossRun = cur.crossRun;
-      if (cur.flag)     e.flag     = cur.flag;
-      if (cur.paramChanges?.length) { e.paramChanges = cur.paramChanges; e.paramChangeCount = cur.paramChangeCount; }
+      // Merge any field cur has populated that the existing entry lacks. This
+      // makes parse order irrelevant — a PARAMETER CHANGES stub (mostly null)
+      // gets upgraded with full classification data when a later section's
+      // parse populates `cur`, and vice versa.
+      for (const k of Object.keys(cur)) {
+        const v = cur[k];
+        if (v === null || v === undefined || v === false) continue;
+        if (Array.isArray(v) && v.length === 0) continue;
+        const ev = e[k];
+        const eEmpty = ev === null || ev === undefined || ev === false
+                       || (Array.isArray(ev) && ev.length === 0);
+        if (eEmpty) e[k] = v;
+      }
+      // Section flags are additive — a pool can sit in multiple sections.
       if (cur.section === 'LUCK_TREND')    e.inLuck   = true;
       if (cur.section === 'HIGH_PLEDGE')   e.inPledge = true;
       if (cur.section === 'SOLICITATION')  e.inSolic  = true;
       if (cur.section === 'PARAM_CHANGES') e.inParam  = true;
+      // PARAM_CHANGES is a tag, not a primary section — if it was recorded
+      // first and a real classification section is now reporting the same
+      // pool, prefer the classification section as the primary.
+      if (e.section === 'PARAM_CHANGES' && cur.section && cur.section !== 'PARAM_CHANGES') {
+        e.section = cur.section;
+      }
     } else {
       if (cur.section === 'LUCK_TREND')    cur.inLuck   = true;
       if (cur.section === 'HIGH_PLEDGE')   cur.inPledge = true;
