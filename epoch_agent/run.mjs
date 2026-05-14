@@ -280,10 +280,14 @@ async function main() {
     }
   }
 
-  // Detect parameter changes since last run
+  // Detect parameter changes since last run, then build the report list from
+  // the per-pool audit log filtered to the current epoch. Building from the log
+  // (rather than from the in-loop `detected` array) lets same-epoch --force
+  // reruns surface the same changes the first-of-epoch run recorded — without
+  // it the comparison sees prev == current (baseline already advanced) and the
+  // section would render as empty.
   if (!state.poolParamHistory) state.poolParamHistory = {};
-  const paramChanges = [];
-  const prevEpochNo  = state.lastUpdatedEpoch > 0 ? state.lastUpdatedEpoch : null;
+  const prevEpochNo = state.lastUpdatedEpoch > 0 ? state.lastUpdatedEpoch : null;
 
   for (const c of classifications) {
     if (!state.poolParamHistory[c.poolId]) {
@@ -296,45 +300,59 @@ async function main() {
       continue;
     }
 
-    const entry    = state.poolParamHistory[c.poolId];
-    const prev     = entry.lastSeen;
-    const detected = [];
+    const entry = state.poolParamHistory[c.poolId];
+    const prev  = entry.lastSeen;
 
-    // Compare fixed cost to nearest whole ADA (consistent with pledge / margin
-    // comparisons below; avoids spurious diffs from float division of lovelace).
-    if (Math.round(prev.fixedCostAda) !== Math.round(c.fixedCostAda)) {
-      detected.push({ field: 'Fixed fee', from: prev.fixedCostAda, to: c.fixedCostAda, unit: 'ada' });
-      entry.changes.push({ epoch: epochNo, field: 'fixedCostAda', from: prev.fixedCostAda, to: c.fixedCostAda });
-    }
-    // Compare margin to 0.01% precision to avoid floating-point noise
-    if (Math.round(prev.margin * 10000) !== Math.round(c.margin * 10000)) {
-      detected.push({ field: 'Margin', from: prev.margin, to: c.margin, unit: 'pct' });
-      entry.changes.push({ epoch: epochNo, field: 'margin', from: prev.margin, to: c.margin });
-    }
-    // Compare pledge to nearest whole ADA
-    if (Math.round(prev.pledgeAda) !== Math.round(c.pledgeAda)) {
-      detected.push({ field: 'Pledge', from: prev.pledgeAda, to: c.pledgeAda, unit: 'ada' });
-      entry.changes.push({ epoch: epochNo, field: 'pledgeAda', from: prev.pledgeAda, to: c.pledgeAda });
-    }
-
-    // Only advance the baseline when the epoch advances. Re-running in the same
-    // epoch (with --force) must preserve the prior-epoch lastSeen so next epoch's
-    // run still compares against it.
+    // Skip the comparison entirely on same-epoch reruns: prev was overwritten
+    // by the first-of-epoch run, so any diff here would be spurious.
     if (epochAdvanced) {
+      // Compare fixed cost to nearest whole ADA (consistent with pledge / margin
+      // comparisons below; avoids spurious diffs from float division of lovelace).
+      if (Math.round(prev.fixedCostAda) !== Math.round(c.fixedCostAda)) {
+        entry.changes.push({ epoch: epochNo, field: 'fixedCostAda', from: prev.fixedCostAda, to: c.fixedCostAda });
+      }
+      // Compare margin to 0.01% precision to avoid floating-point noise
+      if (Math.round(prev.margin * 10000) !== Math.round(c.margin * 10000)) {
+        entry.changes.push({ epoch: epochNo, field: 'margin', from: prev.margin, to: c.margin });
+      }
+      // Compare pledge to nearest whole ADA
+      if (Math.round(prev.pledgeAda) !== Math.round(c.pledgeAda)) {
+        entry.changes.push({ epoch: epochNo, field: 'pledgeAda', from: prev.pledgeAda, to: c.pledgeAda });
+      }
       entry.ticker   = c.ticker;
       entry.lastSeen = { fixedCostAda: c.fixedCostAda, margin: c.margin, pledgeAda: c.pledgeAda, epoch: epochNo };
     }
+  }
 
-    if (detected.length > 0) {
-      paramChanges.push({
-        poolId:             c.poolId,
-        ticker:             c.ticker,
-        recommendation:     c.recommendation,
-        rangerCurrentStake: c.rangerCurrentStake,
-        totalChanges:       entry.changes.length,
-        detected,
-      });
-    }
+  // Build the report-facing list from the audit log. Same-epoch reruns reuse
+  // whatever the first run recorded; first-of-epoch runs see what was just
+  // pushed above.
+  const FIELD_META = {
+    fixedCostAda: { field: 'Fixed fee', unit: 'ada' },
+    margin:       { field: 'Margin',    unit: 'pct' },
+    pledgeAda:    { field: 'Pledge',    unit: 'ada' },
+  };
+  const paramChanges = [];
+  for (const c of classifications) {
+    const entry = state.poolParamHistory[c.poolId];
+    if (!entry?.changes?.length) continue;
+    const detected = entry.changes
+      .filter(ch => ch.epoch === epochNo)
+      .map(ch => ({
+        field: FIELD_META[ch.field]?.field ?? ch.field,
+        from:  ch.from,
+        to:    ch.to,
+        unit:  FIELD_META[ch.field]?.unit  ?? 'ada',
+      }));
+    if (detected.length === 0) continue;
+    paramChanges.push({
+      poolId:             c.poolId,
+      ticker:             c.ticker,
+      recommendation:     c.recommendation,
+      rangerCurrentStake: c.rangerCurrentStake,
+      totalChanges:       entry.changes.length,
+      detected,
+    });
   }
 
   // Format and output report

@@ -8,6 +8,15 @@ function ada(n) {
   return (n / 1_000_000).toFixed(2) + ' M ADA';
 }
 
+// Scale-aware ADA formatter — picks units so small values (fixed fees, tiny
+// pledges) don't collapse to "0.00 M ADA" while large values stay readable.
+function adaSmart(n) {
+  const a = Math.abs(n);
+  if (a >= 1_000_000) return (n / 1_000_000).toFixed(2) + ' M ADA';
+  if (a >= 1_000)     return (n / 1_000).toFixed(2) + ' K ADA';
+  return Math.round(n) + ' ADA';
+}
+
 function pct(n) {
   return n.toFixed(2) + ' %/yr';
 }
@@ -151,8 +160,10 @@ export function formatReport(reportData) {
   blank();
 
   // ── Parameter Changes ────────────────────────────────────────────────────
-  const sinceLabel = prevEpochNo !== null ? `  (since epoch ${prevEpochNo})` : '';
-  push(`PARAMETER CHANGES${sinceLabel}`);
+  // Label uses the current epoch so first-of-epoch runs and same-epoch reruns
+  // produce consistent wording — the listed changes are always those recorded
+  // at epoch=epochNo in poolParamHistory.
+  push(`PARAMETER CHANGES  (detected at epoch ${epochNo})`);
   push(line());
   if (prevEpochNo === null) {
     push('  First run — baseline parameters recorded. Changes will appear here from the next epoch onwards.');
@@ -172,8 +183,10 @@ export function formatReport(reportData) {
           fromStr = `${(ch.from * 100).toFixed(2)}%`;
           toStr   = `${(ch.to   * 100).toFixed(2)}%`;
         } else {
-          fromStr = ada(ch.from);
-          toStr   = ada(ch.to);
+          // Scale-aware so small fees (~170-1000 ADA) and tiny pledges don't
+          // collapse to "0.00 M ADA" — keeps from→to visibly different.
+          fromStr = adaSmart(ch.from);
+          toStr   = adaSmart(ch.to);
         }
         const up     = ch.to > ch.from;
         const arrow  = up ? '▲' : '▼';
