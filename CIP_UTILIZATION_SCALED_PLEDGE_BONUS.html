@@ -214,9 +214,10 @@ input[type=range] {
   flex: 1;
   min-width: 16rem;
 }
-#tour-start-btn          { background: var(--accent);  color: #0d1117; }
+#tour-start-btn           { background: var(--accent);  color: #0d1117; }
 #tour-start-btn-why,
-#tour-start-btn-benefits { background: #233244;        color: #c9d1d9; border: 1px solid var(--accent); }
+#tour-start-btn-benefits,
+#tour-start-btn-mpo       { background: #233244;        color: #c9d1d9; border: 1px solid var(--accent); }
 #tour-launcher-panel button:hover  { opacity: 0.88; transform: translateY(-1px); }
 #tour-launcher-panel button:active { opacity: 0.7; transform: translateY(0); }
 #tour-launcher-hint { font-size: 0.82rem; color: var(--muted); }
@@ -333,8 +334,11 @@ input[type=range] {
 <div class="panel" id="tour-launcher-panel">
   <div class="tour-launcher-row">
     <button id="tour-start-btn">▶  Explain the CIP for a UTILIZATION-SCALED PLEDGE BONUS</button>
+  </div>
+  <div class="tour-launcher-row">
     <button id="tour-start-btn-why"      class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
     <button id="tour-start-btn-benefits" class="secondary">▶  Who benefits, and by how much</button>
+    <button id="tour-start-btn-mpo"      class="secondary">▶  The Multi-Pool Operator problem — and how the CIP helps</button>
   </div>
   <span id="tour-launcher-hint">
     — Guided walkthroughs. Cards appear bottom-right; arrows point at the relevant
@@ -1941,20 +1945,31 @@ TOUR_SCRIPTS.benefits = [
     holdMs: 9000,
   },
   {
-    title: 'Decentralization & Sybil resistance',
-    body: `<p>Sybil splitting is now <strong>punished at the formula level</strong>.</p>
-      <p>A whale splitting <code>X</code> ADA across <code>N</code> pools earns total
-      pledge bonus of roughly <code>1/N</code> of today's value — because each fake pool
-      earns <em>only at the utilization it actually attracts</em>. Under today's formula
-      the whale earns the same total no matter how many pools they create.</p>
-      <p>Net effect: small honest operators become structurally attractive; power tilts
-      from SPO-as-price-setter toward two-sided negotiation between SPOs and delegators.</p>`,
+    title: 'Multi-Pool Operators: deterred at the formula level',
+    body: `<p>A <strong>multi-pool operator (MPO)</strong> is a single entity running many
+      stake pools to capture more block production and fees than they'd get as a single
+      operator. Today's formula does <em>not</em> deter splitting — an MPO with
+      <code>X</code> ADA earns the same total pledge bonus whether they run 1 pool or 100.</p>
+      <p>Under the proposal, splitting <strong>multiplies the cost</strong>. Numbers for a
+      whale with 50 M ADA of pledge:</p>
+      <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
+        <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N pools):</td>
+            <td style="text-align:right">≈ 6,323 ADA/epoch · 462 K/yr</td></tr>
+        <tr><td>Proposed, unsplit (N = 1):</td>
+            <td style="text-align:right">≈ 4,218 ADA/epoch · 308 K/yr</td></tr>
+        <tr><td>Proposed, 10 self-funded pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;422 ADA/epoch · &nbsp;31 K/yr</td></tr>
+        <tr><td>Proposed, 100 self-funded pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;42 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
+      </table>
+      <p>A 10-way split costs roughly <strong>277 K ADA/year</strong> in forgone bonus
+      versus staying in one pool — a formula-level penalty that didn't exist before.</p>`,
     targets: ['m-A-prop'],
     actions: [
       { kind: 'slider', id: 'sl-p', value: 0.5, ms: 600 },
       { kind: 'slider', id: 'sl-d', value: 60,  ms: 800 },
     ],
-    holdMs: 9000,
+    holdMs: 12000,
   },
   {
     title: 'Treasury & protocol health',
@@ -1984,13 +1999,168 @@ TOUR_SCRIPTS.benefits = [
           registration.</li>
         <li><strong>Small honest SPOs</strong> — competitive viability via delegation, not
           personal wealth.</li>
-        <li><strong>Sybil resistance</strong> — strengthened at the formula level.</li>
+        <li><strong>Multi-pool operators</strong> — face a new formula-level cost
+          proportional to how many pools they split into.</li>
         <li><strong>Treasury</strong> — governance-tunable (slower depletion or
           recalibrated to preserve).</li>
         <li><strong>Protocol</strong> — the intended <code>k</code>-pool equilibrium
           becomes self-enforcing.</li>
       </ul>
       <p style="color: var(--muted)">End of tour — press
+      <strong style="color:var(--accent)">Exit</strong> (or Esc) to return.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 11000,
+  },
+];
+
+// "mpo" — fourth tutorial. Walks through the Multi-Pool Operator problem
+// (one entity running many pools) and how the CIP closes the formula-level gap
+// in today's defense. Quantitative throughout — anchored to the 50 M ADA example.
+TOUR_SCRIPTS.mpo = [
+  {
+    title: 'What is a Multi-Pool Operator?',
+    body: `<p>A <strong>multi-pool operator (MPO)</strong> is a single entity running many
+      stake pools simultaneously. The concern in Cardano's community: one entity controlling
+      many pools captures more block production and fixed-fee revenue than a single operator
+      would — and appears as many independent voices in governance, undermining real
+      decentralization while preserving its appearance.</p>
+      <p>This 8-step tutorial shows why the current formula doesn't fully deter splitting,
+      and how the CIP closes that gap with concrete numbers.</p>`,
+    targets: [],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 50,       ms: 600 },
+      { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
+      { kind: 'slider', id: 'sl-f', value: 340,      ms: 400 },
+      { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 400 },
+      { kind: 'check',  id: 'cb-show-current',  value: true },
+      { kind: 'check',  id: 'cb-show-proposed', value: true },
+      { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
+      { kind: 'slider', id: 'sl-d', value: 25,       ms: 400 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Why MPOs are a problem for Cardano',
+    body: `<p>Cardano was designed to converge on roughly <code>k = 500</code>
+      well-distributed pools, each run by a distinct operator. The intent:</p>
+      <ul style="margin: 0.3rem 0 0.3rem 1.1rem; padding: 0;">
+        <li>decentralized block production (no single entity makes most blocks),</li>
+        <li>decentralized governance (voting power tied to genuinely independent operators),</li>
+        <li>resilience (no single point of failure or capture).</li>
+      </ul>
+      <p style="margin-top: 0.45rem">When one entity controls many pools, all three goals weaken. Multi-pool operators
+      are the practical threat the protocol's pledge mechanism was designed to discourage.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 9000,
+  },
+  {
+    title: 'The current defense: pledge influence (a₀)',
+    body: `<p>Cardano already has a defense. The protocol parameter <code>a₀ = 0.3</code>
+      means pools with more pledge per pool earn more pledge bonus. So when a whale splits
+      <code>X</code> ADA across <code>N</code> pools, each pool's pledge drops to
+      <code>X/N</code> and the per-pool pledge bonus shrinks.</p>
+      <p>Rational delegators are supposed to read those small per-pool bonuses and avoid
+      the split pools, choosing pools with concentrated pledge instead. The defense lives
+      in <strong>delegator preference</strong>.</p>`,
+    targets: ['m-A'],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 5, ms: 800 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Why the current defense is incomplete',
+    body: `<p>Today's <em>formula</em> does not penalize splitting at all — the defense
+      lives <strong>only</strong> in delegator preference. Compare the same whale's total
+      pledge bonus today:</p>
+      <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
+        <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">50 M ADA in 1 pool:</td>
+            <td style="text-align:right">≈ 6,323 ADA/epoch</td></tr>
+        <tr><td>50 M ADA across 10 pools (5 M each):</td>
+            <td style="text-align:right">≈ 6,323 ADA/epoch</td></tr>
+        <tr><td>50 M ADA across 100 pools (0.5 M each):</td>
+            <td style="text-align:right">≈ 6,323 ADA/epoch</td></tr>
+      </table>
+      <p>The total is <em>identical</em>. The operator pays nothing at the formula level for
+      splitting. If they can attract even a small fraction of delegators per pool — or
+      self-delegate, or buy delegation through marketing — the strategy works.</p>`,
+    targets: ['m-A'],
+    actions: [],
+    holdMs: 11000,
+  },
+  {
+    title: 'How the CIP closes the gap',
+    body: `<p>The proposal multiplies each pool's pledge bonus by its <strong>utilization</strong>
+      <code>u = S / S<sub>sat</sub></code>.</p>
+      <p>A self-funded MPO's split pools each have <em>low</em> utilization — each pool can
+      only be filled by the operator's <code>X/N</code> share of their own ADA, which is
+      tiny relative to <code>S<sub>sat</sub></code>. So each split pool earns only
+      <code>u<sub>i</sub> ×</code> today's bonus, and the total scales with <code>1/N</code>.</p>
+      <p>The blending coefficient <code>b</code> below the chart lets you watch the effect
+      ramp from <em>0 (today)</em> to <em>1 (full proposal)</em>.</p>`,
+    targets: ['formula-panel', 'sl-b'],
+    actions: [
+      { kind: 'slider', id: 'sl-b', value: 0, ms: 1200 },
+      { kind: 'slider', id: 'sl-b', value: 1, ms: 1800 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'The numbers — 50 M ADA holder',
+    body: `<p>Total pledge bonus under each strategy for an entity with 50 M ADA of pledge
+      (<code>r = 0.000548</code>, <code>a₀ = 0.3</code>, <code>S<sub>sat</sub> = 75 M</code>),
+      assuming each split pool is funded only by the operator's own share:</p>
+      <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
+        <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N):</td>
+            <td style="text-align:right">≈ 6,323 ADA/epoch · 462 K/yr</td></tr>
+        <tr><td>Proposed, unsplit (N = 1):</td>
+            <td style="text-align:right">≈ 4,218 ADA/epoch · 308 K/yr</td></tr>
+        <tr><td>Proposed, 2 self-funded pools:</td>
+            <td style="text-align:right">≈ 2,109 ADA/epoch · 154 K/yr</td></tr>
+        <tr><td>Proposed, 10 self-funded pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;422 ADA/epoch · &nbsp;31 K/yr</td></tr>
+        <tr><td>Proposed, 100 self-funded pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;42 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
+      </table>
+      <p>The cost of a 10-way self-funded split vs leaving the stake in one pool:
+      <strong>~277 K ADA/year of forgone bonus</strong>. The cost grows linearly with N.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 13000,
+  },
+  {
+    title: 'Can the MPO recover by attracting delegators?',
+    body: `<p>In principle, yes — if the MPO attracts enough external delegators to fill
+      <em>every</em> split pool to saturation, each <code>u<sub>i</sub> → 1</code> and the
+      total bonus returns to today's value.</p>
+      <p>But that requires <code>N</code> times the delegator base of a single legitimate
+      operator. By assumption, the MPO doesn't have it — that's <em>why</em> they're
+      splitting in the first place. The formula-level deterrent compounds with the existing
+      delegator-preference channel: small per-pool pledge means small per-pool bonus, means
+      few delegators, means low utilization, means even smaller per-pool bonus.</p>`,
+    targets: ['m-roa-prop'],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 5,  ms: 500 },
+      { kind: 'slider', id: 'sl-d', value: 60, ms: 1500 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Net effect on decentralization',
+    body: `<p>Under the CIP:</p>
+      <ul style="margin: 0.3rem 0 0.5rem 1.1rem; padding: 0;">
+        <li>The "easy multi-pool strategy" is structurally taxed, proportional to how many
+          pools an operator runs.</li>
+        <li>Single-pool honest operators with modest pledge become more attractive — they
+          earn the full saturated pledge bonus at saturation regardless of pledge size.</li>
+        <li>Today's behavioral defense (delegator preference) and the new formula-level
+          defense reinforce each other.</li>
+        <li>The protocol's intended <code>k</code>-pool diversity becomes self-enforcing,
+          not merely aspirational.</li>
+      </ul>
+      <p style="margin-top: 0.45rem; color: var(--muted)">End of tour — press
       <strong style="color:var(--accent)">Exit</strong> (or Esc) to return.</p>`,
     targets: [],
     actions: [],
@@ -2370,6 +2540,7 @@ document.addEventListener('keydown', e => {
 document.getElementById('tour-start-btn').addEventListener('click',          () => startTour('explain'));
 document.getElementById('tour-start-btn-why').addEventListener('click',      () => startTour('why'));
 document.getElementById('tour-start-btn-benefits').addEventListener('click', () => startTour('benefits'));
+document.getElementById('tour-start-btn-mpo').addEventListener('click',      () => startTour('mpo'));
 
 update(); // initial render
 
