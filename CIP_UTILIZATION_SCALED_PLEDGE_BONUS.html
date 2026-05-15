@@ -99,7 +99,8 @@ input[type=range] {
 
 
 /* ── chart ───────────────────────────────────────────── */
-.chart-wrap { position: relative; height: 430px; }
+.chart-wrap          { position: relative; height: 430px; }
+.chart-wrap.marginal { position: relative; height: 240px; }
 
 /* ── pool lookup ─────────────────────────────────────── */
 .lookup-row {
@@ -395,6 +396,44 @@ input[type=range] {
   </div>
 </div>
 
+<!-- ── Marginal ROA chart ────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">
+    Marginal Delegator ROA — dROA/dS (units: %/year change in ROA per +1 M ADA added)<br>
+    <span style="font-size:0.75rem;letter-spacing:0;text-transform:none;color:var(--muted)">
+      This is the quantity a rational delegator actually optimises against:
+      <em>does adding stake to this pool help or hurt per-delegator ROA right now?</em>
+      &nbsp;|&nbsp;
+      Current:
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#1c7ed6" stroke-width="2.5" stroke-dasharray="5,3" stroke-linecap="round"/></svg>
+      dashed blue &nbsp;|&nbsp;
+      Proposed:
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#b197fc" stroke-width="2.5" stroke-dasharray="3,6" stroke-linecap="round"/></svg>
+      dashed purple &nbsp;|&nbsp;
+      <span style="color:var(--green)">above 0 = delegation helps</span>,
+      <span style="color:var(--red)">below 0 = delegation dilutes</span>.
+    </span>
+  </div>
+  <div class="chart-wrap marginal">
+    <canvas id="marginal-chart"></canvas>
+  </div>
+</div>
+
+<!-- ── Marginal ROA metric cards (at cursor) ─────────── -->
+<div class="section-label">Marginal ROA at Cursor (effect of adding 1 M ADA right now)</div>
+<div class="metrics-row">
+  <div class="metric-card">
+    <div class="metric-lbl">Marginal ROA (Current)</div>
+    <div class="metric-val blue" id="m-marg-cur">—</div>
+    <div class="metric-unit">%/yr per +1 M ADA</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Marginal ROA (Proposed)</div>
+    <div class="metric-val purple" id="m-marg-prop">—</div>
+    <div class="metric-unit">%/yr per +1 M ADA</div>
+  </div>
+</div>
+
 <!-- ── Formulas ──────────────────────────────────────── -->
 <div class="panel">
   <div class="panel-title">Reference Formulas — current vs proposed</div>
@@ -448,6 +487,26 @@ input[type=range] {
       raises per-delegator ROA. See
       <a href="https://github.com/johnshearing/pool_ranger/blob/main/claude_queries/utilization_scaled_pledge_bonus.md"
          style="color:var(--accent)">utilization_scaled_pledge_bonus.md §§3–4</a>.
+    </span>
+    <br><br>
+
+    <strong style="color:#c9d1d9">Marginal ROA — dROA/dS (used by the companion chart)</strong><br>
+
+    <span class="hl">d(ROA)/dS (current)</span>
+      = −(1−m) · (A_eff − F) / S² · 73 · 100 &nbsp;
+      <span style="color:var(--muted)">→ negative whenever A_eff &gt; F (dilution)</span><br>
+
+    <span class="hl-prop">d(ROA)/dS (proposed, b = 1)</span>
+      = +(1−m) · F / S² · 73 · 100 &nbsp;
+      <span style="color:var(--muted)">→ strictly positive (no dilution regime)</span><br>
+
+    <span class="hl-prop">d(ROA)/dS (proposed, blended)</span>
+      = (1−m) · [F − A_eff · (1 − b)] / S² · 73 · 100<br>
+
+    <span style="color:var(--muted)">
+      Both curves on the marginal-ROA chart are computed by numerical forward difference
+      (dS = 0.1 M ADA) and scaled to %/year per +1 M ADA added — the dimensionally natural
+      unit for "if one more delegator arrives, how much does ROA move?"
     </span>
   </div>
 </div>
@@ -739,6 +798,52 @@ const cursorPlugin = {
   }
 };
 
+// ── Plugins for the Marginal-ROA companion chart ───────
+// Heavier horizontal line at y = 0 so the sign-of-marginal is unmistakable.
+const zeroLinePlugin = {
+  id: 'zeroLine',
+  afterDraw(ch) {
+    const { ctx, chartArea: ca, scales } = ch;
+    if (!scales.y) return;
+    const py = scales.y.getPixelForValue(0);
+    if (py < ca.top || py > ca.bottom) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(201, 209, 217, 0.55)';
+    ctx.lineWidth   = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(ca.left, py);
+    ctx.lineTo(ca.right, py);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(201, 209, 217, 0.85)';
+    ctx.font      = '11px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText('0 — neither helps nor hurts', ca.left + 6, py - 4);
+    ctx.restore();
+  }
+};
+
+// Vertical dashed cursor, mirroring sl-d (synced with main chart's cursor).
+const marginalCursorPlugin = {
+  id: 'marginalCursor',
+  afterDraw(ch) {
+    const { dM } = getParams();
+    const idx = Math.round(dM / 0.5);
+    if (idx < 0 || idx >= STEPS) return;
+    const { ctx, chartArea: ca, scales } = ch;
+    const px = scales.x.getPixelForValue(idx);
+    if (px < ca.left || px > ca.right) return;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(248,81,73,0.5)';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(px, ca.top);
+    ctx.lineTo(px, ca.bottom);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
 // ── Initialize Chart ───────────────────────────────────
 const ctx = document.getElementById('chart').getContext('2d');
 const myChart = new Chart(ctx, {
@@ -856,6 +961,88 @@ const myChart = new Chart(ctx, {
   }
 });
 
+// ── Initialize Marginal-ROA Chart ──────────────────────
+const marginalCtx = document.getElementById('marginal-chart').getContext('2d');
+const marginalChart = new Chart(marginalCtx, {
+  type: 'line',
+  plugins: [zeroLinePlugin, marginalCursorPlugin],
+  data: {
+    labels: X_LABELS,
+    datasets: [
+      {
+        label: 'Marginal ROA — current formula (dROA/dS)',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#1c7ed6',
+        backgroundColor: 'rgba(28,126,214,0.05)',
+        yAxisID: 'y',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.2,
+        borderDash: [6, 3],
+        fill: false,
+      },
+      {
+        label: 'Marginal ROA — proposed formula',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#b197fc',
+        backgroundColor: 'rgba(177,151,252,0.05)',
+        yAxisID: 'y',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.2,
+        borderDash: [3, 6],
+        fill: false,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { labels: { color: '#c9d1d9', font: { size: 12 } } },
+      tooltip: { enabled: false }
+    },
+    scales: {
+      x: {
+        title: { display: true, text: 'External Delegation (M ADA)', color: '#8b949e' },
+        ticks: {
+          color: '#8b949e',
+          maxTicksLimit: 15,
+          callback(value) {
+            const label = X_LABELS[value];
+            return parseFloat(label) % 10 === 0 ? label : '';
+          }
+        },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+      },
+      y: {
+        type: 'linear',
+        title: {
+          display: true,
+          text: 'dROA/dS  (%/year per +1 M ADA)',
+          color: '#c9d1d9',
+        },
+        ticks: { color: '#c9d1d9' },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+      }
+    }
+  }
+});
+
+// Forward-difference marginal ROA: change in ROA(%/yr) per +1 M ADA added at S.
+function marginalROAAt(roaFn, S, P, F, m, r, perf, b) {
+  const dS = 0.1e6;
+  const a = roaFn(S, P, F, m, r, perf, b);
+  const c = roaFn(S + dS, P, F, m, r, perf, b);
+  // (ROA(S+dS) - ROA(S)) / dS gives %/yr per ADA; × 1e6 → %/yr per 1 M ADA.
+  return (c - a) / dS * 1e6;
+}
+// Wrappers so both formulas have the same argument shape.
+function roaCurrent(S, P, F, m, r, perf, _b) { return delegROA(S, P, F, m, r, perf); }
+function roaProposed(S, P, F, m, r, perf, b)  { return delegROAProposed(S, P, F, m, r, perf, b); }
+
 // ── Main update function ───────────────────────────────
 function update() {
   const { m, P, F, r, dM, perf, b } = getParams();
@@ -911,6 +1098,19 @@ function update() {
   currentTroughIndex = troughExtDelegIndex(P, F, m, r, perf);
   currentROAFalling  = A > F;
 
+  // Marginal ROA at cursor (effect of adding +1 M ADA right now)
+  const margCurAtCursor  = marginalROAAt(roaCurrent,  S, P, F, m, r, perf, b);
+  const margPropAtCursor = marginalROAAt(roaProposed, S, P, F, m, r, perf, b);
+
+  const margCurEl  = document.getElementById('m-marg-cur');
+  const margPropEl = document.getElementById('m-marg-prop');
+  margCurEl.textContent  = (margCurAtCursor  >= 0 ? '+' : '') + margCurAtCursor.toFixed(4);
+  margPropEl.textContent = (margPropAtCursor >= 0 ? '+' : '') + margPropAtCursor.toFixed(4);
+  margCurEl.className  = 'metric-val ' +
+    (margCurAtCursor  >  1e-5 ? 'green' : margCurAtCursor  < -1e-5 ? 'red' : 'orange');
+  margPropEl.className = 'metric-val ' +
+    (margPropAtCursor >  1e-5 ? 'green' : margPropAtCursor < -1e-5 ? 'red' : 'orange');
+
   // Rebuild all five chart series:
   //   [0] SPO red zone (current), [1] SPO green zone (current),
   //   [2] ROA (current),
@@ -920,6 +1120,9 @@ function update() {
   const roaData      = [];
   const spoPropData  = [];
   const roaPropData  = [];
+  // Marginal-ROA chart series (dROA/dS per +1 M ADA, current and proposed).
+  const margCurData  = [];
+  const margPropData = [];
   for (let i = 0; i < STEPS; i++) {
     const Si  = P + i * 0.5e6;
     const spo = spoIncome(Si, P, F, m, r, perf);
@@ -930,6 +1133,8 @@ function update() {
     roaData.push(delegROA(Si, P, F, m, r, perf));
     spoPropData.push(spoIncomeProposed(Si, P, F, m, r, perf, b));
     roaPropData.push(delegROAProposed(Si, P, F, m, r, perf, b));
+    margCurData.push (marginalROAAt(roaCurrent,  Si, P, F, m, r, perf, b));
+    margPropData.push(marginalROAAt(roaProposed, Si, P, F, m, r, perf, b));
   }
   myChart.data.datasets[0].data = spoRedData;
   myChart.data.datasets[1].data = spoGreenData;
@@ -937,19 +1142,27 @@ function update() {
   myChart.data.datasets[3].data = spoPropData;
   myChart.data.datasets[4].data = roaPropData;
   myChart.update();
+
+  marginalChart.data.datasets[0].data = margCurData;
+  marginalChart.data.datasets[1].data = margPropData;
+  marginalChart.update();
 }
 
 // ── Curve visibility (toggle checkboxes) ────────────────
 function applyCurveVisibility() {
   const showCurrent  = document.getElementById('cb-show-current').checked;
   const showProposed = document.getElementById('cb-show-proposed').checked;
-  // datasets 0,1,2 = current; datasets 3,4 = proposed
+  // Main chart: datasets 0,1,2 = current; datasets 3,4 = proposed.
   myChart.data.datasets[0].hidden = !showCurrent;
   myChart.data.datasets[1].hidden = !showCurrent;
   myChart.data.datasets[2].hidden = !showCurrent;
   myChart.data.datasets[3].hidden = !showProposed;
   myChart.data.datasets[4].hidden = !showProposed;
   myChart.update();
+  // Marginal chart: dataset 0 = current; dataset 1 = proposed.
+  marginalChart.data.datasets[0].hidden = !showCurrent;
+  marginalChart.data.datasets[1].hidden = !showProposed;
+  marginalChart.update();
 }
 
 // ── Wire up all sliders ────────────────────────────────
