@@ -214,8 +214,9 @@ input[type=range] {
   flex: 1;
   min-width: 16rem;
 }
-#tour-start-btn       { background: var(--accent);   color: #0d1117; }
-#tour-start-btn-why   { background: #233244;         color: #c9d1d9; border: 1px solid var(--accent); }
+#tour-start-btn          { background: var(--accent);  color: #0d1117; }
+#tour-start-btn-why,
+#tour-start-btn-benefits { background: #233244;        color: #c9d1d9; border: 1px solid var(--accent); }
 #tour-launcher-panel button:hover  { opacity: 0.88; transform: translateY(-1px); }
 #tour-launcher-panel button:active { opacity: 0.7; transform: translateY(0); }
 #tour-launcher-hint { font-size: 0.82rem; color: var(--muted); }
@@ -332,7 +333,8 @@ input[type=range] {
 <div class="panel" id="tour-launcher-panel">
   <div class="tour-launcher-row">
     <button id="tour-start-btn">▶  Explain the CIP for a UTILIZATION-SCALED PLEDGE BONUS</button>
-    <button id="tour-start-btn-why" class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
+    <button id="tour-start-btn-why"      class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
+    <button id="tour-start-btn-benefits" class="secondary">▶  Who benefits, and by how much</button>
   </div>
   <span id="tour-launcher-hint">
     — Guided walkthroughs. Cards appear bottom-right; arrows point at the relevant
@@ -1670,8 +1672,8 @@ const TOUR_SCRIPTS = {
     },
     {
       title: 'Saturation invariance — equilibrium unchanged',
-      body: `<p>I'll drag the cursor all the way to <strong>saturation</strong> (S = 75 M ADA).
-        Watch the metric cards.</p>
+      body: `<p>I dragged the cursor all the way to <strong>saturation</strong> (S = 75 M ADA).
+        Notice the metric cards.</p>
         <p>At saturation, <strong>current SPO income equals proposed SPO income</strong>.
         Same for delegator ROA. The proposal preserves the network's <em>equilibrium state</em>
         — it only changes the path getting there. No SPO who's already running a popular
@@ -1705,6 +1707,9 @@ const TOUR_SCRIPTS = {
         { kind: 'slider', id: 'sl-b', value: 0,        ms: 2400 },
         { kind: 'slider', id: 'sl-b', value: 1,        ms: 2400 },
       ],
+      // Top-right anchor keeps the card out of the way of the slider's
+      // right-side thumb travel during the b sweep.
+      cardPosition: 'top-right',
       holdMs: 8000,
     },
   ],
@@ -1825,6 +1830,173 @@ const TOUR_SCRIPTS = {
     },
   ],
 };
+
+// "benefits" — third tutorial drawn from §5 of utilization_scaled_pledge_bonus.md.
+// One card per stakeholder class: SPOs (saturated), SPOs (below saturation), small
+// honest operators, delegators, cooperatives, decentralization, treasury, summary.
+TOUR_SCRIPTS.benefits = [
+  {
+    title: 'Who benefits, and by how much',
+    body: `<p>The CIP redistributes some emission and reshapes incentives. This 9-step
+      tutorial walks through who gains, who loses, and by how much — stakeholder by
+      stakeholder.</p>
+      <p>The source material is §5 ("Who benefits, and how") of
+      <code>utilization_scaled_pledge_bonus.md</code>. Press
+      <strong>▶ Play</strong> to let it run on its own.</p>`,
+    targets: [],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 10,       ms: 500 },
+      { kind: 'slider', id: 'sl-m', value: 2,        ms: 400 },
+      { kind: 'slider', id: 'sl-f', value: 340,      ms: 400 },
+      { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 400 },
+      { kind: 'check',  id: 'cb-show-current',  value: true },
+      { kind: 'check',  id: 'cb-show-proposed', value: true },
+      { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
+      { kind: 'slider', id: 'sl-d', value: 20,       ms: 400 },
+    ],
+    holdMs: 8000,
+  },
+  {
+    title: 'SPOs at saturation: zero change',
+    body: `<p>SPOs running already-saturated pools see <strong>no change at all</strong>.
+      Same pledge bonus, same margin, same fixed fee, same income.</p>
+      <p>Watch the metric cards as I drag the cursor to saturation
+      (<code>S = 75 M ADA</code>): <em>current SPO income</em> and
+      <em>proposed SPO income</em> display identical values. The proposal preserves the
+      equilibrium state of every popular pool that exists today.</p>`,
+    targets: ['m-spo', 'm-spo-prop', 'm-roa', 'm-roa-prop'],
+    actions: [
+      { kind: 'slider', id: 'sl-d', value: 65, ms: 1500 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'SPOs below saturation: a clear path to recover',
+    body: `<p>An SPO with high pledge but few delegators <em>does</em> see reduced bonus
+      under the proposal — that's the redistribution.</p>
+      <p>But they gain a <strong>clear path to recover it</strong>: court delegators.
+      Each new delegator lifts the pledge bonus closer to today's value. Pledge becomes a
+      partnership claim, redeemed by attracting delegation. Compare
+      <em>Pledge Bonus (A_eff)</em> against <em>Pledge Bonus (A_new)</em> below at this
+      under-utilized cursor position.</p>`,
+    targets: ['m-A', 'm-A-prop'],
+    actions: [
+      { kind: 'slider', id: 'sl-d', value: 10, ms: 1200 },
+    ],
+    holdMs: 9500,
+  },
+  {
+    title: 'Small honest operators: a viable on-ramp',
+    body: `<p>Under today's formula a small-pledge pool cannot compete with whale-pledge
+      pools on the pledge-bonus axis — the bonus is fixed by pledge alone.</p>
+      <p>Under the proposal, a <strong>1 M-ADA pledge pool that fills to saturation</strong>
+      earns the same per-ADA pledge bonus it would earn today at saturation. Many small
+      honest pools can each attract a fraction of delegators and operate profitably. The
+      3,000-pool population the network already maintains becomes productive, not merely
+      tolerated.</p>`,
+    targets: [
+      'sl-p',
+      { kind: 'chart-point', chart: 'main', dataset: 3, dataIndex: 120 },
+    ],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 1,  ms: 900 },
+      { kind: 'slider', id: 'sl-d', value: 65, ms: 900 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Delegators: the central win',
+    body: `<p>For every delegator on every pool: adding delegation now
+      <strong>monotonically increases per-delegator ROA</strong>. The
+      marginal-ROA chart's purple-dashed curve sits above zero across the entire range
+      — every arrival lifts everyone.</p>
+      <p>Today's high-pledge dilution regime is gone. A delegator's choice of pool
+      simplifies to "find pools with high <code>P · u / S</code> and low <code>F</code>".</p>`,
+    targets: [{ kind: 'chart-point', chart: 'marginal', dataset: 1, dataIndex: 30 }],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 5,        ms: 600 },
+      { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
+      { kind: 'slider', id: 'sl-f', value: 170,      ms: 400 },
+      { kind: 'slider', id: 'sl-d', value: 15,       ms: 500 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Cooperatives (Pool Ranger): structural leverage, no registration',
+    body: `<p>A cooperative like Pool Ranger gains bargaining power as a side effect of
+      being any large delegator. <strong>No protocol-level recognition required.</strong></p>
+      <p>When Pool Ranger brings 25 M to a pool, the lift in <code>A_new/S</code> is
+      visible to every existing delegator. When they leave, every remaining delegator's
+      ROA drops by a publicly computable amount. Withdrawal becomes a publicly observable
+      mathematical event — SPOs have a continuous incentive to <em>retain</em> large
+      delegators, not just attract them.</p>`,
+    targets: [
+      { kind: 'chart-point', chart: 'main',     dataset: 4, dataIndex: 30 },
+      { kind: 'chart-point', chart: 'marginal', dataset: 1, dataIndex: 30 },
+    ],
+    actions: [
+      { kind: 'slider', id: 'sl-d', value: 5,  ms: 800 },
+      { kind: 'slider', id: 'sl-d', value: 30, ms: 1600 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Decentralization & Sybil resistance',
+    body: `<p>Sybil splitting is now <strong>punished at the formula level</strong>.</p>
+      <p>A whale splitting <code>X</code> ADA across <code>N</code> pools earns total
+      pledge bonus of roughly <code>1/N</code> of today's value — because each fake pool
+      earns <em>only at the utilization it actually attracts</em>. Under today's formula
+      the whale earns the same total no matter how many pools they create.</p>
+      <p>Net effect: small honest operators become structurally attractive; power tilts
+      from SPO-as-price-setter toward two-sided negotiation between SPOs and delegators.</p>`,
+    targets: ['m-A-prop'],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 0.5, ms: 600 },
+      { kind: 'slider', id: 'sl-d', value: 60,  ms: 800 },
+    ],
+    holdMs: 9000,
+  },
+  {
+    title: 'Treasury & protocol health',
+    body: `<p>Total emission to below-saturation pools is slightly lower under the
+      proposal. That ADA either:</p>
+      <ul style="margin: 0.3rem 0 0.3rem 1.1rem; padding: 0;">
+        <li>stays in the reserve (the protocol's natural depletion slows), or</li>
+        <li>governance recalibrates <code>a₀</code> upward in a single vote so total
+          emission matches today's profile exactly.</li>
+      </ul>
+      <p style="margin-top: 0.45rem">Either way: at the network's equilibrium of
+      <code>k</code> saturated pools, <strong>nothing is lost</strong>. Below-saturation
+      "losses" are redirected to give every delegator a structural reason to fill pools
+      to saturation — the equilibrium the protocol was designed to produce.</p>`,
+    targets: ['formula-panel'],
+    actions: [],
+    holdMs: 9500,
+  },
+  {
+    title: 'The whole picture',
+    body: `<p>Net effect across every stakeholder class:</p>
+      <ul style="margin: 0.3rem 0 0.5rem 1.1rem; padding: 0;">
+        <li><strong>Saturated SPOs</strong> — unchanged.</li>
+        <li><strong>Below-saturation SPOs</strong> — get a clear path to fill up.</li>
+        <li><strong>Every delegator</strong> — gains from every arrival.</li>
+        <li><strong>Cooperatives</strong> — gain structural leverage with no protocol-level
+          registration.</li>
+        <li><strong>Small honest SPOs</strong> — competitive viability via delegation, not
+          personal wealth.</li>
+        <li><strong>Sybil resistance</strong> — strengthened at the formula level.</li>
+        <li><strong>Treasury</strong> — governance-tunable (slower depletion or
+          recalibrated to preserve).</li>
+        <li><strong>Protocol</strong> — the intended <code>k</code>-pool equilibrium
+          becomes self-enforcing.</li>
+      </ul>
+      <p style="color: var(--muted)">End of tour — press
+      <strong style="color:var(--accent)">Exit</strong> (or Esc) to return.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 11000,
+  },
+];
 
 // Mutable pointer to the active script. startTour() reassigns this.
 let TOUR_STEPS = TOUR_SCRIPTS.explain;
@@ -2017,6 +2189,23 @@ function drawArrowsForStep(step) {
 
 function nextFrame() { return new Promise(r => requestAnimationFrame(r)); }
 
+// Place the card at one of four anchors. Default is bottom-right.
+function applyCardPosition(pos) {
+  const card = document.getElementById('tour-card');
+  if (!card) return;
+  card.style.top = '';
+  card.style.bottom = '';
+  card.style.left = '';
+  card.style.right = '';
+  switch (pos) {
+    case 'top-right':    card.style.top    = '1.2rem'; card.style.right = '1.2rem'; break;
+    case 'top-left':     card.style.top    = '1.2rem'; card.style.left  = '1.2rem'; break;
+    case 'bottom-left':  card.style.bottom = '1.2rem'; card.style.left  = '1.2rem'; break;
+    case 'bottom-right':
+    default:             card.style.bottom = '1.2rem'; card.style.right = '1.2rem'; break;
+  }
+}
+
 async function renderStep(i) {
   tour.renderGuard++;
   const myGuard = tour.renderGuard;
@@ -2029,12 +2218,11 @@ async function renderStep(i) {
   document.getElementById('tour-body').innerHTML         = step.body;
   document.getElementById('tour-prev').disabled = tour.i === 0;
   document.getElementById('tour-next').disabled = tour.i === TOUR_STEPS.length - 1;
+  applyCardPosition(step.cardPosition);
 
-  await applyStepActions(step);
-  if (myGuard !== tour.renderGuard) return;
-
-  // Scroll the primary target into view. For chart-point targets, scroll the
-  // corresponding chart canvas. For DOM-element targets, scroll the element.
+  // Scroll the primary target into view BEFORE applying step actions, so the
+  // viewer is looking at the right area while sliders tween. (If we scrolled
+  // after, long-tween steps would let the whole animation play off-screen.)
   const first = (step.targets ?? [])[0];
   if (typeof first === 'string') {
     const el = document.getElementById(first);
@@ -2043,6 +2231,13 @@ async function renderStep(i) {
     const canvas = (first.chart === 'main' ? myChart : marginalChart)?.canvas;
     if (canvas) canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
+
+  // Brief pause so the smooth-scroll has a head start before action tweens fire.
+  await new Promise(r => setTimeout(r, 280));
+  if (myGuard !== tour.renderGuard) return;
+
+  await applyStepActions(step);
+  if (myGuard !== tour.renderGuard) return;
 
   await nextFrame(); await nextFrame();
   if (myGuard !== tour.renderGuard) return;
@@ -2172,8 +2367,9 @@ document.addEventListener('keydown', e => {
   }
 });
 
-document.getElementById('tour-start-btn').addEventListener('click', () => startTour('explain'));
-document.getElementById('tour-start-btn-why').addEventListener('click', () => startTour('why'));
+document.getElementById('tour-start-btn').addEventListener('click',          () => startTour('explain'));
+document.getElementById('tour-start-btn-why').addEventListener('click',      () => startTour('why'));
+document.getElementById('tour-start-btn-benefits').addEventListener('click', () => startTour('benefits'));
 
 update(); // initial render
 
