@@ -200,24 +200,25 @@ input[type=range] {
 .metric-val.purple { color: #b197fc; }
 
 /* ── tour launcher ──────────────────────────────────── */
-#tour-launcher-panel {
-  display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap;
-}
-#tour-start-btn {
-  background: var(--accent);
+#tour-launcher-panel { display: flex; flex-direction: column; gap: 0.7rem; }
+.tour-launcher-row { display: flex; gap: 0.7rem; flex-wrap: wrap; }
+#tour-launcher-panel button {
   border: none;
   border-radius: 6px;
-  color: #0d1117;
   cursor: pointer;
-  font-size: 0.95rem;
+  font-size: 0.93rem;
   font-weight: 700;
-  padding: 0.7rem 1.2rem;
+  padding: 0.7rem 1.1rem;
   letter-spacing: 0.02em;
   transition: opacity 0.15s, transform 0.15s;
+  flex: 1;
+  min-width: 16rem;
 }
-#tour-start-btn:hover  { opacity: 0.88; transform: translateY(-1px); }
-#tour-start-btn:active { opacity: 0.7; transform: translateY(0); }
-#tour-launcher-hint { font-size: 0.82rem; color: var(--muted); flex: 1; min-width: 16rem; }
+#tour-start-btn       { background: var(--accent);   color: #0d1117; }
+#tour-start-btn-why   { background: #233244;         color: #c9d1d9; border: 1px solid var(--accent); }
+#tour-launcher-panel button:hover  { opacity: 0.88; transform: translateY(-1px); }
+#tour-launcher-panel button:active { opacity: 0.7; transform: translateY(0); }
+#tour-launcher-hint { font-size: 0.82rem; color: var(--muted); }
 
 /* ── tour overlay / card / arrows ───────────────────── */
 #tour-dim {
@@ -329,10 +330,14 @@ input[type=range] {
 
 <!-- ── Tour launcher ─────────────────────────────────── -->
 <div class="panel" id="tour-launcher-panel">
-  <button id="tour-start-btn">▶  Explain the CIP for a UTILIZATION-SCALED PLEDGE BONUS</button>
+  <div class="tour-launcher-row">
+    <button id="tour-start-btn">▶  Explain the CIP for a UTILIZATION-SCALED PLEDGE BONUS</button>
+    <button id="tour-start-btn-why" class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
+  </div>
   <span id="tour-launcher-hint">
-    — 10-step guided walkthrough (≈ 90 s on auto-play). Cards appear bottom-right; arrows
-    point at the relevant sliders, checkboxes, and chart regions. Press
+    — Guided walkthroughs. Cards appear bottom-right; arrows point at the relevant
+    sliders, checkboxes, and chart regions. Click <strong style="color:var(--accent)">▶ Play</strong>
+    in the card to let the tour run itself. Press
     <strong style="color:var(--accent)">Esc</strong> at any time to return to free exploration.
   </span>
 </div>
@@ -373,31 +378,6 @@ input[type=range] {
       <label>Epoch Rate (r) <span id="lbl-r">0.000400</span></label>
       <input type="range" id="sl-r" min="0.0003" max="0.0008" step="0.000001" value="0.000400">
     </div>
-  </div>
-</div>
-
-<!-- ── Proposal Controls ─────────────────────────────── -->
-<div class="panel">
-  <div class="panel-title">Proposal Controls — blending coefficient and curve visibility</div>
-  <div class="sliders-grid">
-    <div class="slider-row">
-      <label>
-        Blending Coefficient (b) <span id="lbl-b">1.00 — full proposal</span>
-      </label>
-      <input type="range" id="sl-b" min="0" max="1" step="0.01" value="1">
-    </div>
-  </div>
-  <div class="toggle-row">
-    <label><input type="checkbox" id="cb-show-current" checked>
-      <span class="swatch current"></span>Show current-formula curves</label>
-    <label><input type="checkbox" id="cb-show-proposed" checked>
-      <span class="swatch proposed"></span>Show proposed-formula curves</label>
-    <span style="font-size:0.75rem">
-      At <code>b = 0</code> the proposed curves overlap the current curves exactly.
-      At <code>b = 1</code> the pledge bonus <code>A</code> is fully multiplied by utilization
-      <code>u = S/S<sub>sat</sub></code>. Saturated pools (<code>S = S<sub>sat</sub></code>) earn
-      the same under either formula.
-    </span>
   </div>
 </div>
 
@@ -517,6 +497,31 @@ input[type=range] {
   </div>
 </div>
 
+<!-- ── Proposal Controls (anchored to main chart) ────── -->
+<div class="panel" id="proposal-controls-panel">
+  <div class="panel-title">Proposal Controls — blending coefficient and curve visibility</div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <label>
+        Blending Coefficient (b) <span id="lbl-b">1.00 — full proposal</span>
+      </label>
+      <input type="range" id="sl-b" min="0" max="1" step="0.01" value="1">
+    </div>
+  </div>
+  <div class="toggle-row">
+    <label><input type="checkbox" id="cb-show-current" checked>
+      <span class="swatch current"></span>Show current-formula curves</label>
+    <label><input type="checkbox" id="cb-show-proposed" checked>
+      <span class="swatch proposed"></span>Show proposed-formula curves</label>
+    <span style="font-size:0.75rem">
+      At <code>b = 0</code> the proposed curves overlap the current curves exactly.
+      At <code>b = 1</code> the pledge bonus <code>A</code> is fully multiplied by utilization
+      <code>u = S/S<sub>sat</sub></code>. Saturated pools (<code>S = S<sub>sat</sub></code>) earn
+      the same under either formula.
+    </span>
+  </div>
+</div>
+
 <!-- ── Marginal ROA chart ────────────────────────────── -->
 <div class="panel">
   <div class="panel-title">
@@ -556,7 +561,7 @@ input[type=range] {
 </div>
 
 <!-- ── Formulas ──────────────────────────────────────── -->
-<div class="panel">
+<div class="panel" id="formula-panel">
   <div class="panel-title">Reference Formulas — current vs proposed</div>
   <div class="formula">
     <strong style="color:#c9d1d9">Current formula (today's mainnet)</strong><br>
@@ -1517,150 +1522,312 @@ document.addEventListener('keydown', e => {
   }
 });
 
-// ──────────────────── Guided CIP Tour ────────────────────
-// Walks a viewer through the proposal's argument with timed slider tweens,
-// arrows from a docked card to the relevant chart controls, and an autoplay
-// option ("Do it for me") for the no-clicks-required experience.
+// ──────────────────── Guided CIP Tours ────────────────────
+// Two tutorials live on the page:
+//   "explain" — the main pitch: red zone, formula change, equilibrium preserved.
+//   "why"     — addresses the natural objection that proposed curves sit lower.
+// Both share the same engine; the active script is the one referenced by TOUR_STEPS.
 
-const TOUR_STEPS = [
-  {
-    title: 'Why this CIP exists',
-    body: `<p>Cardano's <strong>pledge bonus</strong> is set by the SPO's pledge alone and does
-      <em>not grow</em> as more delegators arrive. Once a pool's pledge bonus exceeds its fixed
-      fee, every new delegator <strong>dilutes</strong> per-delegator ROA — punishing exactly
-      the behaviour the protocol's Nash equilibrium assumes will happen.</p>
-      <p>This walkthrough shows the defect, then the proposed fix, in 10 steps. Press
-      <strong>▶ Do it for me</strong> for the no-clicks version, or click Next to advance manually.</p>`,
-    targets: [],
-    actions: [
-      { kind: 'check',  id: 'cb-show-current',  value: true },
-      { kind: 'check',  id: 'cb-show-proposed', value: true },
-      { kind: 'slider', id: 'sl-b',             value: 1, ms: 300 },
-    ],
-    holdMs: 8000,
-  },
-  {
-    title: 'A typical high-pledge pool',
-    body: `<p>I'm setting up a realistic pool: <strong>Pledge = 5 M ADA</strong>,
-      <strong>Margin = 5 %</strong>, <strong>Fixed Fee = 340 ADA/epoch</strong>,
-      <strong>r = 0.000548</strong>. These are the canonical "red-zone" parameters
-      from the chart's companion document — high enough pledge that the pledge bonus
-      <code>A</code> exceeds the fixed fee <code>F</code>.</p>`,
-    targets: ['sl-p', 'sl-m', 'sl-f', 'sl-r'],
-    actions: [
-      { kind: 'slider', id: 'sl-p', value: 5,        ms: 700 },
-      { kind: 'slider', id: 'sl-m', value: 5,        ms: 500 },
-      { kind: 'slider', id: 'sl-f', value: 340,      ms: 500 },
-      { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 500 },
-      { kind: 'slider', id: 'sl-d', value: 10,       ms: 400 },
-    ],
-    holdMs: 6500,
-  },
-  {
-    title: 'Hide the proposal — see today’s protocol cleanly',
-    body: `<p>I'm hiding the cyan/purple <em>proposed-formula</em> curves so the picture
-      shows exactly the Cardano reward formula that's live on mainnet today.</p>`,
-    targets: ['cb-show-proposed'],
-    actions: [
-      { kind: 'check', id: 'cb-show-proposed', value: false },
-    ],
-    holdMs: 5500,
-  },
-  {
-    title: 'The red zone — SPO income falls when delegators arrive',
-    body: `<p>Look at the SPO income curve. The <strong style="color:#f85149">red portion</strong>
-      on the left is the <em>dilution regime</em>. At those delegation levels, adding more stake
-      <em>reduces</em> the SPO's per-epoch income.</p>
-      <p>The pool operator is structurally punished for becoming popular. This red zone exists
-      at any margin below the threshold <code>m_min</code> ≈ 12 % for this pool.</p>`,
-    targets: ['chart'],
-    actions: [],
-    holdMs: 7500,
-  },
-  {
-    title: 'Same defect, delegator side',
-    body: `<p>The marginal-ROA chart makes the delegator-side effect just as visible. The
-      <strong style="color:#1c7ed6">blue dashed curve</strong> sits well below zero across
-      most of the delegation range.</p>
-      <p>Every new delegator who arrives at this pool drags <em>every existing delegator's
-      ROA</em> down. This is the coordination failure that the CIP fixes — rational
-      delegators are punished for concentrating into the high-pledge pools the protocol
-      assumes they'll choose.</p>`,
-    targets: ['marginal-chart', 'm-marg-cur'],
-    actions: [],
-    holdMs: 8000,
-  },
-  {
-    title: 'Reveal the proposed formula',
-    body: `<p>Now I turn the proposed-formula overlay back on with the blending coefficient
-      <strong>b = 1</strong> (full proposal). The new curves are <strong style="color:#4ecdc4">cyan</strong>
-      for SPO income and <strong style="color:#b197fc">dashed purple</strong> for delegator ROA.</p>
-      <p>Watch what happens next.</p>`,
-    targets: ['cb-show-proposed', 'sl-b'],
-    actions: [
-      { kind: 'check',  id: 'cb-show-proposed', value: true },
-      { kind: 'slider', id: 'sl-b',             value: 1, ms: 500 },
-    ],
-    holdMs: 5500,
-  },
-  {
-    title: 'Red zone gone. Slopes flip positive.',
-    body: `<p>Two things just happened in the main chart:</p>
-      <ul style="margin: 0.3rem 0 0.3rem 1.1rem; padding: 0;">
-        <li>The cyan <strong>proposed SPO-income</strong> curve has no red zone — it rises
-          monotonically as delegation grows.</li>
-        <li>The purple-dashed <strong>proposed ROA</strong> curve slopes <em>upward</em>, not
-          downward.</li>
-      </ul>
-      <p style="margin-top: 0.45rem">The dilution regime is structurally gone. Pledge becomes a partnership claim:
-      the SPO earns the bonus in proportion to how many delegators actually arrive.</p>`,
-    targets: ['chart'],
-    actions: [],
-    holdMs: 8000,
-  },
-  {
-    title: 'Marginal ROA flips above zero',
-    body: `<p>Same story on the marginal-ROA chart. The purple-dashed curve now sits
-      <strong style="color:var(--green)">above the zero line</strong> across the entire delegation range.</p>
-      <p>Every delegator who arrives now <em>lifts</em> every existing delegator's ROA — the
-      cooperative equilibrium the protocol was designed to produce, finally rewarded by the
-      formula that pays the rewards.</p>`,
-    targets: ['marginal-chart', 'm-marg-prop'],
-    actions: [],
-    holdMs: 7500,
-  },
-  {
-    title: 'Saturation invariance — equilibrium unchanged',
-    body: `<p>I'll drag the cursor all the way to <strong>saturation</strong> (S = 75 M ADA).
-      Watch the metric cards.</p>
-      <p>At the saturation point, <strong>current SPO income equals proposed SPO income</strong>.
-      Same for delegator ROA. The proposal preserves the network's <em>equilibrium state</em> —
-      it only changes the path getting there. No SPO who's already running a popular pool
-      loses anything.</p>`,
-    targets: ['sl-d', 'm-spo', 'm-spo-prop'],
-    actions: [
-      { kind: 'slider', id: 'sl-d', value: 70, ms: 1200 },
-    ],
-    holdMs: 8000,
-  },
-  {
-    title: 'Gradual phase-in via the blending coefficient',
-    body: `<p>The change can be phased in. The blending coefficient <strong>b</strong>
-      dials the proposal from 0 (today's formula exactly) to 1 (full proposal).</p>
-      <p>Watch the curves morph as I sweep b. Governance can move b a small step per
-      hard-fork combinator and observe the on-chain result before committing further.</p>
-      <p style="margin-top: 0.5rem; color: var(--muted)">
-      End of tour. Press <strong style="color:var(--accent)">Exit</strong> (or Esc) to return
-      to free exploration, or type any mainnet pool's ticker into the Pool Lookup panel to
-      see this analysis run on real on-chain data.</p>`,
-    targets: ['sl-b'],
-    actions: [
-      { kind: 'slider', id: 'sl-b', value: 0, ms: 2400 },
-      { kind: 'slider', id: 'sl-b', value: 1, ms: 2400 },
-    ],
-    holdMs: 6000,
-  },
-];
+const TOUR_SCRIPTS = {
+  explain: [
+    {
+      title: 'Why this CIP exists',
+      body: `<p>Cardano's <strong>pledge bonus</strong> is set by the amount of SPO pledge
+        alone and does <em>not grow</em> as more delegators arrive. Once a pool's pledge bonus
+        exceeds its fixed fee, every new delegator <strong>dilutes</strong> per-delegator ROA.
+        In other words, ROA goes down as delegation goes up. This is punishing exactly the
+        behaviour the protocol's Nash equilibrium creates.</p>
+        <p>This walkthrough shows the defect, then the proposed fix, in 11 steps. Press
+        <strong>▶ Play</strong> for the no-clicks version, or click Next to advance manually.</p>`,
+      targets: [],
+      actions: [
+        { kind: 'check',  id: 'cb-show-current',  value: true },
+        { kind: 'check',  id: 'cb-show-proposed', value: true },
+        { kind: 'slider', id: 'sl-b',             value: 1, ms: 300 },
+      ],
+      holdMs: 9000,
+    },
+    {
+      title: 'A typical high-pledge pool',
+      body: `<p>I'm setting up a realistic pool: <strong>Pledge = 5 M ADA</strong>,
+        <strong>Margin = 1 %</strong>, <strong>Fixed Fee = 170 ADA/epoch</strong>,
+        <strong>r = 0.000548</strong>. These parameters produce a large, very visible red
+        zone — the pledge bonus <code>A</code> is well above the fixed fee <code>F</code>,
+        and the low margin leaves room for the dilution to dominate.</p>`,
+      targets: ['sl-p', 'sl-m', 'sl-f', 'sl-r'],
+      actions: [
+        { kind: 'slider', id: 'sl-p', value: 5,        ms: 700 },
+        { kind: 'slider', id: 'sl-m', value: 1,        ms: 500 },
+        { kind: 'slider', id: 'sl-f', value: 170,      ms: 500 },
+        { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 500 },
+        { kind: 'slider', id: 'sl-d', value: 10,       ms: 400 },
+      ],
+      holdMs: 6500,
+    },
+    {
+      title: 'Hide the proposal — see today’s protocol cleanly',
+      body: `<p>I'm hiding the cyan and purple <em>proposed-formula</em> curves so the picture
+        shows exactly the Cardano reward formula that's live on mainnet today.</p>`,
+      targets: ['cb-show-proposed'],
+      actions: [
+        { kind: 'check', id: 'cb-show-proposed', value: false },
+      ],
+      holdMs: 5500,
+    },
+    {
+      title: 'The red zone — SPO income falls when delegators arrive',
+      body: `<p>Look at the SPO income curve. The <strong style="color:#f85149">red portion</strong>
+        on the left is the <em>dilution regime</em>. At those delegation levels, adding more stake
+        <em>reduces</em> the SPO's per-epoch income.</p>
+        <p>The pool operator is structurally punished for becoming popular. With these
+        parameters the red zone covers roughly the leftmost quarter of the chart — every
+        delegator who arrives in that range makes the SPO worse off.</p>`,
+      // Point at the red SPO curve (dataset 0) around 7 M external delegation,
+      // deep in the descending portion of the red zone.
+      targets: [{ kind: 'chart-point', chart: 'main', dataset: 0, dataIndex: 14 }],
+      actions: [],
+      holdMs: 8000,
+    },
+    {
+      title: 'And delegators feel it too — ROA falls as delegation rises',
+      body: `<p>Watch the <strong style="color:#1c7ed6">blue dashed line</strong> on the same
+        chart — the current-formula delegator ROA. It slopes <em>downward</em>: as more
+        delegation arrives, per-delegator ROA falls.</p>
+        <p>The protocol punishes delegators for arriving at exactly the kind of pool it
+        wants them to fill. Rational delegators avoid the path to saturation, so pools
+        never converge.</p>`,
+      targets: [{ kind: 'chart-point', chart: 'main', dataset: 2, dataIndex: 20 }],
+      actions: [],
+      holdMs: 8500,
+    },
+    {
+      title: 'The CIP in plain English',
+      body: `<p>Today, an SPO declares pledge and immediately collects the bonus — whether
+        or not anyone delegates to them.</p>
+        <p>The CIP changes this: <strong>the pledge bonus is paid only in proportion to how
+        full the pool actually is.</strong> An empty pledged pool earns nothing from pledge.
+        A saturated pool earns today's bonus exactly. Pledge becomes a partnership claim —
+        redeemed by attracting delegators.</p>`,
+      targets: ['sl-p'],
+      actions: [],
+      holdMs: 9000,
+    },
+    {
+      title: 'The CIP as a formula',
+      body: `<p>Concretely, the pledge bonus formula changes from:</p>
+        <p style="font-family:monospace;color:var(--accent);margin:0.3rem 0">
+          A = r · a₀ · P / (1 + a₀)
+        </p>
+        <p>to:</p>
+        <p style="font-family:monospace;color:#4ecdc4;margin:0.3rem 0">
+          A<sub>new</sub> = A · u, &nbsp;&nbsp; u = S / S<sub>sat</sub>
+        </p>
+        <p>where <strong>u</strong> is the pool's <em>utilization</em> — the fraction of
+        saturation it has reached. The blending coefficient <strong>b</strong> in the controls
+        below the chart slides smoothly between 0 (today) and 1 (full proposal), so we can
+        watch the transition continuously.</p>`,
+      targets: ['formula-panel'],
+      actions: [],
+      holdMs: 10000,
+    },
+    {
+      title: 'Reveal the proposed formula',
+      body: `<p>Now I turn the proposed-formula overlay back on with the blending coefficient
+        <strong>b = 1</strong> (full proposal). The new curves are <strong style="color:#4ecdc4">cyan</strong>
+        for SPO income and <strong style="color:#b197fc">dashed purple</strong> for delegator ROA.</p>
+        <p>The controls just below the chart (b slider + visibility checkboxes) are the
+        ones we are touching here.</p>`,
+      targets: [
+        'cb-show-proposed',
+        'sl-b',
+        { kind: 'chart-point', chart: 'main', dataset: 3, dataIndex: 30 },
+        { kind: 'chart-point', chart: 'main', dataset: 4, dataIndex: 30 },
+      ],
+      actions: [
+        { kind: 'check',  id: 'cb-show-proposed', value: true },
+        { kind: 'slider', id: 'sl-b',             value: 1, ms: 500 },
+      ],
+      holdMs: 7000,
+    },
+    {
+      title: 'Red zone gone. Slopes flip positive.',
+      body: `<p>Two things just happened on the main chart:</p>
+        <ul style="margin: 0.3rem 0 0.3rem 1.1rem; padding: 0;">
+          <li>The cyan <strong>proposed SPO-income</strong> curve has no red zone — it rises
+            monotonically as delegation grows.</li>
+          <li>The purple-dashed <strong>proposed ROA</strong> curve slopes <em>upward</em>,
+            not downward.</li>
+        </ul>
+        <p style="margin-top: 0.45rem">The dilution regime is structurally gone. Pledge becomes
+        a partnership claim: the SPO earns the bonus in proportion to how many delegators
+        actually arrive.</p>`,
+      targets: [
+        { kind: 'chart-point', chart: 'main', dataset: 3, dataIndex: 8 },
+        { kind: 'chart-point', chart: 'main', dataset: 4, dataIndex: 8 },
+      ],
+      actions: [],
+      holdMs: 9000,
+    },
+    {
+      title: 'Saturation invariance — equilibrium unchanged',
+      body: `<p>I'll drag the cursor all the way to <strong>saturation</strong> (S = 75 M ADA).
+        Watch the metric cards.</p>
+        <p>At saturation, <strong>current SPO income equals proposed SPO income</strong>.
+        Same for delegator ROA. The proposal preserves the network's <em>equilibrium state</em>
+        — it only changes the path getting there. No SPO who's already running a popular
+        pool loses anything.</p>`,
+      targets: ['sl-d', 'm-spo', 'm-spo-prop'],
+      actions: [
+        { kind: 'slider', id: 'sl-d', value: 70, ms: 1500 },
+      ],
+      holdMs: 8500,
+    },
+    {
+      title: 'Gradual phase-in via the blending coefficient',
+      body: `<p>The change can be phased in. <strong>b</strong> dials the proposal from
+        0 (today's formula exactly) to 1 (full proposal).</p>
+        <p>Watch the cyan and purple curves morph as I sweep b back and forth. Governance can
+        move b a small step per hard-fork combinator and observe the on-chain result before
+        committing further.</p>
+        <p style="margin-top: 0.5rem; color: var(--muted)">
+        End of tour. Press <strong style="color:var(--accent)">Exit</strong> (or Esc) to return
+        to free exploration. Or click the second tutorial button at the top of the page to
+        see why the new curves look "lower" — and why that's still a win.</p>`,
+      targets: [
+        'sl-b',
+        { kind: 'chart-point', chart: 'main', dataset: 3, dataIndex: 20 },
+        { kind: 'chart-point', chart: 'main', dataset: 4, dataIndex: 20 },
+      ],
+      actions: [
+        { kind: 'slider', id: 'sl-d', value: 20,       ms: 600 },
+        { kind: 'slider', id: 'sl-b', value: 0,        ms: 2400 },
+        { kind: 'slider', id: 'sl-b', value: 1,        ms: 2400 },
+        { kind: 'slider', id: 'sl-b', value: 0,        ms: 2400 },
+        { kind: 'slider', id: 'sl-b', value: 1,        ms: 2400 },
+      ],
+      holdMs: 8000,
+    },
+  ],
+
+  why: [
+    {
+      title: 'The natural objection',
+      body: `<p>You may have noticed: with both formulas visible at <strong>b = 1</strong>,
+        the proposed <strong style="color:#4ecdc4">cyan</strong> and
+        <strong style="color:#b197fc">purple</strong> curves sit <em>below</em> the
+        current curves at every point below saturation.</p>
+        <p>So how can the CIP help anyone if it pays everyone less?</p>`,
+      targets: [
+        { kind: 'chart-point', chart: 'main', dataset: 3, dataIndex: 30 },
+        { kind: 'chart-point', chart: 'main', dataset: 4, dataIndex: 30 },
+      ],
+      actions: [
+        { kind: 'slider', id: 'sl-p', value: 5,        ms: 500 },
+        { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
+        { kind: 'slider', id: 'sl-f', value: 170,      ms: 400 },
+        { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 400 },
+        { kind: 'check',  id: 'cb-show-current',  value: true },
+        { kind: 'check',  id: 'cb-show-proposed', value: true },
+        { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
+        { kind: 'slider', id: 'sl-d', value: 15,       ms: 400 },
+      ],
+      holdMs: 9000,
+    },
+    {
+      title: 'The win is in the slope, not the height',
+      body: `<p>The position of the curve at any single moment is not what determines whether
+        the formula is good for the network. The <em>slope</em> — whether adding delegation
+        helps or hurts existing delegators — is.</p>
+        <p>Under today's formula the ROA curve slopes <em>down</em>. Under the proposed
+        formula it slopes <em>up</em>. That sign flip is the prize, not the curve's
+        absolute height.</p>`,
+      targets: [{ kind: 'chart-point', chart: 'main', dataset: 4, dataIndex: 20 }],
+      actions: [],
+      holdMs: 9000,
+    },
+    {
+      title: 'Meet the marginal-ROA chart',
+      body: `<p>The chart below the main chart makes the slope visible directly.</p>
+        <p>It shows <strong>dROA/dS</strong> — the change in delegator ROA per +1 M ADA added
+        at the cursor's delegation level. <em>Above zero</em> means delegation helps;
+        <em>below zero</em> means delegation dilutes.</p>`,
+      targets: ['marginal-chart'],
+      actions: [],
+      holdMs: 8000,
+    },
+    {
+      title: 'Today\'s dilution regime',
+      body: `<p>The <strong style="color:#1c7ed6">blue dashed curve</strong> (current formula)
+        sits well below zero across most of the range. Every delegator who arrives drags
+        every existing delegator's ROA down.</p>
+        <p>This is the coordination failure: rational delegators avoid the path to saturation,
+        so pools never converge on the equilibrium the protocol was designed to produce.</p>`,
+      targets: [{ kind: 'chart-point', chart: 'marginal', dataset: 0, dataIndex: 30 }],
+      actions: [],
+      holdMs: 9000,
+    },
+    {
+      title: 'Under the proposal — dilution gone',
+      body: `<p>The <strong style="color:#b197fc">purple dashed curve</strong> (proposed
+        formula) sits <em>above</em> zero across the whole range. Every delegator who arrives
+        now <em>lifts</em> every existing delegator's ROA.</p>
+        <p>The coordination failure is structurally removed. The protocol's intended
+        equilibrium becomes self-enforcing.</p>`,
+      targets: [{ kind: 'chart-point', chart: 'marginal', dataset: 1, dataIndex: 30 }],
+      actions: [],
+      holdMs: 9000,
+    },
+    {
+      title: 'Saturation invariance — at the equilibrium, nothing is lost',
+      body: `<p>Now drag the cursor to saturation (S = 75 M ADA). Watch the metric cards.</p>
+        <p>Current SPO income equals proposed SPO income. Same for ROA. At equilibrium the
+        formulas coincide — no SPO who's already running a popular pool loses anything.</p>`,
+      targets: ['m-spo', 'm-spo-prop', 'm-roa', 'm-roa-prop'],
+      actions: [
+        { kind: 'slider', id: 'sl-d', value: 70, ms: 1500 },
+      ],
+      holdMs: 9000,
+    },
+    {
+      title: 'What happens to the "missing" emission?',
+      body: `<p>Total emission to below-saturation pools <em>is</em> lower under the proposal.
+        That ADA either stays in the reserve (slower depletion across time), or governance can
+        recalibrate <code>a₀</code> slightly upward to keep total emission constant.</p>
+        <p>Either way: at equilibrium <strong>nothing is lost</strong>. The CIP redirects
+        emission from pledged pools that haven't earned delegators yet, to pledged pools
+        that have.</p>`,
+      targets: [],
+      actions: [
+        { kind: 'slider', id: 'sl-d', value: 20, ms: 700 },
+      ],
+      holdMs: 9000,
+    },
+    {
+      title: 'Path matters, not just height',
+      body: `<p>Under today's formula, rational delegators avoid the path to equilibrium
+        because it dilutes them — so pools never reach saturation. Under the proposed formula
+        the path itself is rewarding, so pools fill naturally. <strong>Same equilibrium, but
+        reachable.</strong></p>
+        <p>Watch the marginal-ROA curves flip back and forth as I sweep b.</p>
+        <p style="margin-top: 0.5rem; color: var(--muted)">End of tour — press
+        <strong style="color:var(--accent)">Exit</strong> (or Esc) to return.</p>`,
+      targets: [
+        { kind: 'chart-point', chart: 'marginal', dataset: 0, dataIndex: 20 },
+        { kind: 'chart-point', chart: 'marginal', dataset: 1, dataIndex: 20 },
+      ],
+      actions: [
+        { kind: 'slider', id: 'sl-b', value: 0, ms: 2400 },
+        { kind: 'slider', id: 'sl-b', value: 1, ms: 2400 },
+        { kind: 'slider', id: 'sl-b', value: 0, ms: 2400 },
+        { kind: 'slider', id: 'sl-b', value: 1, ms: 2400 },
+      ],
+      holdMs: 8000,
+    },
+  ],
+};
+
+// Mutable pointer to the active script. startTour() reassigns this.
+let TOUR_STEPS = TOUR_SCRIPTS.explain;
 
 const tour = {
   i: 0,
@@ -1713,33 +1880,72 @@ async function applyStepActions(step) {
   }
 }
 
-function nearestEdgePoint(target, fromX, fromY) {
-  const r  = target.getBoundingClientRect();
-  const cx = r.left + r.width / 2;
-  const cy = r.top  + r.height / 2;
+function nearestEdgePoint(rect, fromX, fromY) {
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top  + rect.height / 2;
   const dx = fromX - cx;
   const dy = fromY - cy;
-  if (dx === 0 && dy === 0) return { x: cx, y: r.top };
-  const hx = r.width / 2, hy = r.height / 2;
+  if (dx === 0 && dy === 0) return { x: cx, y: rect.top };
+  const hx = rect.width / 2, hy = rect.height / 2;
   const sx = dx === 0 ? Infinity : hx / Math.abs(dx);
   const sy = dy === 0 ? Infinity : hy / Math.abs(dy);
   const s  = Math.min(sx, sy);
   return { x: cx + dx * s, y: cy + dy * s };
 }
 
-function drawArrow(svg, cardEl, targetEl) {
-  const cardR = cardEl.getBoundingClientRect();
+// Resolve a chart-point target to its current viewport (page) pixel.
+function chartPointPixel(t) {
+  const chart = t.chart === 'main' ? myChart : marginalChart;
+  if (!chart) return null;
+  const ds = chart.data.datasets[t.dataset];
+  if (!ds) return null;
+  const xScale  = chart.scales.x;
+  const yScaleId = t.yAxis ?? ds.yAxisID ?? 'y';
+  const yScale  = chart.scales[yScaleId];
+  if (!xScale || !yScale) return null;
+  const xPx = xScale.getPixelForValue(t.dataIndex);
+  const val = ds.data[t.dataIndex];
+  if (val == null) return null;
+  const yPx = yScale.getPixelForValue(val);
+  const r   = chart.canvas.getBoundingClientRect();
+  return { x: r.left + xPx, y: r.top + yPx };
+}
+
+// Resolve any target (string ID or chart-point object) to { tip, rect? }.
+// rect is provided for DOM-element targets so the arrow stops at the edge;
+// chart-point targets supply the tip directly.
+function resolveTarget(t) {
+  if (typeof t === 'string') {
+    const el = document.getElementById(t);
+    if (!el) return null;
+    return { kind: 'dom', el, rect: el.getBoundingClientRect() };
+  }
+  if (t && t.kind === 'chart-point') {
+    const px = chartPointPixel(t);
+    if (!px) return null;
+    return { kind: 'point', tip: px };
+  }
+  return null;
+}
+
+function drawArrow(svg, cardR, resolved) {
   const fromX = cardR.left;
   const fromY = cardR.top + cardR.height / 2;
-  const tip   = nearestEdgePoint(targetEl, fromX, fromY);
-  const dx    = tip.x - fromX, dy = tip.y - fromY;
-  const len   = Math.hypot(dx, dy) || 1;
-  const tipX  = tip.x - (dx / len) * 8;
-  const tipY  = tip.y - (dy / len) * 8;
-  const c1x   = fromX - 80, c1y = fromY;
-  const c2x   = tipX  + 80, c2y = tipY;
-  const d     = `M ${fromX} ${fromY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${tipX} ${tipY}`;
-  const NS    = 'http://www.w3.org/2000/svg';
+  let tipX, tipY;
+  if (resolved.kind === 'dom') {
+    const tip = nearestEdgePoint(resolved.rect, fromX, fromY);
+    const dx  = tip.x - fromX, dy = tip.y - fromY;
+    const len = Math.hypot(dx, dy) || 1;
+    tipX = tip.x - (dx / len) * 8;
+    tipY = tip.y - (dy / len) * 8;
+  } else {
+    tipX = resolved.tip.x;
+    tipY = resolved.tip.y;
+  }
+  const c1x = fromX - 80, c1y = fromY;
+  const c2x = tipX  + 80, c2y = tipY;
+  const d   = `M ${fromX} ${fromY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${tipX} ${tipY}`;
+  const NS  = 'http://www.w3.org/2000/svg';
 
   const path = document.createElementNS(NS, 'path');
   path.setAttribute('d', d);
@@ -1760,6 +1966,32 @@ function drawArrow(svg, cardEl, targetEl) {
     `${tipX - L * Math.cos(ang + a)} ${tipY - L * Math.sin(ang + a)}`);
   head.setAttribute('fill', '#4ecdc4');
   svg.appendChild(head);
+
+  // For chart-point targets, draw a pulsing SVG circle at the tip so the viewer
+  // can see exactly which curve the arrow lands on. (DOM-element targets use the
+  // CSS .tour-pulse outline instead.)
+  if (resolved.kind === 'point') {
+    const circle = document.createElementNS(NS, 'circle');
+    circle.setAttribute('cx', tipX);
+    circle.setAttribute('cy', tipY);
+    circle.setAttribute('r', '6');
+    circle.setAttribute('fill', 'none');
+    circle.setAttribute('stroke', '#4ecdc4');
+    circle.setAttribute('stroke-width', '2');
+    const anim1 = document.createElementNS(NS, 'animate');
+    anim1.setAttribute('attributeName', 'r');
+    anim1.setAttribute('values', '6;14;6');
+    anim1.setAttribute('dur', '1.4s');
+    anim1.setAttribute('repeatCount', 'indefinite');
+    const anim2 = document.createElementNS(NS, 'animate');
+    anim2.setAttribute('attributeName', 'opacity');
+    anim2.setAttribute('values', '1;0.15;1');
+    anim2.setAttribute('dur', '1.4s');
+    anim2.setAttribute('repeatCount', 'indefinite');
+    circle.appendChild(anim1);
+    circle.appendChild(anim2);
+    svg.appendChild(circle);
+  }
 }
 
 function drawArrowsForStep(step) {
@@ -1771,16 +2003,15 @@ function drawArrowsForStep(step) {
   svg.setAttribute('height', window.innerHeight);
   svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
 
-  const targets = (step.targets ?? [])
-    .map(id => document.getElementById(id))
-    .filter(Boolean);
-  if (targets.length === 0) return;
+  const resolved = (step.targets ?? []).map(resolveTarget).filter(Boolean);
+  if (resolved.length === 0) return;
 
-  const card = document.getElementById('tour-card');
+  const card  = document.getElementById('tour-card');
   if (!card) return;
-  targets.forEach(t => {
-    t.classList.add('tour-pulse');
-    drawArrow(svg, card, t);
+  const cardR = card.getBoundingClientRect();
+  resolved.forEach(r => {
+    if (r.kind === 'dom') r.el.classList.add('tour-pulse');
+    drawArrow(svg, cardR, r);
   });
 }
 
@@ -1802,8 +2033,16 @@ async function renderStep(i) {
   await applyStepActions(step);
   if (myGuard !== tour.renderGuard) return;
 
-  const targets = (step.targets ?? []).map(id => document.getElementById(id)).filter(Boolean);
-  if (targets.length > 0) targets[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Scroll the primary target into view. For chart-point targets, scroll the
+  // corresponding chart canvas. For DOM-element targets, scroll the element.
+  const first = (step.targets ?? [])[0];
+  if (typeof first === 'string') {
+    const el = document.getElementById(first);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (first && first.kind === 'chart-point') {
+    const canvas = (first.chart === 'main' ? myChart : marginalChart)?.canvas;
+    if (canvas) canvas.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   await nextFrame(); await nextFrame();
   if (myGuard !== tour.renderGuard) return;
@@ -1815,7 +2054,7 @@ async function prevStep() { if (tour.i > 0)                    await renderStep(
 
 function setAutoplayButton(isPlaying) {
   const btn = document.getElementById('tour-autoplay');
-  btn.textContent = isPlaying ? '⏸ Pause' : '▶ Do it for me';
+  btn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
   btn.classList.toggle('playing', isPlaying);
 }
 
@@ -1866,7 +2105,7 @@ function buildTourDom() {
     <div class="tour-controls">
       <button id="tour-prev">‹ Prev</button>
       <button id="tour-next">Next ›</button>
-      <button id="tour-autoplay">▶ Do it for me</button>
+      <button id="tour-autoplay">▶ Play</button>
       <button id="tour-exit">Exit (Esc)</button>
     </div>`;
   document.body.appendChild(card);
@@ -1877,9 +2116,17 @@ function buildTourDom() {
   document.getElementById('tour-exit').addEventListener('click',     exitTour);
 }
 
-function startTour() {
-  if (tour.open) return;
+function startTour(scriptName = 'explain') {
+  TOUR_STEPS = TOUR_SCRIPTS[scriptName] ?? TOUR_SCRIPTS.explain;
+  if (tour.open) {
+    // Switch scripts: bump guard to abort any running actions, reset to step 0.
+    tour.renderGuard++;
+    tour.i = 0;
+    renderStep(0);
+    return;
+  }
   tour.open = true;
+  tour.i = 0;
   if (!document.getElementById('tour-dim')) buildTourDom();
   document.getElementById('tour-dim').classList.add('shown');
   document.getElementById('tour-card').style.display = 'block';
@@ -1925,7 +2172,8 @@ document.addEventListener('keydown', e => {
   }
 });
 
-document.getElementById('tour-start-btn').addEventListener('click', startTour);
+document.getElementById('tour-start-btn').addEventListener('click', () => startTour('explain'));
+document.getElementById('tour-start-btn-why').addEventListener('click', () => startTour('why'));
 
 update(); // initial render
 
