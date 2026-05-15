@@ -198,6 +198,117 @@ input[type=range] {
 .section-label.proposed { color: #4ecdc4; }
 .metric-val.cyan   { color: #4ecdc4; }
 .metric-val.purple { color: #b197fc; }
+
+/* ── tour launcher ──────────────────────────────────── */
+#tour-launcher-panel {
+  display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap;
+}
+#tour-start-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #0d1117;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 0.7rem 1.2rem;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s, transform 0.15s;
+}
+#tour-start-btn:hover  { opacity: 0.88; transform: translateY(-1px); }
+#tour-start-btn:active { opacity: 0.7; transform: translateY(0); }
+#tour-launcher-hint { font-size: 0.82rem; color: var(--muted); flex: 1; min-width: 16rem; }
+
+/* ── tour overlay / card / arrows ───────────────────── */
+#tour-dim {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 9000;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+#tour-dim.shown { opacity: 1; }
+
+#tour-arrow-layer {
+  position: fixed; inset: 0;
+  width: 100%; height: 100%;
+  z-index: 9100;
+  pointer-events: none;
+}
+
+#tour-card {
+  position: fixed;
+  bottom: 1.2rem; right: 1.2rem;
+  width: clamp(340px, 30vw, 460px);
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  padding: 1rem 1.2rem 0.9rem;
+  z-index: 9200;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.55), 0 0 0 1px rgba(88,166,255,0.15);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+.tour-step-counter {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+#tour-title {
+  font-size: 1.02rem;
+  color: var(--accent);
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+}
+#tour-body { color: var(--text); }
+#tour-body strong  { color: var(--accent); }
+#tour-body code    { font-family: monospace; background: rgba(255,255,255,0.05); padding: 0 0.25rem; border-radius: 3px; }
+#tour-body em      { color: var(--orange); font-style: normal; font-weight: 600; }
+.tour-controls {
+  display: flex; gap: 0.45rem; flex-wrap: wrap;
+  margin-top: 0.85rem;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--border);
+}
+.tour-controls button {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.4rem 0.75rem;
+  transition: background 0.15s, border-color 0.15s;
+}
+.tour-controls button:hover { background: rgba(88,166,255,0.08); border-color: var(--accent); }
+.tour-controls button:disabled { opacity: 0.35; cursor: default; }
+#tour-autoplay { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+#tour-autoplay:hover { opacity: 0.88; }
+#tour-autoplay.playing { background: var(--orange); border-color: var(--orange); color: #0d1117; }
+#tour-exit { margin-left: auto; }
+
+@keyframes tour-pulse {
+  0%   { box-shadow: 0 0 0 0   rgba(78,205,196,0.65); }
+  70%  { box-shadow: 0 0 0 12px rgba(78,205,196,0);    }
+  100% { box-shadow: 0 0 0 0   rgba(78,205,196,0);    }
+}
+.tour-pulse {
+  outline: 2px solid #4ecdc4 !important;
+  outline-offset: 3px;
+  border-radius: 6px;
+  animation: tour-pulse 1.4s ease-out infinite;
+  position: relative;
+  z-index: 9050;
+}
+
+@media (max-width: 700px) {
+  #tour-card { left: 0.6rem; right: 0.6rem; width: auto; bottom: 0.6rem; }
+}
 </style>
 </head>
 <body>
@@ -215,6 +326,16 @@ input[type=range] {
   Drag the blending coefficient <code>b</code> from 0 (today) to 1 (full proposal) to watch the
   dilution regime collapse and the red zone disappear.
 </p>
+
+<!-- ── Tour launcher ─────────────────────────────────── -->
+<div class="panel" id="tour-launcher-panel">
+  <button id="tour-start-btn">▶  Explain the CIP for a UTILIZATION-SCALED PLEDGE BONUS</button>
+  <span id="tour-launcher-hint">
+    — 10-step guided walkthrough (≈ 90 s on auto-play). Cards appear bottom-right; arrows
+    point at the relevant sliders, checkboxes, and chart regions. Press
+    <strong style="color:var(--accent)">Esc</strong> at any time to return to free exploration.
+  </span>
+</div>
 
 <!-- ── Pool Lookup ───────────────────────────────────── -->
 <div class="panel">
@@ -1395,6 +1516,416 @@ document.addEventListener('keydown', e => {
     inp.select();
   }
 });
+
+// ──────────────────── Guided CIP Tour ────────────────────
+// Walks a viewer through the proposal's argument with timed slider tweens,
+// arrows from a docked card to the relevant chart controls, and an autoplay
+// option ("Do it for me") for the no-clicks-required experience.
+
+const TOUR_STEPS = [
+  {
+    title: 'Why this CIP exists',
+    body: `<p>Cardano's <strong>pledge bonus</strong> is set by the SPO's pledge alone and does
+      <em>not grow</em> as more delegators arrive. Once a pool's pledge bonus exceeds its fixed
+      fee, every new delegator <strong>dilutes</strong> per-delegator ROA — punishing exactly
+      the behaviour the protocol's Nash equilibrium assumes will happen.</p>
+      <p>This walkthrough shows the defect, then the proposed fix, in 10 steps. Press
+      <strong>▶ Do it for me</strong> for the no-clicks version, or click Next to advance manually.</p>`,
+    targets: [],
+    actions: [
+      { kind: 'check',  id: 'cb-show-current',  value: true },
+      { kind: 'check',  id: 'cb-show-proposed', value: true },
+      { kind: 'slider', id: 'sl-b',             value: 1, ms: 300 },
+    ],
+    holdMs: 8000,
+  },
+  {
+    title: 'A typical high-pledge pool',
+    body: `<p>I'm setting up a realistic pool: <strong>Pledge = 5 M ADA</strong>,
+      <strong>Margin = 5 %</strong>, <strong>Fixed Fee = 340 ADA/epoch</strong>,
+      <strong>r = 0.000548</strong>. These are the canonical "red-zone" parameters
+      from the chart's companion document — high enough pledge that the pledge bonus
+      <code>A</code> exceeds the fixed fee <code>F</code>.</p>`,
+    targets: ['sl-p', 'sl-m', 'sl-f', 'sl-r'],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 5,        ms: 700 },
+      { kind: 'slider', id: 'sl-m', value: 5,        ms: 500 },
+      { kind: 'slider', id: 'sl-f', value: 340,      ms: 500 },
+      { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 500 },
+      { kind: 'slider', id: 'sl-d', value: 10,       ms: 400 },
+    ],
+    holdMs: 6500,
+  },
+  {
+    title: 'Hide the proposal — see today’s protocol cleanly',
+    body: `<p>I'm hiding the cyan/purple <em>proposed-formula</em> curves so the picture
+      shows exactly the Cardano reward formula that's live on mainnet today.</p>`,
+    targets: ['cb-show-proposed'],
+    actions: [
+      { kind: 'check', id: 'cb-show-proposed', value: false },
+    ],
+    holdMs: 5500,
+  },
+  {
+    title: 'The red zone — SPO income falls when delegators arrive',
+    body: `<p>Look at the SPO income curve. The <strong style="color:#f85149">red portion</strong>
+      on the left is the <em>dilution regime</em>. At those delegation levels, adding more stake
+      <em>reduces</em> the SPO's per-epoch income.</p>
+      <p>The pool operator is structurally punished for becoming popular. This red zone exists
+      at any margin below the threshold <code>m_min</code> ≈ 12 % for this pool.</p>`,
+    targets: ['chart'],
+    actions: [],
+    holdMs: 7500,
+  },
+  {
+    title: 'Same defect, delegator side',
+    body: `<p>The marginal-ROA chart makes the delegator-side effect just as visible. The
+      <strong style="color:#1c7ed6">blue dashed curve</strong> sits well below zero across
+      most of the delegation range.</p>
+      <p>Every new delegator who arrives at this pool drags <em>every existing delegator's
+      ROA</em> down. This is the coordination failure that the CIP fixes — rational
+      delegators are punished for concentrating into the high-pledge pools the protocol
+      assumes they'll choose.</p>`,
+    targets: ['marginal-chart', 'm-marg-cur'],
+    actions: [],
+    holdMs: 8000,
+  },
+  {
+    title: 'Reveal the proposed formula',
+    body: `<p>Now I turn the proposed-formula overlay back on with the blending coefficient
+      <strong>b = 1</strong> (full proposal). The new curves are <strong style="color:#4ecdc4">cyan</strong>
+      for SPO income and <strong style="color:#b197fc">dashed purple</strong> for delegator ROA.</p>
+      <p>Watch what happens next.</p>`,
+    targets: ['cb-show-proposed', 'sl-b'],
+    actions: [
+      { kind: 'check',  id: 'cb-show-proposed', value: true },
+      { kind: 'slider', id: 'sl-b',             value: 1, ms: 500 },
+    ],
+    holdMs: 5500,
+  },
+  {
+    title: 'Red zone gone. Slopes flip positive.',
+    body: `<p>Two things just happened in the main chart:</p>
+      <ul style="margin: 0.3rem 0 0.3rem 1.1rem; padding: 0;">
+        <li>The cyan <strong>proposed SPO-income</strong> curve has no red zone — it rises
+          monotonically as delegation grows.</li>
+        <li>The purple-dashed <strong>proposed ROA</strong> curve slopes <em>upward</em>, not
+          downward.</li>
+      </ul>
+      <p style="margin-top: 0.45rem">The dilution regime is structurally gone. Pledge becomes a partnership claim:
+      the SPO earns the bonus in proportion to how many delegators actually arrive.</p>`,
+    targets: ['chart'],
+    actions: [],
+    holdMs: 8000,
+  },
+  {
+    title: 'Marginal ROA flips above zero',
+    body: `<p>Same story on the marginal-ROA chart. The purple-dashed curve now sits
+      <strong style="color:var(--green)">above the zero line</strong> across the entire delegation range.</p>
+      <p>Every delegator who arrives now <em>lifts</em> every existing delegator's ROA — the
+      cooperative equilibrium the protocol was designed to produce, finally rewarded by the
+      formula that pays the rewards.</p>`,
+    targets: ['marginal-chart', 'm-marg-prop'],
+    actions: [],
+    holdMs: 7500,
+  },
+  {
+    title: 'Saturation invariance — equilibrium unchanged',
+    body: `<p>I'll drag the cursor all the way to <strong>saturation</strong> (S = 75 M ADA).
+      Watch the metric cards.</p>
+      <p>At the saturation point, <strong>current SPO income equals proposed SPO income</strong>.
+      Same for delegator ROA. The proposal preserves the network's <em>equilibrium state</em> —
+      it only changes the path getting there. No SPO who's already running a popular pool
+      loses anything.</p>`,
+    targets: ['sl-d', 'm-spo', 'm-spo-prop'],
+    actions: [
+      { kind: 'slider', id: 'sl-d', value: 70, ms: 1200 },
+    ],
+    holdMs: 8000,
+  },
+  {
+    title: 'Gradual phase-in via the blending coefficient',
+    body: `<p>The change can be phased in. The blending coefficient <strong>b</strong>
+      dials the proposal from 0 (today's formula exactly) to 1 (full proposal).</p>
+      <p>Watch the curves morph as I sweep b. Governance can move b a small step per
+      hard-fork combinator and observe the on-chain result before committing further.</p>
+      <p style="margin-top: 0.5rem; color: var(--muted)">
+      End of tour. Press <strong style="color:var(--accent)">Exit</strong> (or Esc) to return
+      to free exploration, or type any mainnet pool's ticker into the Pool Lookup panel to
+      see this analysis run on real on-chain data.</p>`,
+    targets: ['sl-b'],
+    actions: [
+      { kind: 'slider', id: 'sl-b', value: 0, ms: 2400 },
+      { kind: 'slider', id: 'sl-b', value: 1, ms: 2400 },
+    ],
+    holdMs: 6000,
+  },
+];
+
+const tour = {
+  i: 0,
+  playing: false,
+  open: false,
+  rafId: null,
+  autoTimerId: null,
+  renderGuard: 0,   // bumped on each renderStep — async actions abort if stale
+};
+
+function tourClamp(min, max, v) { return Math.max(min, Math.min(max, v)); }
+
+function tweenSlider(id, targetValue, durationMs = 600) {
+  return new Promise(resolve => {
+    const el = document.getElementById(id);
+    if (!el) { resolve(); return; }
+    const startValue = parseFloat(el.value);
+    const target = tourClamp(parseFloat(el.min), parseFloat(el.max), targetValue);
+    if (startValue === target) { resolve(); return; }
+    const start = performance.now();
+    const myGuard = tour.renderGuard;
+    function frame(now) {
+      if (myGuard !== tour.renderGuard) { resolve(); return; }
+      const t = Math.min(1, (now - start) / durationMs);
+      const ease = 0.5 - 0.5 * Math.cos(Math.PI * t);
+      el.value = startValue + (target - startValue) * ease;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (t < 1) tour.rafId = requestAnimationFrame(frame);
+      else      { tour.rafId = null; resolve(); }
+    }
+    tour.rafId = requestAnimationFrame(frame);
+  });
+}
+
+function tourSetCheckbox(id, checked) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.checked !== checked) {
+    el.checked = checked;
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
+async function applyStepActions(step) {
+  const myGuard = tour.renderGuard;
+  for (const a of step.actions ?? []) {
+    if (myGuard !== tour.renderGuard) return;
+    if (a.kind === 'slider')     await tweenSlider(a.id, a.value, a.ms ?? 600);
+    else if (a.kind === 'check') tourSetCheckbox(a.id, a.value);
+  }
+}
+
+function nearestEdgePoint(target, fromX, fromY) {
+  const r  = target.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top  + r.height / 2;
+  const dx = fromX - cx;
+  const dy = fromY - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: r.top };
+  const hx = r.width / 2, hy = r.height / 2;
+  const sx = dx === 0 ? Infinity : hx / Math.abs(dx);
+  const sy = dy === 0 ? Infinity : hy / Math.abs(dy);
+  const s  = Math.min(sx, sy);
+  return { x: cx + dx * s, y: cy + dy * s };
+}
+
+function drawArrow(svg, cardEl, targetEl) {
+  const cardR = cardEl.getBoundingClientRect();
+  const fromX = cardR.left;
+  const fromY = cardR.top + cardR.height / 2;
+  const tip   = nearestEdgePoint(targetEl, fromX, fromY);
+  const dx    = tip.x - fromX, dy = tip.y - fromY;
+  const len   = Math.hypot(dx, dy) || 1;
+  const tipX  = tip.x - (dx / len) * 8;
+  const tipY  = tip.y - (dy / len) * 8;
+  const c1x   = fromX - 80, c1y = fromY;
+  const c2x   = tipX  + 80, c2y = tipY;
+  const d     = `M ${fromX} ${fromY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${tipX} ${tipY}`;
+  const NS    = 'http://www.w3.org/2000/svg';
+
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke', '#4ecdc4');
+  path.setAttribute('stroke-width', '2.5');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-dasharray', '6 4');
+  svg.appendChild(path);
+
+  const ang  = Math.atan2(tipY - c2y, tipX - c2x);
+  const a    = 0.55;
+  const L    = 11;
+  const head = document.createElementNS(NS, 'polygon');
+  head.setAttribute('points',
+    `${tipX} ${tipY} ` +
+    `${tipX - L * Math.cos(ang - a)} ${tipY - L * Math.sin(ang - a)} ` +
+    `${tipX - L * Math.cos(ang + a)} ${tipY - L * Math.sin(ang + a)}`);
+  head.setAttribute('fill', '#4ecdc4');
+  svg.appendChild(head);
+}
+
+function drawArrowsForStep(step) {
+  document.querySelectorAll('.tour-pulse').forEach(e => e.classList.remove('tour-pulse'));
+  const svg = document.getElementById('tour-arrow-layer');
+  if (!svg) return;
+  svg.innerHTML = '';
+  svg.setAttribute('width',  window.innerWidth);
+  svg.setAttribute('height', window.innerHeight);
+  svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
+
+  const targets = (step.targets ?? [])
+    .map(id => document.getElementById(id))
+    .filter(Boolean);
+  if (targets.length === 0) return;
+
+  const card = document.getElementById('tour-card');
+  if (!card) return;
+  targets.forEach(t => {
+    t.classList.add('tour-pulse');
+    drawArrow(svg, card, t);
+  });
+}
+
+function nextFrame() { return new Promise(r => requestAnimationFrame(r)); }
+
+async function renderStep(i) {
+  tour.renderGuard++;
+  const myGuard = tour.renderGuard;
+  tour.i = Math.max(0, Math.min(TOUR_STEPS.length - 1, i));
+  const step = TOUR_STEPS[tour.i];
+
+  document.getElementById('tour-step-n').textContent     = String(tour.i + 1);
+  document.getElementById('tour-step-total').textContent = String(TOUR_STEPS.length);
+  document.getElementById('tour-title').textContent      = step.title;
+  document.getElementById('tour-body').innerHTML         = step.body;
+  document.getElementById('tour-prev').disabled = tour.i === 0;
+  document.getElementById('tour-next').disabled = tour.i === TOUR_STEPS.length - 1;
+
+  await applyStepActions(step);
+  if (myGuard !== tour.renderGuard) return;
+
+  const targets = (step.targets ?? []).map(id => document.getElementById(id)).filter(Boolean);
+  if (targets.length > 0) targets[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  await nextFrame(); await nextFrame();
+  if (myGuard !== tour.renderGuard) return;
+  drawArrowsForStep(step);
+}
+
+async function nextStep() { if (tour.i < TOUR_STEPS.length - 1) await renderStep(tour.i + 1); }
+async function prevStep() { if (tour.i > 0)                    await renderStep(tour.i - 1); }
+
+function setAutoplayButton(isPlaying) {
+  const btn = document.getElementById('tour-autoplay');
+  btn.textContent = isPlaying ? '⏸ Pause' : '▶ Do it for me';
+  btn.classList.toggle('playing', isPlaying);
+}
+
+async function autoPlay() {
+  tour.playing = true;
+  setAutoplayButton(true);
+  while (tour.playing) {
+    const step = TOUR_STEPS[tour.i];
+    const hold = step.holdMs ?? 5500;
+    await new Promise(res => { tour.autoTimerId = setTimeout(res, hold); });
+    tour.autoTimerId = null;
+    if (!tour.playing) break;
+    if (tour.i >= TOUR_STEPS.length - 1) break;
+    await nextStep();
+  }
+  tour.playing = false;
+  setAutoplayButton(false);
+}
+
+function pauseAutoplay() {
+  tour.playing = false;
+  if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+  setAutoplayButton(false);
+}
+
+function toggleAutoplay() {
+  if (tour.playing) pauseAutoplay();
+  else              autoPlay();
+}
+
+function buildTourDom() {
+  const dim = document.createElement('div');
+  dim.id = 'tour-dim';
+  document.body.appendChild(dim);
+
+  const NS  = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.id = 'tour-arrow-layer';
+  document.body.appendChild(svg);
+
+  const card = document.createElement('div');
+  card.id = 'tour-card';
+  card.tabIndex = -1;
+  card.innerHTML = `
+    <div class="tour-step-counter">Step <span id="tour-step-n">1</span> of <span id="tour-step-total">${TOUR_STEPS.length}</span></div>
+    <div id="tour-title"></div>
+    <div id="tour-body"></div>
+    <div class="tour-controls">
+      <button id="tour-prev">‹ Prev</button>
+      <button id="tour-next">Next ›</button>
+      <button id="tour-autoplay">▶ Do it for me</button>
+      <button id="tour-exit">Exit (Esc)</button>
+    </div>`;
+  document.body.appendChild(card);
+
+  document.getElementById('tour-prev').addEventListener('click',     () => { pauseAutoplay(); prevStep(); });
+  document.getElementById('tour-next').addEventListener('click',     () => { pauseAutoplay(); nextStep(); });
+  document.getElementById('tour-autoplay').addEventListener('click', toggleAutoplay);
+  document.getElementById('tour-exit').addEventListener('click',     exitTour);
+}
+
+function startTour() {
+  if (tour.open) return;
+  tour.open = true;
+  if (!document.getElementById('tour-dim')) buildTourDom();
+  document.getElementById('tour-dim').classList.add('shown');
+  document.getElementById('tour-card').style.display = 'block';
+  document.getElementById('tour-arrow-layer').style.display = 'block';
+  renderStep(0);
+  document.getElementById('tour-card').focus();
+}
+
+function exitTour() {
+  if (!tour.open) return;
+  pauseAutoplay();
+  tour.renderGuard++;
+  tour.open = false;
+  document.querySelectorAll('.tour-pulse').forEach(e => e.classList.remove('tour-pulse'));
+  const dim  = document.getElementById('tour-dim');
+  const card = document.getElementById('tour-card');
+  const svg  = document.getElementById('tour-arrow-layer');
+  if (dim)  dim.classList.remove('shown');
+  if (card) card.style.display = 'none';
+  if (svg)  { svg.innerHTML = ''; svg.style.display = 'none'; }
+}
+
+let _tourResizeRaf = null;
+function scheduleArrowRedraw() {
+  if (!tour.open) return;
+  if (_tourResizeRaf) cancelAnimationFrame(_tourResizeRaf);
+  _tourResizeRaf = requestAnimationFrame(() => {
+    _tourResizeRaf = null;
+    drawArrowsForStep(TOUR_STEPS[tour.i]);
+  });
+}
+window.addEventListener('resize', scheduleArrowRedraw);
+window.addEventListener('scroll', scheduleArrowRedraw, { passive: true });
+
+document.addEventListener('keydown', e => {
+  if (!tour.open) return;
+  if (e.target && e.target.id === 'ticker-input') return;
+  switch (e.key) {
+    case 'Escape':                   e.preventDefault(); exitTour();                break;
+    case 'ArrowRight': case 'Enter':  e.preventDefault(); pauseAutoplay(); nextStep(); break;
+    case 'ArrowLeft':                 e.preventDefault(); pauseAutoplay(); prevStep(); break;
+    case ' ':                         e.preventDefault(); toggleAutoplay();          break;
+  }
+});
+
+document.getElementById('tour-start-btn').addEventListener('click', startTour);
 
 update(); // initial render
 
