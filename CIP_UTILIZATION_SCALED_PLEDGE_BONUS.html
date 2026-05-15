@@ -1,0 +1,1192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+
+<!--
+  CIP Simulation: Utilization-Scaled Pledge Bonus.
+  Companion chart to ranger/claude_queries/utilization_scaled_pledge_bonus.md.
+  Live URL:
+  https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html
+-->
+
+
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CIP Simulation — Utilization-Scaled Pledge Bonus</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg:      #0d1117;
+  --surface: #161b22;
+  --border:  #30363d;
+  --text:    #c9d1d9;
+  --muted:   #8b949e;
+  --accent:  #58a6ff;
+  --green:   #3fb950;
+  --orange:  #d29922;
+  --red:     #f85149;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+  padding: 1.5rem;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+h1   { color: var(--accent); font-size: 1.4rem; margin-bottom: 0.2rem; }
+.sub { color: var(--muted);  font-size: 0.88rem; margin-bottom: 1.4rem; }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.1rem 1.4rem;
+  margin-bottom: 1.1rem;
+}
+.panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 0.9rem;
+}
+
+/* ── sliders ─────────────────────────────────────────── */
+.sliders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.1rem;
+}
+.slider-row label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.83rem;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+.slider-row label span { color: var(--accent); font-weight: 600; font-family: monospace; }
+input[type=range] {
+  width: 100%;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ── metrics row ─────────────────────────────────────── */
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.1rem;
+}
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  text-align: center;
+}
+.metric-lbl  { font-size: 0.68rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.45rem; }
+.metric-val  { font-size: 1.35rem; font-weight: 700; font-family: monospace; line-height: 1; }
+.metric-unit { font-size: 0.67rem; color: var(--muted); margin-top: 0.25rem; }
+.green  { color: var(--green);  }
+.orange { color: var(--orange); }
+.red    { color: var(--red);    }
+.blue   { color: var(--accent); }
+
+
+/* ── chart ───────────────────────────────────────────── */
+.chart-wrap { position: relative; height: 430px; }
+
+/* ── pool lookup ─────────────────────────────────────── */
+.lookup-row {
+  display: flex;
+  gap: 0.6rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#ticker-input {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: monospace;
+  font-size: 0.95rem;
+  padding: 0.45rem 0.75rem;
+  flex: 1;
+  min-width: 9rem;
+  max-width: 30rem;
+  outline: none;
+  transition: border-color 0.15s;
+}
+#ticker-input:focus { border-color: var(--accent); }
+#load-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: 6px;
+  color: #0d1117;
+  cursor: pointer;
+  font-size: 0.83rem;
+  font-weight: 700;
+  padding: 0.45rem 1rem;
+  transition: opacity 0.15s;
+}
+#load-btn:hover  { opacity: 0.85; }
+#load-btn:active { opacity: 0.7;  }
+#load-btn:disabled { opacity: 0.4; cursor: default; }
+#lookup-status {
+  font-size: 0.8rem;
+  margin-top: 0.6rem;
+  font-family: monospace;
+  min-height: 1.1rem;
+}
+
+/* ── formula box ─────────────────────────────────────── */
+.formula {
+  font-family: monospace;
+  font-size: 0.77rem;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.formula .hl       { color: var(--accent); }
+.formula .hl-prop  { color: #4ecdc4;       }
+
+/* ── proposal controls ──────────────────────────────── */
+.toggle-row {
+  display: flex;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 0.9rem;
+  font-size: 0.83rem;
+  color: var(--muted);
+}
+.toggle-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle-row input[type=checkbox] {
+  accent-color: var(--accent);
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+.toggle-row .swatch {
+  display: inline-block;
+  width: 22px;
+  height: 3px;
+  vertical-align: middle;
+  border-radius: 1px;
+}
+.toggle-row .swatch.proposed { background: #4ecdc4; }
+.toggle-row .swatch.current  { background: linear-gradient(to right, #f85149 0 50%, #3fb950 50% 100%); }
+
+.section-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin: 0.4rem 0 0.55rem 0.1rem;
+}
+.section-label.proposed { color: #4ecdc4; }
+.metric-val.cyan   { color: #4ecdc4; }
+.metric-val.purple { color: #b197fc; }
+</style>
+</head>
+<body>
+
+<h1>CIP Simulation — Utilization-Scaled Pledge Bonus</h1>
+<p class="sub">
+  Interactive simulation of the parameter change proposed in
+  <a href="https://github.com/johnshearing/pool_ranger/blob/main/claude_queries/utilization_scaled_pledge_bonus.md"
+     style="color:var(--accent)">utilization_scaled_pledge_bonus.md</a>:
+  multiply the pledge bonus <code>A</code> by pool utilization <code>u = S/S<sub>sat</sub></code>.
+  Every <strong>current-formula</strong> curve is in red/green/blue (same colors as
+  <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html"
+     style="color:var(--accent)">SPO_REWARD_ANALYSIS_CHART.html</a>);
+  each is overlaid with its <strong style="color:#4ecdc4">proposed-formula</strong> counterpart in cyan / purple-dashed.
+  Drag the blending coefficient <code>b</code> from 0 (today) to 1 (full proposal) to watch the
+  dilution regime collapse and the red zone disappear.
+</p>
+
+<!-- ── Pool Lookup ───────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Pool Lookup — Mainnet via Koios + corsproxy.io (no API key needed)</div>
+  <div class="lookup-row">
+    <input type="text" id="ticker-input" placeholder="Ticker (e.g. IOHK) or pool1…" maxlength="60"
+           autocomplete="off" spellcheck="false">
+    <button id="load-btn">Load Pool</button>
+    <span style="font-size:0.75rem;color:var(--muted)">
+      Enter a ticker <em>or</em> a full pool ID (pool1…) then press Enter or click Load Pool.
+      Sliders for margin, fee, pledge, current delegation, and performance will be set automatically.
+      <strong style="color:var(--accent)">Ctrl+K</strong> returns focus here.
+    </span>
+  </div>
+  <div id="lookup-status"></div>
+</div>
+
+<!-- ── Pool parameters ──────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Pool Parameters</div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <label>Margin (m) <span id="lbl-m">5.0%</span></label>
+      <input type="range" id="sl-m" min="0" max="100" step="0.5" value="5">
+    </div>
+    <div class="slider-row">
+      <label>Pledge (P) <span id="lbl-p">5.0 M ADA</span></label>
+      <input type="range" id="sl-p" min="0" max="70" step="0.5" value="5">
+    </div>
+    <div class="slider-row">
+      <label>Fixed Fee (F) <span id="lbl-f">170 ADA/epoch</span></label>
+      <input type="range" id="sl-f" min="170" max="1000" step="10" value="340">
+    </div>
+    <div class="slider-row">
+      <label>Epoch Rate (r) <span id="lbl-r">0.000400</span></label>
+      <input type="range" id="sl-r" min="0.0003" max="0.0008" step="0.000001" value="0.000400">
+    </div>
+  </div>
+</div>
+
+<!-- ── Proposal Controls ─────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Proposal Controls — blending coefficient and curve visibility</div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <label>
+        Blending Coefficient (b) <span id="lbl-b">1.00 — full proposal</span>
+      </label>
+      <input type="range" id="sl-b" min="0" max="1" step="0.01" value="1">
+    </div>
+  </div>
+  <div class="toggle-row">
+    <label><input type="checkbox" id="cb-show-current" checked>
+      <span class="swatch current"></span>Show current-formula curves</label>
+    <label><input type="checkbox" id="cb-show-proposed" checked>
+      <span class="swatch proposed"></span>Show proposed-formula curves</label>
+    <span style="font-size:0.75rem">
+      At <code>b = 0</code> the proposed curves overlap the current curves exactly.
+      At <code>b = 1</code> the pledge bonus <code>A</code> is fully multiplied by utilization
+      <code>u = S/S<sub>sat</sub></code>. Saturated pools (<code>S = S<sub>sat</sub></code>) earn
+      the same under either formula.
+    </span>
+  </div>
+</div>
+
+<!-- ── Performance Analysis ──────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Performance Analysis — actual vs expected blocks, auto-fetched from Koios on Load Pool</div>
+  <div class="sliders-grid">
+    <div class="slider-row">
+      <label>Epoch Window <span id="lbl-epoch-window">20 epochs ≈ 100 days</span></label>
+      <input type="range" id="sl-epoch-window" min="1" max="73" step="1" value="20">
+    </div>
+    <div class="slider-row">
+      <label>Performance Factor (p) <span id="lbl-perf">100%</span></label>
+      <input type="range" id="sl-perf" min="0" max="100" step="1" value="100">
+    </div>
+  </div>
+  <div id="perf-status" style="font-size:0.78rem;color:var(--muted);margin-top:0.7rem;font-family:monospace;min-height:1.1rem;">
+    Load a pool above to auto-compute performance. Epochs with fewer than 0.5 expected blocks are excluded. Adjust the window or the factor manually for what-if analysis.
+  </div>
+</div>
+
+<!-- ── Metrics: current formula ─────────────────────── -->
+<div class="section-label">Current Formula (at cursor)</div>
+<div class="metrics-row">
+  <div class="metric-card">
+    <div class="metric-lbl">Pledge Bonus (A_eff)</div>
+    <div class="metric-val blue" id="m-A">—</div>
+    <div class="metric-unit">ADA/epoch</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">SPO Income</div>
+    <div class="metric-val green" id="m-spo">—</div>
+    <div class="metric-unit">ADA / epoch</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Delegator ROA</div>
+    <div class="metric-val blue" id="m-roa">—</div>
+    <div class="metric-unit">% per year</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Performance Factor</div>
+    <div class="metric-val green" id="m-perf">100.0%</div>
+    <div class="metric-unit">actual / expected blocks</div>
+  </div>
+</div>
+
+<!-- ── Metrics: proposed formula ────────────────────── -->
+<div class="section-label proposed">Proposed Formula (at cursor) — pledge bonus scaled by utilization</div>
+<div class="metrics-row">
+  <div class="metric-card">
+    <div class="metric-lbl">Pledge Bonus (A_new)</div>
+    <div class="metric-val cyan" id="m-A-prop">—</div>
+    <div class="metric-unit">ADA/epoch</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">SPO Income (Proposed)</div>
+    <div class="metric-val cyan" id="m-spo-prop">—</div>
+    <div class="metric-unit">ADA / epoch</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">Delegator ROA (Proposed)</div>
+    <div class="metric-val purple" id="m-roa-prop">—</div>
+    <div class="metric-unit">% per year</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-lbl">ROA Delta (Proposed − Current)</div>
+    <div class="metric-val green" id="m-roa-delta">—</div>
+    <div class="metric-unit">percentage points / year</div>
+  </div>
+</div>
+
+<!-- ── Cursor / current delegation ──────────────────── -->
+<div class="panel">
+  <div class="panel-title">Chart Cursor — Current Delegation Level</div>
+  <div class="slider-row">
+    <label>
+      External Delegation &nbsp;<span id="lbl-d">10.0 M ADA</span>
+      &nbsp;→ Total Stake S =&nbsp;<span id="lbl-S">15.0 M ADA</span>
+    </label>
+    <input type="range" id="sl-d" min="0" max="70" step="0.5" value="10">
+  </div>
+</div>
+
+<!-- ── Chart ─────────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">
+    SPO Income (solid, left axis) &amp; Delegator ROA %/yr (dashed, right axis) — External Delegation 0 → 70 M ADA &nbsp;|&nbsp; dashed orange = saturation<br>
+    <span style="font-size:0.75rem;letter-spacing:0;text-transform:none;color:var(--muted)">
+      <strong style="color:#c9d1d9">Current formula —</strong>
+      SPO:
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#3fb950" stroke-width="2.5" stroke-linecap="round"/></svg>
+      green helps &nbsp;
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"/></svg>
+      red hurts &nbsp;|&nbsp; ROA:
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#1c7ed6" stroke-width="2.5" stroke-dasharray="5,3" stroke-linecap="round"/></svg>
+      dashed blue
+      &nbsp;&nbsp;||&nbsp;&nbsp;
+      <strong style="color:#4ecdc4">Proposed formula —</strong>
+      SPO:
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#4ecdc4" stroke-width="2.5" stroke-linecap="round"/></svg>
+      cyan &nbsp;|&nbsp; ROA:
+      <svg width="22" height="11" viewBox="0 0 22 11" style="vertical-align:middle;display:inline-block"><line x1="0" y1="5.5" x2="22" y2="5.5" stroke="#b197fc" stroke-width="2.5" stroke-dasharray="3,6" stroke-linecap="round"/></svg>
+      dashed purple
+      <br>
+      Cursor markers (on current-formula curves):&nbsp;
+      <svg width="11" height="11" viewBox="0 0 11 11" style="vertical-align:middle;display:inline-block"><circle cx="5.5" cy="5.5" r="4.5" fill="#3fb950"/></svg>
+      slope ≥ 0 &nbsp;
+      <svg width="11" height="11" viewBox="0 0 11 11" style="vertical-align:middle;display:inline-block">
+        <line x1="1.5" y1="1.5" x2="9.5" y2="9.5" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"/>
+        <line x1="9.5" y1="1.5" x2="1.5" y2="9.5" stroke="#f85149" stroke-width="2.5" stroke-linecap="round"/>
+      </svg>
+      slope &lt; 0
+    </span>
+  </div>
+  <div class="chart-wrap">
+    <canvas id="chart"></canvas>
+  </div>
+</div>
+
+<!-- ── Formulas ──────────────────────────────────────── -->
+<div class="panel">
+  <div class="panel-title">Reference Formulas — current vs proposed</div>
+  <div class="formula">
+    <strong style="color:#c9d1d9">Current formula (today's mainnet)</strong><br>
+    <span class="hl">gross_eff(S, P, p)</span>
+      = p × r × (S + a₀·P) / (1 + a₀)
+      &nbsp;|&nbsp; p = performance factor (0–1)
+      &nbsp;|&nbsp; a₀ = 0.3 (protocol constant)<br>
+
+    <span class="hl">SPO income</span>
+      = F + m·(gross_eff − F) + (P/S)·(1−m)·(gross_eff − F)
+      &nbsp;&nbsp; [when gross_eff &gt; F; otherwise SPO takes all of gross_eff]<br>
+
+    <span class="hl">Delegator ROA/yr</span>
+      = (1−m)·(gross_eff − F) / S × 73 epochs × 100%<br>
+
+    <span class="hl">A_eff</span> = p·r·a₀·P / (1+a₀)
+      &nbsp;|&nbsp;
+    <span class="hl">m<sub>min</sub></span> = (A_eff − F) / (p·r·P − F) &nbsp; when A_eff &gt; F, else 0%
+      &nbsp;|&nbsp; Ceiling: a₀/(1+a₀) ≈ 23.1%<br>
+
+    <span class="hl">r</span> = <span id="formula-r">0.000548</span> (epoch rate — slowly declining as ADA reserve depletes)
+      &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 75 M ADA (2025)<br>
+
+    <span class="hl">Performance p</span>
+      = actual blocks / expected blocks (averaged over chosen epoch window)
+      &nbsp;|&nbsp; expected = (pool active stake / network active stake) × total epoch blocks
+    <br><br>
+
+    <strong style="color:#4ecdc4">Proposed formula — utilization-scaled pledge bonus</strong><br>
+    <span class="hl-prop">u</span> = min(S, S<sub>sat</sub>) / S<sub>sat</sub>
+      &nbsp;(pool utilization, 0 to 1)
+      &nbsp;|&nbsp;
+    <span class="hl-prop">blend(b)</span> = (1 − b) + b · u
+      &nbsp;(b = 0 reproduces current; b = 1 = full proposal)<br>
+
+    <span class="hl-prop">gross_proposed(S, P, p, b)</span>
+      = p × r × (S + a₀·P·blend(b)) / (1 + a₀)<br>
+
+    <span class="hl-prop">A_new</span> = A_eff · blend(b)
+      &nbsp;|&nbsp;
+    <span class="hl-prop">SPO income (proposed)</span> and
+    <span class="hl-prop">ROA (proposed)</span>
+      use gross_proposed in place of gross_eff.<br>
+
+    <span style="color:var(--muted)">
+      Key result: at S = S<sub>sat</sub> (saturated pool) the two formulas coincide for any b.
+      Below saturation, the proposed formula removes the dilution regime —
+      d(ROA)/dS = +F/S² &gt; 0 always — so adding delegation to <em>any</em> pool monotonically
+      raises per-delegator ROA. See
+      <a href="https://github.com/johnshearing/pool_ranger/blob/main/claude_queries/utilization_scaled_pledge_bonus.md"
+         style="color:var(--accent)">utilization_scaled_pledge_bonus.md §§3–4</a>.
+    </span>
+  </div>
+</div>
+
+<script>
+// ── Constants ──────────────────────────────────────────
+const A0             = 0.3;
+const S_SAT          = 75e6;
+const EPOCHS_PER_YR  = 73;
+const STEPS          = 141;          // 0 to 70 M in 0.5 M increments
+const X_LABELS       = Array.from({ length: STEPS }, (_, i) => (i * 0.5).toFixed(1));
+
+// ── Performance history state ──────────────────────────
+let poolHistoryData = [];  // [{epoch_no, active_stake, block_cnt}] sorted descending
+let epochInfoData   = {};  // { epoch_no: {blk_count, active_stake} }
+
+// ── Math ───────────────────────────────────────────────
+function getParams() {
+  return {
+    m    : parseFloat(document.getElementById('sl-m').value) / 100,
+    P    : parseFloat(document.getElementById('sl-p').value) * 1e6,
+    F    : parseFloat(document.getElementById('sl-f').value),
+    r    : parseFloat(document.getElementById('sl-r').value),
+    dM   : parseFloat(document.getElementById('sl-d').value),
+    perf : parseFloat(document.getElementById('sl-perf').value) / 100,
+    b    : parseFloat(document.getElementById('sl-b').value),
+  };
+}
+
+function gross(S, P, r) {
+  const S_capped = Math.min(S, S_SAT);
+  return r * (S_capped + A0 * P) / (1 + A0);
+}
+
+// perf scales the effective rewards; when perf = 1 results are identical to original
+function spoIncome(S, P, F, m, r, perf) {
+  if (S <= 0) return 0;
+  const g   = gross(S, P, r) * perf;
+  if (g <= F) return g;
+  const net = g - F;
+  return F + m * net + (P / S) * (1 - m) * net;
+}
+
+function delegROA(S, P, F, m, r, perf) {
+  if (S <= 0) return 0;
+  const g = gross(S, P, r) * perf;
+  if (g <= F) return 0;
+  return (1 - m) * (g - F) / S * EPOCHS_PER_YR * 100;
+}
+
+// Returns the performance-adjusted pledge bonus: p × r × a₀ × P / (1 + a₀)
+function pledgeBonus(P, r, perf) {
+  return perf * r * A0 * P / (1 + A0);
+}
+
+// ── Proposed-formula math (CIP: utilization-scaled pledge bonus) ─────────────
+// Blending factor: at b=0 returns 1 (current formula); at b=1 returns u = S/S_sat.
+// This is the (1 − b + b·u) blend from §3 of utilization_scaled_pledge_bonus.md.
+function utilFactor(S, b) {
+  const u = Math.min(S, S_SAT) / S_SAT;
+  return (1 - b) + b * u;
+}
+
+// Proposed gross rewards: only the a₀·P pledge contribution is multiplied by
+// the blended utilization factor. The proportional stake term r·S/(1+a₀) is unchanged.
+function grossProposed(S, P, r, b) {
+  const S_capped = Math.min(S, S_SAT);
+  return r * (S_capped + A0 * P * utilFactor(S, b)) / (1 + A0);
+}
+
+function spoIncomeProposed(S, P, F, m, r, perf, b) {
+  if (S <= 0) return 0;
+  const g = grossProposed(S, P, r, b) * perf;
+  if (g <= F) return g;
+  const net = g - F;
+  return F + m * net + (P / S) * (1 - m) * net;
+}
+
+function delegROAProposed(S, P, F, m, r, perf, b) {
+  if (S <= 0) return 0;
+  const g = grossProposed(S, P, r, b) * perf;
+  if (g <= F) return 0;
+  return (1 - m) * (g - F) / S * EPOCHS_PER_YR * 100;
+}
+
+// Proposed pledge bonus at cursor — A_new = A_current · utilFactor(S, b).
+function pledgeBonusProposed(P, r, perf, S, b) {
+  return pledgeBonus(P, r, perf) * utilFactor(S, b);
+}
+
+// mMin with performance: (A_eff − F) / (p·r·P − F)
+function mMin(P, F, r, perf) {
+  const A    = pledgeBonus(P, r, perf);
+  if (A <= F) return 0;
+  const denom = perf * r * P - F;
+  if (denom <= 0) return 0;
+  return Math.min((A - F) / denom, 1);
+}
+
+// Cached x-index of the trough (-1 = no red zone; ≥ STEPS = entire curve is red)
+let currentTroughIndex = -1;
+// True when effective A > F — ROA falls monotonically with more delegation
+let currentROAFalling = false;
+
+// Trough with performance: S*² = P·(1−m)·(A_eff−F) / (m·p·r/(1+a₀))
+function troughExtDelegIndex(P, F, m, r, perf) {
+  const A = pledgeBonus(P, r, perf);
+  if (A <= F) return -1;
+  if (m <= 0) return STEPS;
+  const mm = mMin(P, F, r, perf);
+  if (m >= mm) return -1;
+  const Sstar = Math.sqrt(P * (1 - m) * (A - F) / (m * perf * r / (1 + A0)));
+  if (Sstar >= S_SAT) return STEPS;   // trough beyond saturation → slope negative everywhere → all red
+  const extAtTrough = Sstar - P;
+  if (extAtTrough <= 0) return 0;
+  return Math.min(Math.round(extAtTrough / 0.5e6), STEPS - 1);
+}
+
+// ── Performance Computation ────────────────────────────
+function computePerformance(windowEpochs) {
+  const slice = poolHistoryData.slice(0, windowEpochs);
+  let totalExpected = 0;
+  let totalActual   = 0;
+  let validEpochs   = 0;
+
+  for (const epoch of slice) {
+    const netInfo = epochInfoData[epoch.epoch_no];
+    if (!netInfo) continue;
+
+    const netStake  = Number(netInfo.active_stake);
+    const netBlocks = Number(netInfo.blk_count);
+    const poolStake = Number(epoch.active_stake);
+    const blockCnt  = Number(epoch.block_cnt ?? 0);
+
+    if (netStake <= 0 || netBlocks <= 0 || poolStake <= 0) continue;
+
+    const expected = (poolStake / netStake) * netBlocks;
+    // Skip epochs where pool was too small to distinguish luck from skill
+    if (expected < 0.5) continue;
+
+    totalExpected += expected;
+    totalActual   += blockCnt;
+    validEpochs++;
+  }
+
+  if (totalExpected === 0) {
+    return { perf: 1, validEpochs: 0, totalActual: 0, totalExpected: 0, epochsChecked: slice.length };
+  }
+  const perf = Math.min(1, totalActual / totalExpected);
+  return { perf, validEpochs, totalActual, totalExpected, epochsChecked: slice.length };
+}
+
+function autoSetPerformance() {
+  const windowEpochs = parseInt(document.getElementById('sl-epoch-window').value);
+  const result = computePerformance(windowEpochs);
+  clampSet('sl-perf', Math.round(result.perf * 100));
+
+  const statusEl = document.getElementById('perf-status');
+  if (result.validEpochs === 0) {
+    statusEl.textContent = `No valid epoch data in the ${windowEpochs}-epoch window. Performance left at 100%.`;
+    statusEl.style.color = 'var(--muted)';
+  } else {
+    statusEl.textContent =
+      `Auto-computed: ${(result.perf * 100).toFixed(1)}% — ` +
+      `${result.totalActual.toFixed(1)} actual / ${result.totalExpected.toFixed(1)} expected blocks ` +
+      `(${result.validEpochs} valid epochs of ${result.epochsChecked} checked)`;
+    statusEl.style.color = result.perf >= 0.95 ? 'var(--green)'
+                         : result.perf >= 0.80 ? 'var(--orange)'
+                         : 'var(--red)';
+  }
+  update();
+}
+
+// ── Chart.js local plugins ─────────────────────────────
+// Draws dashed orange line at ≈ saturation point
+const satPlugin = {
+  id: 'satLine',
+  afterDraw(ch) {
+    const { P } = getParams();
+    const extAtSat = S_SAT - P;
+    if (extAtSat < 0 || extAtSat > 70e6) return;
+
+    const idx   = Math.round(extAtSat / 0.5e6);
+    if (idx < 0 || idx >= STEPS) return;
+
+    const { ctx, chartArea: ca, scales: { x } } = ch;
+    const px = x.getPixelForValue(idx);
+    if (px < ca.left || px > ca.right) return;
+
+    ctx.save();
+    ctx.strokeStyle = '#d29922';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(px, ca.top);
+    ctx.lineTo(px, ca.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle  = '#d29922';
+    ctx.font       = '11px monospace';
+    ctx.textAlign  = 'left';
+    ctx.fillText('≈ saturation', px + 4, ca.top + 14);
+    ctx.restore();
+  }
+};
+
+// Draws a dashed cursor line and X/circle markers on each visible curve
+const cursorPlugin = {
+  id: 'cursorLine',
+  afterDraw(ch) {
+    const { dM } = getParams();
+    const idx = Math.round(dM / 0.5);
+    if (idx < 0 || idx >= STEPS) return;
+
+    const { ctx, chartArea: ca, scales } = ch;
+    const px = scales.x.getPixelForValue(idx);
+    if (px < ca.left || px > ca.right) return;
+
+    ctx.save();
+
+    // Dashed vertical cursor line
+    ctx.strokeStyle = 'rgba(248,81,73,0.5)';
+    ctx.lineWidth   = 1.5;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(px, ca.top);
+    ctx.lineTo(px, ca.bottom);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    const R = 5;          // marker half-size
+    const ds = ch.data.datasets;
+    const showCurrent  = !(ds[0].hidden && ds[1].hidden && ds[2].hidden);
+    const showProposed = !(ds[3].hidden && ds[4].hidden);
+
+    // Marker on current SPO income curve — X when in red zone, circle when green
+    if (showCurrent) {
+      const spoVal = ds[0].data[idx] ?? ds[1].data[idx];
+      if (spoVal != null && scales.ySPO) {
+        const py = scales.ySPO.getPixelForValue(spoVal);
+        if (currentTroughIndex >= 0 && idx < currentTroughIndex) {
+          ctx.strokeStyle = '#f85149';
+          ctx.lineWidth   = 2.5;
+          ctx.lineCap     = 'round';
+          ctx.beginPath(); ctx.moveTo(px - R, py - R); ctx.lineTo(px + R, py + R); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(px + R, py - R); ctx.lineTo(px - R, py + R); ctx.stroke();
+        } else {
+          ctx.fillStyle = '#3fb950';
+          ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+
+      // Marker on current ROA curve — X when ROA falling (A_eff > F), circle when rising
+      const roaVal = ds[2].data[idx];
+      if (roaVal != null && scales.yROA) {
+        const py = scales.yROA.getPixelForValue(roaVal);
+        if (currentROAFalling) {
+          ctx.strokeStyle = '#f85149';
+          ctx.lineWidth   = 2.5;
+          ctx.lineCap     = 'round';
+          ctx.beginPath(); ctx.moveTo(px - R, py - R); ctx.lineTo(px + R, py + R); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(px + R, py - R); ctx.lineTo(px - R, py + R); ctx.stroke();
+        } else {
+          ctx.fillStyle = '#3fb950';
+          ctx.beginPath(); ctx.arc(px, py, R, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+    }
+
+    // Small dots on the proposed curves at the cursor — purely for visual reference,
+    // colored to match each curve. Under the proposed formula ROA always rises with S,
+    // so a coloured slope-indicator is not informative; the dot just marks the value.
+    if (showProposed) {
+      const spoPropVal = ds[3].data[idx];
+      if (spoPropVal != null && scales.ySPO) {
+        const py = scales.ySPO.getPixelForValue(spoPropVal);
+        ctx.fillStyle = '#4ecdc4';
+        ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+      }
+      const roaPropVal = ds[4].data[idx];
+      if (roaPropVal != null && scales.yROA) {
+        const py = scales.yROA.getPixelForValue(roaPropVal);
+        ctx.fillStyle = '#b197fc';
+        ctx.beginPath(); ctx.arc(px, py, 4, 0, Math.PI * 2); ctx.fill();
+      }
+    }
+
+    ctx.restore();
+  }
+};
+
+// ── Initialize Chart ───────────────────────────────────
+const ctx = document.getElementById('chart').getContext('2d');
+const myChart = new Chart(ctx, {
+  type: 'line',
+  plugins: [satPlugin, cursorPlugin],
+  data: {
+    labels: X_LABELS,
+    datasets: [
+      {
+        label: 'SPO Income — delegation hurts (red zone)',
+        data: new Array(STEPS).fill(null),
+        borderColor: '#f85149',
+        backgroundColor: 'rgba(248,81,73,0.07)',
+        yAxisID: 'ySPO',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        fill: true,
+        spanGaps: false,
+      },
+      {
+        label: 'SPO Income — delegation helps (green zone)',
+        data: new Array(STEPS).fill(null),
+        borderColor: '#3fb950',
+        backgroundColor: 'rgba(63,185,80,0.07)',
+        yAxisID: 'ySPO',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        fill: true,
+        spanGaps: false,
+      },
+      {
+        label: 'Delegator ROA % / year (current, dashed blue)',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#1c7ed6',
+        backgroundColor: 'rgba(28,126,214,0.07)',
+        yAxisID: 'yROA',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        borderDash: [6, 3],
+        fill: true,
+      },
+      {
+        label: 'SPO Income (proposed, cyan)',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#4ecdc4',
+        backgroundColor: 'rgba(78,205,196,0.04)',
+        yAxisID: 'ySPO',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        fill: false,
+      },
+      {
+        label: 'Delegator ROA % / year (proposed, dashed purple)',
+        data: new Array(STEPS).fill(0),
+        borderColor: '#b197fc',
+        backgroundColor: 'rgba(177,151,252,0.04)',
+        yAxisID: 'yROA',
+        tension: 0.3,
+        pointRadius: 0,
+        borderWidth: 2.5,
+        borderDash: [3, 6],
+        fill: false,
+      },
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        labels: { color: '#c9d1d9', font: { size: 13 } }
+      },
+      tooltip: { enabled: false }
+    },
+    scales: {
+      x: {
+        title: {
+          display: true,
+          text: 'External Delegation (M ADA)',
+          color: '#8b949e',
+        },
+        ticks: {
+          color: '#8b949e',
+          maxTicksLimit: 15,
+          callback(value) {
+            const label = X_LABELS[value];
+            return parseFloat(label) % 10 === 0 ? label : '';
+          }
+        },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+      },
+      ySPO: {
+        type: 'linear',
+        position: 'left',
+        title: { display: true, text: 'SPO Income (ADA / epoch)', color: '#3fb950' },
+        ticks: { color: '#3fb950' },
+        grid: { color: 'rgba(48,54,61,0.7)' },
+        beginAtZero: true,
+      },
+      yROA: {
+        type: 'linear',
+        position: 'right',
+        title: { display: true, text: 'Delegator ROA (% / year)', color: '#1c7ed6' },
+        ticks: { color: '#1c7ed6' },
+        grid: { drawOnChartArea: false },
+        beginAtZero: true,
+      },
+    }
+  }
+});
+
+// ── Main update function ───────────────────────────────
+function update() {
+  const { m, P, F, r, dM, perf, b } = getParams();
+  const S = P + dM * 1e6;
+
+  // Update slider labels
+  document.getElementById('lbl-m').textContent    = (m * 100).toFixed(1) + '%';
+  document.getElementById('lbl-p').textContent    = (P / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('lbl-f').textContent    = F + ' ADA/epoch';
+  document.getElementById('lbl-r').textContent    = r.toFixed(6);
+  document.getElementById('lbl-d').textContent    = dM.toFixed(1) + ' M ADA';
+  document.getElementById('lbl-S').textContent    = (S / 1e6).toFixed(1) + ' M ADA';
+  document.getElementById('lbl-perf').textContent = (perf * 100).toFixed(0) + '%';
+  document.getElementById('formula-r').textContent = r.toFixed(6);
+
+  const bLabel =
+    b === 0 ? '0.00 — current formula' :
+    b === 1 ? '1.00 — full proposal'   :
+              b.toFixed(2) + ' — blended';
+  document.getElementById('lbl-b').textContent = bLabel;
+
+  // Compute and display current-formula metrics
+  const A = pledgeBonus(P, r, perf);
+  const spoCur = spoIncome(S, P, F, m, r, perf);
+  const roaCur = delegROA(S, P, F, m, r, perf);
+
+  document.getElementById('m-A').textContent   = A.toFixed(1);
+  document.getElementById('m-spo').textContent = spoCur.toFixed(0);
+  document.getElementById('m-roa').textContent = roaCur.toFixed(3);
+
+  // Compute and display proposed-formula metrics
+  const Aprop   = pledgeBonusProposed(P, r, perf, S, b);
+  const spoProp = spoIncomeProposed(S, P, F, m, r, perf, b);
+  const roaProp = delegROAProposed(S, P, F, m, r, perf, b);
+  const roaDelta = roaProp - roaCur;
+
+  document.getElementById('m-A-prop').textContent   = Aprop.toFixed(1);
+  document.getElementById('m-spo-prop').textContent = spoProp.toFixed(0);
+  document.getElementById('m-roa-prop').textContent = roaProp.toFixed(3);
+
+  const deltaEl = document.getElementById('m-roa-delta');
+  const deltaSign = roaDelta >= 0 ? '+' : '';
+  deltaEl.textContent = deltaSign + roaDelta.toFixed(3);
+  deltaEl.className = 'metric-val ' +
+    (roaDelta > 0.0005 ? 'green' : roaDelta < -0.0005 ? 'red' : 'orange');
+
+  // Performance metric card with color-coded value
+  const perfEl = document.getElementById('m-perf');
+  perfEl.textContent = (perf * 100).toFixed(1) + '%';
+  perfEl.className   = 'metric-val ' + (perf >= 0.95 ? 'green' : perf >= 0.80 ? 'orange' : 'red');
+
+  // Update cached state used by cursor plugin (current-formula trough/falling)
+  currentTroughIndex = troughExtDelegIndex(P, F, m, r, perf);
+  currentROAFalling  = A > F;
+
+  // Rebuild all five chart series:
+  //   [0] SPO red zone (current), [1] SPO green zone (current),
+  //   [2] ROA (current),
+  //   [3] SPO (proposed), [4] ROA (proposed).
+  const spoRedData   = [];
+  const spoGreenData = [];
+  const roaData      = [];
+  const spoPropData  = [];
+  const roaPropData  = [];
+  for (let i = 0; i < STEPS; i++) {
+    const Si  = P + i * 0.5e6;
+    const spo = spoIncome(Si, P, F, m, r, perf);
+    const inRed   = currentTroughIndex >= 0 && i <= currentTroughIndex;
+    const inGreen = currentTroughIndex <  0 || i >= currentTroughIndex;
+    spoRedData.push(inRed   ? spo : null);
+    spoGreenData.push(inGreen ? spo : null);
+    roaData.push(delegROA(Si, P, F, m, r, perf));
+    spoPropData.push(spoIncomeProposed(Si, P, F, m, r, perf, b));
+    roaPropData.push(delegROAProposed(Si, P, F, m, r, perf, b));
+  }
+  myChart.data.datasets[0].data = spoRedData;
+  myChart.data.datasets[1].data = spoGreenData;
+  myChart.data.datasets[2].data = roaData;
+  myChart.data.datasets[3].data = spoPropData;
+  myChart.data.datasets[4].data = roaPropData;
+  myChart.update();
+}
+
+// ── Curve visibility (toggle checkboxes) ────────────────
+function applyCurveVisibility() {
+  const showCurrent  = document.getElementById('cb-show-current').checked;
+  const showProposed = document.getElementById('cb-show-proposed').checked;
+  // datasets 0,1,2 = current; datasets 3,4 = proposed
+  myChart.data.datasets[0].hidden = !showCurrent;
+  myChart.data.datasets[1].hidden = !showCurrent;
+  myChart.data.datasets[2].hidden = !showCurrent;
+  myChart.data.datasets[3].hidden = !showProposed;
+  myChart.data.datasets[4].hidden = !showProposed;
+  myChart.update();
+}
+
+// ── Wire up all sliders ────────────────────────────────
+['sl-m', 'sl-p', 'sl-f', 'sl-r', 'sl-d', 'sl-perf', 'sl-b'].forEach(id =>
+  document.getElementById(id).addEventListener('input', update)
+);
+
+// Curve visibility checkboxes
+document.getElementById('cb-show-current').addEventListener('change', applyCurveVisibility);
+document.getElementById('cb-show-proposed').addEventListener('change', applyCurveVisibility);
+
+// Epoch window slider: recalculate performance from cached history if available
+document.getElementById('sl-epoch-window').addEventListener('input', () => {
+  const val = parseInt(document.getElementById('sl-epoch-window').value);
+  document.getElementById('lbl-epoch-window').textContent =
+    `${val} epoch${val === 1 ? '' : 's'} ≈ ${Math.round(val * 5)} days`;
+  if (poolHistoryData.length > 0) {
+    autoSetPerformance();
+  }
+});
+
+// ── Pool Lookup via Koios (mainnet, routed through CORS proxy) ────
+const KOIOS = 'https://api.koios.rest/api/v1';
+const PROXY = 'https://corsproxy.io/?';
+const R_MIN  = 0.00010;
+const R_MAX  = 0.00100;
+function proxied(url) { return PROXY + encodeURIComponent(url); }
+
+function setStatus(msg, color) {
+  const el = document.getElementById('lookup-status');
+  el.textContent = msg;
+  el.style.color = color === 'green'  ? 'var(--green)'
+                 : color === 'red'    ? 'var(--red)'
+                 : color === 'accent' ? 'var(--accent)'
+                 : 'var(--muted)';
+}
+
+function clampSet(id, value) {
+  const el = document.getElementById(id);
+  const clamped = Math.max(parseFloat(el.min), Math.min(parseFloat(el.max), value));
+  el.value = clamped;
+}
+
+// Fetch live r averaged over the last numEpochs settled epochs.
+// Retries once after 1 s on failure. Returns null if both attempts fail.
+async function fetchLiveR(numEpochs = 5) {
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    try {
+      if (attempt > 0) await new Promise(res => setTimeout(res, 1000));
+      const resp = await fetch(
+        proxied(`${KOIOS}/epoch_info?order=epoch_no.desc&limit=9&select=epoch_no,total_rewards,active_stake`)
+      );
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const epochs = await resp.json();
+      if (!Array.isArray(epochs)) throw new Error('Unexpected response');
+      const rates = [];
+      for (const e of epochs) {
+        if (e.total_rewards == null) continue;
+        // Same correction as koios.mjs: Koios total_rewards ≈ R/(1+A₀); gross() needs R/TAS.
+        const r = Number(e.total_rewards) / Number(e.active_stake) * (1 + A0);
+        if (r >= R_MIN && r <= R_MAX) rates.push(r);
+        if (rates.length >= numEpochs) break;
+      }
+      if (rates.length === 0) throw new Error('No settled epoch data');
+      return rates.reduce((a, b) => a + b, 0) / rates.length;
+    } catch (err) {
+      if (attempt >= 1) return null;
+    }
+  }
+  return null;
+}
+
+async function loadPool() {
+  const raw = document.getElementById('ticker-input').value.trim();
+  if (!raw) { setStatus('Please enter a ticker or pool ID.', 'muted'); return; }
+
+  // Detect whether input is a bech32 pool ID (starts with "pool1", length > 30)
+  const isPoolId = /^pool1[a-z0-9]{50,}$/i.test(raw);
+  const ticker   = isPoolId ? null : raw.toUpperCase();
+
+  const btn = document.getElementById('load-btn');
+  btn.disabled = true;
+
+  // Reset performance state before fetch
+  poolHistoryData = [];
+  epochInfoData   = {};
+  clampSet('sl-perf', 100);
+  document.getElementById('perf-status').textContent = 'Fetching performance history…';
+  document.getElementById('perf-status').style.color = 'var(--muted)';
+
+  const label = isPoolId ? raw.slice(0, 16) + '…' : ticker;
+  setStatus('Searching for ' + label + ' on mainnet…', 'muted');
+
+  try {
+    let poolId;
+
+    if (isPoolId) {
+      // Input is already a bech32 pool ID — skip the ticker lookup
+      poolId = raw.toLowerCase();
+    } else {
+      // Step 1: resolve ticker → pool_id_bech32
+      const listResp = await fetch(
+        proxied(`${KOIOS}/pool_list?ticker=eq.${encodeURIComponent(ticker)}&select=pool_id_bech32,ticker`)
+      );
+      if (!listResp.ok) throw new Error(`Koios pool_list HTTP ${listResp.status}`);
+      const pools = await listResp.json();
+
+      if (!Array.isArray(pools) || pools.length === 0) {
+        setStatus(`Pool "${ticker}" not found on mainnet. Check the ticker and try again.`, 'red');
+        document.getElementById('perf-status').textContent = 'Pool not found.';
+        return;
+      }
+
+      poolId = pools[0].pool_id_bech32;
+    }
+    setStatus('Found pool ID — fetching parameters…', 'muted');
+
+    // Step 2: fetch pool financial parameters
+    const infoResp = await fetch(proxied(`${KOIOS}/pool_info`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ _pool_bech32_ids: [poolId] }),
+    });
+    if (!infoResp.ok) throw new Error(`Koios pool_info HTTP ${infoResp.status}`);
+    const infos = await infoResp.json();
+
+    if (!Array.isArray(infos) || infos.length === 0) {
+      setStatus('Pool info not returned by Koios. Try again in a moment.', 'red');
+      return;
+    }
+
+    const info = infos[0];
+    const name         = info.meta_json?.name ?? ticker ?? poolId.slice(0, 20);
+    const marginPct    = (info.margin ?? 0) * 100;                          // % (0–100)
+    const fixedADA     = Number(info.fixed_cost ?? 340000000) / 1e6;        // lovelace → ADA
+    const pledgeMADA   = Number(info.pledge     ?? 0)         / 1e12;       // lovelace → M ADA
+    const liveStakeLov = Number(info.live_stake ?? info.pledge ?? 0);
+    const pledgeLov    = Number(info.pledge     ?? 0);
+    const extDelegMADA = Math.max(0, (liveStakeLov - pledgeLov) / 1e12);   // M ADA
+    const delegators   = info.live_delegators ?? '?';
+    const totalMADA    = (liveStakeLov / 1e12).toFixed(1);
+
+    clampSet('sl-m', marginPct);
+    clampSet('sl-f', fixedADA);
+    clampSet('sl-p', pledgeMADA);
+    clampSet('sl-d', extDelegMADA);
+
+    const warnings = [];
+    if (pledgeMADA   > 70) warnings.push('pledge clamped to 70 M ADA');
+    if (extDelegMADA > 70) warnings.push('delegation clamped to 70 M ADA');
+    const warn = warnings.length ? ' ⚠ ' + warnings.join(', ') : '';
+
+    const displayTag = ticker ? `${name} [${ticker}]` : `${name} [${poolId.slice(0, 16)}…]`;
+    setStatus(
+      `${displayTag} · ${delegators} delegators · ${totalMADA} M ADA live stake` +
+      `${warn} · fetching epoch history and live r…`,
+      'accent'
+    );
+
+    // Step 3: fetch pool block history (up to 73 epochs, most recent first)
+    const histResp = await fetch(
+      proxied(
+        `${KOIOS}/pool_history?_pool_bech32=${encodeURIComponent(poolId)}` +
+        `&select=epoch_no,active_stake,block_cnt&order=epoch_no.desc&limit=73`
+      )
+    );
+    if (histResp.ok) {
+      const histJson = await histResp.json();
+      if (Array.isArray(histJson)) poolHistoryData = histJson;
+    }
+
+    // Step 4: fetch network epoch info for those epochs (blk_count + active_stake)
+    if (poolHistoryData.length > 0) {
+      const epochNums = poolHistoryData.map(h => h.epoch_no).join(',');
+      const epochResp = await fetch(
+        proxied(
+          `${KOIOS}/epoch_info?epoch_no=in.(${epochNums})&select=epoch_no,blk_count,active_stake`
+        )
+      );
+      if (epochResp.ok) {
+        const epochArr = await epochResp.json();
+        if (Array.isArray(epochArr)) {
+          epochInfoData = {};
+          for (const e of epochArr) epochInfoData[e.epoch_no] = e;
+        }
+      }
+    }
+
+    // Step 5: fetch live r and update slider
+    let rNote;
+    const liveR = await fetchLiveR();
+    if (liveR !== null) {
+      clampSet('sl-r', liveR);
+      rNote = ` · r = ${liveR.toFixed(6)} (live from Koios)`;
+    } else {
+      const currentR = parseFloat(document.getElementById('sl-r').value);
+      rNote = ` · ⚠ r fetch failed — using ${currentR.toFixed(6)} (ROA may be inaccurate)`;
+    }
+
+    // Auto-compute performance from fetched history then redraw (reads updated r slider)
+    autoSetPerformance();
+
+    setStatus(
+      `${displayTag} · ${delegators} delegators · ${totalMADA} M ADA live stake` +
+      `${rNote}${warn}`,
+      liveR !== null ? 'green' : 'accent'
+    );
+
+  } catch (err) {
+    setStatus('Error: ' + err.message, 'red');
+    document.getElementById('perf-status').textContent = 'Could not fetch performance data — performance left at 100%.';
+    document.getElementById('perf-status').style.color = 'var(--red)';
+    update();
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('load-btn').addEventListener('click', loadPool);
+document.getElementById('ticker-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadPool();
+});
+
+// Ctrl+K → focus the ticker/pool-ID input from anywhere on the page
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey && e.key === 'k') {
+    e.preventDefault();
+    const inp = document.getElementById('ticker-input');
+    inp.focus();
+    inp.select();
+  }
+});
+
+update(); // initial render
+
+// Auto-focus the input so the user can start typing immediately
+document.getElementById('ticker-input').focus();
+</script>
+</body>
+</html>
