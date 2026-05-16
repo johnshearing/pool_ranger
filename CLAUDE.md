@@ -1,9 +1,7 @@
 # CLAUDE.md — Pool Ranger (ranger)
 
 These files are auto-loaded by Claude Code at the start of every session for this directory.
-**Always read `claude_queries/utilization_scaled_pledge_bonus.md` at the start of each session** to get background information on the interactive chart we are trying to create in order to simulate the Cardano parameter change that was proposed.
-**Always read `SPO_REWARD_ANALYSIS_CHART_COMPANION.md` at the start of each session** to get background on a chart that currently exist that we may modify to simulate the Cardano parameter change that was proposed in `SPO_REWARD_ANALYSIS_CHART_COMPANION.md`.
-**Always read `SPO_REWARD_ANALYSIS_CHART.html` at the start of each session** see the chart which might be used as a model for a chart which will simulate the Cardano parameter change that was proposed in `SPO_REWARD_ANALYSIS_CHART_COMPANION.md`.
+**Always read `README.md` at the start of each session** to understand the value Pool Ranger can add to the community.
 
 
 ---

@@ -210,4 +210,11 @@ To see rewards that have built up but not yet been sent to you:
 
 
 ## Donate To Pool Ranger
+```
 addr1q9m7zdhxm7ecp560nyl7rnl2xstajnx0s96ppwfcv0upawzwfv6fkds3r7tagww4hq5ruz49jknfjaz5ujdch3gyng5qkhxd5v
+```
+
+[Why Supporting Pool Ranger Is a Wise Investment](https://github.com/johnshearing/pool_ranger/blob/main/WHY_SUPPORT_POOL_RANGER.md) 
+- How the free tools already pay back your donation.  
+- Why the on-chain 99/1 split keeps paying you back after launch.   
+- Why open-sourcing the code permanently caps Pool Ranger's fees.
