@@ -18,6 +18,8 @@ Cardano's reward formula contains a structural defect in the pledge bonus term `
 
 This CIP proposes a parameter-free reshape of the existing pledge bonus by multiplying it by pool utilization `u = min(S, S_sat) / S_sat`. The new bonus is `A = r · a₀ · P · min(S, S_sat) / (S_sat · (1 + a₀))`. A saturated pool earns exactly today's pledge bonus; a half-utilized pool earns half; an empty pledged pool earns nothing from pledge until delegators arrive. No new parameter is introduced — `a₀` retains its name, governance dial, and Sybil-resistance role. The change removes the dilution regime entirely, strengthens Sybil resistance at the formula level, makes "fill pools to saturation" self-enforcing at every utilization level, and gives small honest operators a viable on-ramp through delegation rather than personal capital.
 
+> **▶ Interactive simulator with guided tutorials.** A companion page lets readers manipulate `P`, `S`, `r`, `a₀`, `m`, `F`, and the blending coefficient `b`, and watch the formula's behavior in real time against side-by-side current-vs-proposed curves. Four narrated walkthroughs are built in: (1) **the math explainer** — what changes, why, with the formula derivation; (2) **who benefits, and by how much** — stakeholder-by-stakeholder tour of saturated SPOs, below-saturation SPOs, small honest operators, delegators, cooperatives, decentralization, and treasury; (3) **the multi-pool operator problem** — the quantitative case for how the CIP deters MPO behavior at the formula level without lowering Sybil resistance; (4) **free-form exploration** — manipulate every parameter freely. Live page: https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html. The same file is also included in this folder as `CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html` and runs offline in any modern browser.
+
 ## Motivation: why is this CIP necessary?
 
 The standard Cardano delegator return formula (Reward Sharing Scheme, CIP-0084) reduces to:
@@ -245,7 +247,11 @@ Implementors have not yet committed; the `Implementors:` field is empty pending 
 - CIP-50 — Pool leverage cap proposal (related; addresses a different symptom).
 - Brünjes, Kiayias, Koutsoupias, Stouka — *Reward Sharing Schemes for Stake Pools* (the original RSS paper formalizing the formula this CIP modifies).
 - `utilization_scaled_pledge_bonus.md` (in this folder) — Full written derivation, numerical anchors, and risk analysis.
-- `CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html` (in this folder) — Interactive simulator. Live URL: https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html
+- `CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html` (in this folder) — Interactive simulator with four guided tutorials, runnable offline. Live page: https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html. Tutorials:
+  - **The math explainer** — derivation of `A_new` from the existing reward formula, with the blending coefficient `b` and the current-vs-proposed curves side by side.
+  - **Who benefits, and by how much** — stakeholder-by-stakeholder walkthrough: saturated SPOs, below-saturation SPOs, small honest operators, delegators, cooperatives, decentralization, treasury.
+  - **The multi-pool operator problem** — quantitative tour showing today's formula imposes no cost on splitting, while the proposal taxes it proportional to `N` without lowering `a₀`.
+  - **Free-form exploration** — every slider unlocked; sweep parameters and watch both formulas respond.
 
 ## Acknowledgements
 
