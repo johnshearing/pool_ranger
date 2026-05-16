@@ -206,3 +206,8 @@ To see rewards that have built up but not yet been sent to you:
 - [SPO and Delegator Reward Analysis - Interactive Chart](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
 - [Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)
 - [View and Analyze All Pools](https://johnshearing.github.io/pool_ranger/epoch_agent/epoch_report_viewer.html)
+- [CIP: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)
+
+
+## Donate To Pool Ranger
+addr1q9m7zdhxm7ecp560nyl7rnl2xstajnx0s96ppwfcv0upawzwfv6fkds3r7tagww4hq5ruz49jknfjaz5ujdch3gyng5qkhxd5v

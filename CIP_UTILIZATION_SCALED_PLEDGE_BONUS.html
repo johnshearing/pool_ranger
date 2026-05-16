@@ -40,6 +40,68 @@ body {
 h1   { color: var(--accent); font-size: 1.4rem; margin-bottom: 0.2rem; }
 .sub { color: var(--muted);  font-size: 0.88rem; margin-bottom: 1.4rem; }
 
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.github-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.github-link:hover { border-color: var(--accent); color: var(--accent); }
+.github-link svg   { fill: currentColor; }
+
+/* ── donations panel ──────────────────────────────────── */
+#donate-panel {
+  border: 2px dashed var(--orange);
+  background: linear-gradient(180deg, rgba(210,153,34,0.07) 0%, var(--surface) 100%);
+}
+#donate-panel .donate-warning {
+  background: var(--orange);
+  color: #0d1117;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0.45rem 0.7rem;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  margin: 0.5rem 0 0.6rem;
+}
+#donate-panel .donate-address {
+  display: block;
+  font-family: monospace;
+  font-size: 0.86rem;
+  color: var(--orange);
+  background: var(--bg);
+  border: 1px dashed var(--orange);
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  word-break: break-all;
+  text-align: center;
+  margin: 0.4rem 0;
+}
+#donate-panel .donate-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.55rem;
+  line-height: 1.45;
+}
+
 .panel {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -316,7 +378,26 @@ input[type=range] {
 </head>
 <body>
 
-<h1>CIP Simulation — Utilization-Scaled Pledge Bonus</h1>
+<div class="page-header">
+  <h1>CIP Simulation — Utilization-Scaled Pledge Bonus</h1>
+  <a class="github-link"
+     href="https://github.com/johnshearing/pool_ranger"
+     target="_blank"
+     rel="noopener noreferrer"
+     title="Pool Ranger on GitHub">
+    <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38
+        0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13
+        -.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66
+        .07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95
+        0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.42 7.42 0 014 0
+        c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15
+        0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2
+        0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
+    </svg>
+    Pool Ranger on GitHub
+  </a>
+</div>
 <p class="sub">
   Interactive simulation of the parameter change proposed in
   <a href="https://github.com/johnshearing/pool_ranger/blob/main/claude_queries/utilization_scaled_pledge_bonus.md"
@@ -336,9 +417,9 @@ input[type=range] {
     <button id="tour-start-btn">▶  Explain the CIP for a UTILIZATION-SCALED PLEDGE BONUS</button>
   </div>
   <div class="tour-launcher-row">
-    <button id="tour-start-btn-why"      class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
+    <button id="tour-start-btn-mpo"      class="secondary">▶  The Multi-Pool Operator Problem — and how the CIP helps decentralization</button>
     <button id="tour-start-btn-benefits" class="secondary">▶  Who benefits, and by how much</button>
-    <button id="tour-start-btn-mpo"      class="secondary">▶  The Multi-Pool Operator problem — and how the CIP helps</button>
+    <button id="tour-start-btn-why"      class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
   </div>
   <span id="tour-launcher-hint">
     — Guided walkthroughs. Cards appear bottom-right; arrows point at the relevant
@@ -640,6 +721,15 @@ input[type=range] {
       (dS = 0.1 M ADA) and scaled to %/year per +1 M ADA added — the dimensionally natural
       unit for "if one more delegator arrives, how much does ROA move?"
     </span>
+  </div>
+</div>
+
+<!-- ── Donations ─────────────────────────────────────── -->
+<div class="panel" id="donate-panel">
+  <div class="panel-title">Support Pool Ranger — Donations in ADA</div>
+  <code class="donate-address" id="donate-address">addr1q9m7zdhxm7ecp560nyl7rnl2xstajnx0s96ppwfcv0upawzwfv6fkds3r7tagww4hq5ruz49jknfjaz5ujdch3gyng5qkhxd5v</code>
+  <div class="donate-note">
+    If you find this analysis useful and want to support continued work on Pool Ranger and CIP advocacy, please donate.
   </div>
 </div>
 
@@ -1945,13 +2035,16 @@ TOUR_SCRIPTS.benefits = [
     holdMs: 9000,
   },
   {
-    title: 'Multi-Pool Operators: deterred at the formula level',
-    body: `<p>A <strong>multi-pool operator (MPO)</strong> is a single entity running many
-      stake pools to capture more block production and fees than they'd get as a single
-      operator. Today's formula does <em>not</em> deter splitting — an MPO with
-      <code>X</code> ADA earns the same total pledge bonus whether they run 1 pool or 100.</p>
-      <p>Under the proposal, splitting <strong>multiplies the cost</strong>. Numbers for a
-      whale with 50 M ADA of pledge:</p>
+    title: 'Decentralization — MPOs deterred without lowering Sybil resistance',
+    body: `<p><strong>Decentralization</strong> is the network-wide stakeholder this part of
+      the CIP serves. A <strong>multi-pool operator (MPO)</strong> is a single entity running
+      many stake pools to capture more block production and fees than they'd get as one
+      operator — undermining Cardano's intended <code>k</code>-pool diversity.</p>
+      <p>Today's defense is purely <em>behavioural</em>: <code>a₀ = 0.3</code> makes the
+      per-pool pledge bonus small for split pools, and rational delegators avoid them.
+      <strong>The CIP leaves <code>a₀</code> untouched</strong> — today's Sybil deterrent
+      is preserved exactly as it stands. On top of that, the CIP adds a <em>formula-level</em>
+      cost for splitting. Numbers for a 50 M ADA holder:</p>
       <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
         <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N pools):</td>
             <td style="text-align:right">≈ 6,323 ADA/epoch · 462 K/yr</td></tr>
@@ -1963,13 +2056,14 @@ TOUR_SCRIPTS.benefits = [
             <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;42 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
       </table>
       <p>A 10-way split costs roughly <strong>277 K ADA/year</strong> in forgone bonus
-      versus staying in one pool — a formula-level penalty that didn't exist before.</p>`,
+      versus staying in one pool. Multi-pool operation is discouraged at the formula level —
+      while Sybil resistance via <code>a₀</code> remains exactly what it is today.</p>`,
     targets: ['m-A-prop'],
     actions: [
       { kind: 'slider', id: 'sl-p', value: 0.5, ms: 600 },
       { kind: 'slider', id: 'sl-d', value: 60,  ms: 800 },
     ],
-    holdMs: 12000,
+    holdMs: 13000,
   },
   {
     title: 'Treasury & protocol health',
@@ -1999,8 +2093,9 @@ TOUR_SCRIPTS.benefits = [
           registration.</li>
         <li><strong>Small honest SPOs</strong> — competitive viability via delegation, not
           personal wealth.</li>
-        <li><strong>Multi-pool operators</strong> — face a new formula-level cost
-          proportional to how many pools they split into.</li>
+        <li><strong>Decentralization</strong> — multi-pool operators face a new
+          formula-level cost proportional to how many pools they split into;
+          <code>a₀</code> is untouched, so today's Sybil resistance is preserved.</li>
         <li><strong>Treasury</strong> — governance-tunable (slower depletion or
           recalibrated to preserve).</li>
         <li><strong>Protocol</strong> — the intended <code>k</code>-pool equilibrium
@@ -2019,14 +2114,16 @@ TOUR_SCRIPTS.benefits = [
 // in today's defense. Quantitative throughout — anchored to the 50 M ADA example.
 TOUR_SCRIPTS.mpo = [
   {
-    title: 'What is a Multi-Pool Operator?',
+    title: 'The MPO problem — a decentralization issue',
     body: `<p>A <strong>multi-pool operator (MPO)</strong> is a single entity running many
-      stake pools simultaneously. The concern in Cardano's community: one entity controlling
-      many pools captures more block production and fixed-fee revenue than a single operator
-      would — and appears as many independent voices in governance, undermining real
-      decentralization while preserving its appearance.</p>
-      <p>This 8-step tutorial shows why the current formula doesn't fully deter splitting,
-      and how the CIP closes that gap with concrete numbers.</p>`,
+      stake pools simultaneously. One entity controlling many pools captures more block
+      production and fixed-fee revenue than a single operator would, and appears as many
+      independent voices in governance — undermining <strong>real decentralization</strong>
+      while preserving its appearance.</p>
+      <p>Decentralization is the stakeholder this tutorial speaks for. The 8 steps below
+      show why today's formula does not fully deter splitting, and how the CIP closes that
+      gap <em>without lowering Sybil resistance</em> — <code>a₀</code> stays exactly as it
+      is today.</p>`,
     targets: [],
     actions: [
       { kind: 'slider', id: 'sl-p', value: 50,       ms: 600 },
@@ -2091,13 +2188,16 @@ TOUR_SCRIPTS.mpo = [
     holdMs: 11000,
   },
   {
-    title: 'How the CIP closes the gap',
+    title: 'How the CIP closes the gap — without lowering a₀',
     body: `<p>The proposal multiplies each pool's pledge bonus by its <strong>utilization</strong>
-      <code>u = S / S<sub>sat</sub></code>.</p>
+      <code>u = S / S<sub>sat</sub></code>. Crucially, it <strong>does not touch
+      <code>a₀</code></strong> — the existing Sybil-resistance dial keeps doing its job
+      through the delegator-preference channel.</p>
       <p>A self-funded MPO's split pools each have <em>low</em> utilization — each pool can
       only be filled by the operator's <code>X/N</code> share of their own ADA, which is
       tiny relative to <code>S<sub>sat</sub></code>. So each split pool earns only
-      <code>u<sub>i</sub> ×</code> today's bonus, and the total scales with <code>1/N</code>.</p>
+      <code>u<sub>i</sub> ×</code> today's bonus, and the total scales with <code>1/N</code>.
+      The new formula-level cost stacks <em>on top of</em> today's behavioural defense.</p>
       <p>The blending coefficient <code>b</code> below the chart lets you watch the effect
       ramp from <em>0 (today)</em> to <em>1 (full proposal)</em>.</p>`,
     targets: ['formula-panel', 'sl-b'],
@@ -2105,7 +2205,7 @@ TOUR_SCRIPTS.mpo = [
       { kind: 'slider', id: 'sl-b', value: 0, ms: 1200 },
       { kind: 'slider', id: 'sl-b', value: 1, ms: 1800 },
     ],
-    holdMs: 9000,
+    holdMs: 10000,
   },
   {
     title: 'The numbers — 50 M ADA holder',
@@ -2148,15 +2248,16 @@ TOUR_SCRIPTS.mpo = [
     holdMs: 9000,
   },
   {
-    title: 'Net effect on decentralization',
-    body: `<p>Under the CIP:</p>
+    title: 'Net effect — decentralization, strengthened',
+    body: `<p>Under the CIP, the decentralization stakeholder gains on every axis:</p>
       <ul style="margin: 0.3rem 0 0.5rem 1.1rem; padding: 0;">
         <li>The "easy multi-pool strategy" is structurally taxed, proportional to how many
           pools an operator runs.</li>
         <li>Single-pool honest operators with modest pledge become more attractive — they
           earn the full saturated pledge bonus at saturation regardless of pledge size.</li>
-        <li>Today's behavioral defense (delegator preference) and the new formula-level
-          defense reinforce each other.</li>
+        <li><strong>Sybil resistance is preserved.</strong> <code>a₀</code> is untouched,
+          so today's delegator-preference channel continues to work exactly as it does
+          now. The new formula-level cost stacks on top of it.</li>
         <li>The protocol's intended <code>k</code>-pool diversity becomes self-enforcing,
           not merely aspirational.</li>
       </ul>
