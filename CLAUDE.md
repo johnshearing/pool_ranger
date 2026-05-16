@@ -1,7 +1,9 @@
 # CLAUDE.md — Pool Ranger (ranger)
 
 These files are auto-loaded by Claude Code at the start of every session for this directory.
-**Always read `README.md` at the start of each session** to understand the value Pool Ranger can add to the community.
+**Always read `README.md` at the start of each session**.
+**Always read `/home/js/aiken/ranger/claude_queries/utilization_scaled_pledge_bonus.md` at the start of each session**.
+**Always read `/home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.htmlU` at the start of each session**.
 
 
 ---
