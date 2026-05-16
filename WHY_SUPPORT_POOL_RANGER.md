@@ -10,7 +10,7 @@
 You do not have to wait for the Pool Ranger smart contract to go live to start earning a return on a donation.
 The interactive tools published by Pool Ranger are free, open to everyone, and already produce real ADA gains for any delegator who uses them.
 
-Consider what these tools do for you right now, at zero cost:
+**Consider what these tools do for you right now, at zero cost:**
 
 - **[SPO and Delegator Reward Analysis — Interactive Chart](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)**
   Type the ticker of the pool you currently delegate to. The chart pulls live data from the Cardano blockchain and shows you exactly what your pool is earning, what its margin is doing to your returns, and where your ROA falls on the saturation curve. Most delegators have never seen their pool's economics laid out this clearly. Many discover within thirty seconds that they are leaving 1% to 3% annual return on the table — every year, on every ADA they hold.
@@ -24,8 +24,23 @@ Consider what these tools do for you right now, at zero cost:
 - **[Latest Epoch Reporting Data](https://github.com/johnshearing/pool_ranger/tree/main/epoch_agent/reports)**
   Look here for the latest raw data that feeds the Pool Viewer. At the very top of the report is a list of what pools changed Fee, Margin, or Pledge since the last epoch. This information is also available from the Pool Viewer by setting a filter.  
 
-- **[CIP: Utilization Scaled Pledge Bonus — The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)**
-  A proposed protocol improvement that would push more reward to single-pool operators who actually pledge their own ADA. Whether or not it is adopted, the analysis behind it helps you understand which operators are already aligned with sound economic incentives.
+- **[CIP: Utilization Scaled Pledge Bonus — The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)**  
+  This is a proposed protocol improvement that would push more reward to single-pool operators who actually pledge their own ADA.  
+  Whether or not it is adopted, the analysis behind it helps you understand which operators are already aligned with sound economic incentives.  
+  The CIP is about changing the way pledge bonus is calculated to include the effect of how much delegation a pool has.  
+  The effect is to support honest pools and penalize multipool operators without lowering Sybil resistance of the protocol.  
+  If you look at a typical Single Pool Operator [using the simulator](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html) you will see there is little or no difference when using the current calculation of pledge bonus or the proposed calculation.  
+  Only pools that have pledge but no delegation (typically multi-pools) are punished.  
+  Also, currently the protocol is actually working against filling honest pools with delegation.  
+  This is because with many combinations of fee, margin, and pledge, ROA actually goes down as delegation rises.  
+  In these cases, SPOs and Delegators are actually penalized for adding delegation! You can see this in the simulator.  
+  The CIP fixes this with one small change in how the pledge bonus is calculated.  
+  In any case, Pool Ranger has no pony in this race. Pool Ranger gets the highest possible ROA for its members no matter how the pledge bonus is calculated.    
+  The only reason I know about the issue is because Pool Ranger developed software that allows us to pick good stake pools and avoid the bad.  
+  All of that software is now open sourced and listed above.  
+  In any case, the problem with pledge calculation that favors multipool operators and discourages delegation to honest pools showed itself in the software so I wrote a CIP about it.  
+  **Note:** Using the term Honest Pool when talking about Single Pools implies that Multi-Pools are not honest. Here is why most Multi-Pools do not meet the honesty criteria: While currently the protocol does not incentivize the behavior, the intention of the protocol creators is that SPOs will provide a place for delegators to earn a fair reward for staking. Multi-Pools with lots of delegation are meeting at least that objective, and these pools will be unaffected by the proposed change. But Multi-Pools with little delegation are collecting fees for each pool, and a pledge bonus too, every epoch without providing that service. These are the pools that will lose income from the change proposed in this CIP. 
+
 
 **The math is straightforward.** If a single one-hour session with these tools moves you from a mediocre pool to a well-parameterized one, the additional staking rewards over the next year will dwarf any reasonable donation. On a 10,000 ADA delegation, even a 1% ROA improvement is 100 ADA per year — every year, compounding, for as long as you hold ADA.
 
