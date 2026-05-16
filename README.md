@@ -200,13 +200,14 @@ To see rewards that have built up but not yet been sent to you:
 - [The Pool Ranger Specification, Roadmap, and ToDo List](https://github.com/johnshearing/pool_ranger/blob/main/REQUIREMENTS.md)
 - [How to Use The Epoch Reporting System](https://github.com/johnshearing/pool_ranger/blob/main/epoch_agent/HOW_TO_RUN.md)
 - [How To Use The SPO and Delegator Reward Analysis - Interactive Chart](https://github.com/johnshearing/pool_ranger/blob/main/SPO_REWARD_ANALYSIS_CHART_COMPANION.md)
+- [CIP: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://github.com/cardano-foundation/CIPs/pull/1193)
 
 ## Pool Ranger Interactive Tools
 
 - [SPO and Delegator Reward Analysis - Interactive Chart](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
 - [Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)
 - [View and Analyze All Pools](https://johnshearing.github.io/pool_ranger/epoch_agent/epoch_report_viewer.html)
-- [CIP: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)
+- [Interactive Chart for CIP: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)
 
 
 ## Donate To Pool Ranger
