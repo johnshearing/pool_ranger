@@ -282,6 +282,42 @@ tbody td { padding: .42rem .65rem; vertical-align: middle; }
   display: flex; flex-wrap: wrap; gap: 1.2rem; font-size: .8rem; color: var(--muted);
 }
 .sum-bar b { color: var(--text); font-weight: normal; }
+
+/* ── donations panel ──────────────────────────────────── */
+.donate-panel {
+  border: 2px dashed var(--green);
+  background: linear-gradient(180deg, rgba(210,153,34,0.07) 0%, var(--surface) 100%);
+  border-radius: 8px;
+  padding: 1.1rem 1.4rem;
+  margin-bottom: 1rem;
+}
+.donate-panel .panel-title {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--muted);
+  margin-bottom: 0.9rem;
+}
+.donate-panel .donate-address {
+  display: block;
+  font-family: monospace;
+  font-size: 0.86rem;
+  color: var(--green);
+  background: var(--bg);
+  border: 1px dashed var(--green);
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  word-break: break-all;
+  text-align: center;
+  margin: 0.4rem 0;
+}
+.donate-panel .donate-note {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.55rem;
+  line-height: 1.45;
+}
+.donate-panel .donate-note ul { margin-left: 1.2rem; }
 </style>
 </head>
 <body>
@@ -371,6 +407,19 @@ tbody td { padding: .42rem .65rem; vertical-align: middle; }
 
   <div class="pagination" id="pagination"></div>
   <div class="sum-bar" id="sum-bar"></div>
+
+  <!-- ── Donations ─────────────────────────────────────── -->
+  <div class="donate-panel" id="donate-panel">
+    <div class="panel-title"><a href="https://github.com/johnshearing/pool_ranger/blob/main/WHY_SUPPORT_POOL_RANGER.md" style="color: var(--green); text-decoration: underline;">Why donating to Pool Ranger has a positive expected return</a></div>
+    <div class="donate-note">
+      <ul>
+        <li>How the free tools already pay back your donation.</li>
+        <li>Why the on-chain 99/1 split keeps paying you back after launch.</li>
+        <li>Why open-sourcing the code permanently caps Pool Ranger's fees.</li>
+      </ul>
+    </div>
+    <code class="donate-address" id="donate-address">addr1q9m7zdhxm7ecp560nyl7rnl2xstajnx0s96ppwfcv0upawzwfv6fkds3r7tagww4hq5ruz49jknfjaz5ujdch3gyng5qkhxd5v</code>
+  </div>
 </div>
 
 <script>
