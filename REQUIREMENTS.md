@@ -233,6 +233,65 @@ This is the step-by-step process the Pool Ranger administrator follows.
 
 ---
 
+## Pool Analytics & Epoch Reporting (Phase 1b — Implemented)
+
+While building the smart contracts it became clear that the administrator needs robust tools
+to pick the best pools each epoch. The need for these tools was discovered after the original
+Phase 1 list was written, but they are an essential part of Pool Ranger and are now in active
+use. They also lay the data + math foundation for the Phase 3 automation agent.
+
+All of these tools pull live mainnet data from **Koios** (via `corsproxy.io`, no API key
+required), so the admin can evaluate any real Cardano pool, not just preview-testnet pools.
+
+### Epoch Reporting System (`epoch_agent/`)
+
+A Node.js `.mjs` pipeline that runs once per epoch. It discovers candidate pools, evaluates
+each one against Cardano's reward formula, allocates Pool Ranger's total stake across the best
+fits, and emits a human-readable epoch report.
+
+- [x] `epoch_agent/run.mjs` — top-level orchestrator; runs the full pipeline for one epoch
+- [x] `epoch_agent/discover_pools.mjs` — discovers candidate pools from mainnet
+- [x] `epoch_agent/koios.mjs` — Koios API wrapper (`pool_list`, `pool_info`, `pool_history`, `epoch_info`)
+- [x] `epoch_agent/math.mjs` — Cardano reward math (gross rewards, SPO income, delegator ROA,
+  pledge bonus `A_eff`, minimum-profitable margin `m_min`, trough analysis)
+- [x] `epoch_agent/classify.mjs` — classifies each pool as `ALL_GREEN` / `HAS_RED_ZONE` /
+  `ALL_RED` based on whether additional delegation helps or hurts the SPO
+- [x] `epoch_agent/allocate.mjs` — allocates Pool Ranger's total stake across qualifying pools
+- [x] `epoch_agent/report.mjs` — generates the per-epoch `epoch_NNN.txt` report
+- [x] `epoch_agent/ranger_state.json` — persistent state across runs (history, prior decisions)
+- [x] `epoch_agent/candidate_pools.json` — curated candidate pool list
+- [x] `epoch_agent/reports/epoch_NNN.txt` — one report per epoch (e.g. `epoch_628.txt`,
+  `epoch_629.txt`, `epoch_630.txt`)
+- [x] `epoch_agent/HOW_TO_RUN.md` — operator runbook for the pipeline
+
+Each report covers: eligible pools, high-pledge opportunities, pools avoided, pools dropped,
+solicitation candidates, luck Z-score trends, existing delegations, rebalancing moves, and
+per-pool parameter changes detected this epoch.
+
+### Interactive Web Tools (single-file static HTML, no build step)
+
+Hosted from `https://johnshearing.github.io/pool_ranger/`. Each page fetches live data from
+Koios through `corsproxy.io` so anyone can load any mainnet pool by ticker or `pool1…` ID.
+
+- [x] `SPO_REWARD_ANALYSIS_CHART.html` — interactive sliders + live Chart.js chart showing how
+  an SPO's income and a delegator's ROA change with external delegation. Auto-fills margin,
+  fixed fee, pledge, performance, and live `r` from Koios. Visually separates the **green zone**
+  (delegation helps the SPO) from the **red zone** (delegation hurts the SPO). Includes a
+  performance-history analyser over a configurable epoch window.
+- [x] `POOL_SWITCH_CALCULATOR.html` — load a *current* and a *target* pool side-by-side, enter
+  the ADA being moved, and see annual-reward difference plus a switch-or-stay verdict. Models
+  the 2-epoch overlap so the user can see that switching has no earnings gap.
+- [x] `epoch_agent/epoch_report_viewer.html` — drop-zone / auto-loading web viewer for the
+  `epoch_NNN.txt` reports. Filter by section, recommendation, and classification; sortable on
+  every column; groups by section; expandable detail row per pool with parameter-change deltas.
+  Auto-loads the latest epoch report when served from GitHub Pages.
+
+These three pages are the administrator's daily decision-support surface and will feed directly
+into the Phase 3 automation agent (which consumes the same Koios data through the same math
+module).
+
+---
+
 ## Web UI Requirements (Phase 2)
 
 ### Member WebUI
@@ -254,8 +313,13 @@ This is the step-by-step process the Pool Ranger administrator follows.
 
 ## Automation Phase (Phase 3 — Claude Code Agent)
 
+The pool-evaluation foundation for this phase is already in place: see
+**Pool Analytics & Epoch Reporting (Phase 1b)** above. The `epoch_agent/` pipeline already does
+the per-epoch pool evaluation, classification, and allocation; the remaining Phase 3 work is
+wiring those decisions to the on-chain delegation and reward-distribution scripts.
+
 Claude Code will autonomously handle:
-- Evaluating pools each epoch by projected ROA, block production performance, fee and pledge structure, single-pool operator status, and community contribution
+- Evaluating pools each epoch by projected ROA, block production performance, fee and pledge structure, single-pool operator status, and community contribution *(implemented in `epoch_agent/`)*
 - Moving delegation to higher-ROA pools whenever the optimizer finds a better allocation
 - Last-minute delegation before epoch boundary
 - Withdrawing and distributing rewards

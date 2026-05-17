@@ -1,11 +1,11 @@
 # Why Supporting Pool Ranger Is a Wise Investment
 
 > Pool Ranger asks for ADA donations to fund continued development.  
-> This document explains why this is one of the highest-return decisions a Cardano delegator can make.
+> This document shows why this is one of the highest-return decisions a Cardano delegator can make.
 
 ---
 
-## 1. The Tools Already Pay You Back — Today, Before Pool Ranger Even Launches
+## 1. The Tools Pay You Back Today, Even Before Pool Ranger Launches
 
 You do not have to wait for the Pool Ranger smart contract to go live to start earning a return on a donation.
 The interactive tools published by Pool Ranger are free, open to everyone, and already produce real ADA gains for any delegator who uses them.
@@ -13,7 +13,7 @@ The interactive tools published by Pool Ranger are free, open to everyone, and a
 **Consider what these tools do for you right now, at zero cost:**
 
 - **[SPO and Delegator Reward Analysis — Interactive Chart](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)**
-  Type the ticker of the pool you currently delegate to. The chart pulls live data from the Cardano blockchain and shows you exactly what your pool is earning, what its margin is doing to your returns, and where your ROA falls on the saturation curve. Most delegators have never seen their pool's economics laid out this clearly. Many discover within thirty seconds that they are leaving 1% to 3% annual return on the table — every year, on every ADA they hold.
+  Type the ticker of the pool you currently delegate to. The chart pulls live data from the Cardano blockchain and shows you exactly what your pool is earning, what its margin is doing to your returns, and where your ROA falls on the saturation curve. Many delegators have never seen their pool's economics laid out this clearly. Some discover within thirty seconds that they are leaving 1% or 2% annual return on the table — every year, on every ADA they hold.
 
 - **[Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)**
   Tells you whether moving your delegation to a better pool is worth the transaction friction, and how many epochs until the switch pays for itself. No more guessing.

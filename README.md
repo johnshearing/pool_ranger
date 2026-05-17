@@ -207,7 +207,7 @@ To see rewards that have built up but not yet been sent to you:
 - [SPO and Delegator Reward Analysis - Interactive Chart](https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html)
 - [Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)
 - [View and Analyze All Pools](https://johnshearing.github.io/pool_ranger/epoch_agent/epoch_report_viewer.html)
-- [Latest Epoch Reporting Data](https://github.com/johnshearing/pool_ranger/tree/main/epoch_agent/reports)
+- [Latest Epoch Reporting Data](https://github.com/johnshearing/pool_ranger/tree/main/epoch_agent/reports): See which pools changed their fee, margin, or pledge since the last epoch.
 - [Interactive Chart for CIP: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)
 
 
@@ -216,7 +216,7 @@ To see rewards that have built up but not yet been sent to you:
 addr1q9m7zdhxm7ecp560nyl7rnl2xstajnx0s96ppwfcv0upawzwfv6fkds3r7tagww4hq5ruz49jknfjaz5ujdch3gyng5qkhxd5v
 ```
 
-[Why Supporting Pool Ranger Is a Wise Investment](https://github.com/johnshearing/pool_ranger/blob/main/WHY_SUPPORT_POOL_RANGER.md) 
+[Why Supporting Pool Ranger Returns Your Investment Many Times Over](https://github.com/johnshearing/pool_ranger/blob/main/WHY_SUPPORT_POOL_RANGER.md) 
 - How the free tools already pay back your donation.  
 - Why the on-chain 99/1 split keeps paying you back after launch.   
-- Why open-sourcing the code permanently caps Pool Ranger's fees.
+- Why open-sourcing the code permanently caps delegation management fees.
