@@ -14,7 +14,10 @@
 Pool Ranger is a Cardano staking management platform built on Plutus V3 smart contracts.  
 Members join by moving their ADA to a Pool Ranger base address
 where:
-- The **payment credential** is the member's own spending key — they always control their funds.
+- The **payment credential** is the member's own spending key 
+  - Members always have full control their own funds.
+  - Pool Ranger never has access to member funds.
+  - Members can withdraw or spend their funds at any time.  
 - The **stake credential** is a Pool Ranger Plutus script, parameterized with both the admin's
   and the member's key hash.
 
@@ -46,12 +49,12 @@ validator coop_stake(admin_pkh: VerificationKeyHash, member_pkh: VerificationKey
 | `RegisterAndDelegateCredential` | Admin only |
 | Everything else | Denied |
 
-### `withdraw` handler — reward distribution rules
+### Staking Reward `withdraw` handler — staking reward distribution rules
 
 - **Either admin or member may initiate.** The rule is the same regardless of who signs.
-- **Admin receives ≤ 1%** of the withdrawal amount.
-- **Member receives ≥ 99% minus the transaction fee.**  
-  - The fee is read from `tx.fee` and deducted from the member's floor.  
+- **Admin receives ≤ 1%** of the staking reward withdrawal amount.
+- **Member receives ≥ 99% of staking rewards minus the transaction fee.**  
+  - The fee is read from `tx.fee` and deducted from the member's floor.
    So neither party needs extra ADA on hand — the rewards are self-funding.   
    The initiator provides a small "fee carrier" UTxO that is returned as change.  
    The actual fee comes from the reward balance.  
@@ -61,7 +64,8 @@ validator coop_stake(admin_pkh: VerificationKeyHash, member_pkh: VerificationKey
 - No spending (private) key is ever revealed or required by the contract.
 - Members can revoke membership (deregister) at any time — admin or member signature suffices.
 - Funds remain under sole member control at all times.
-- Transaction fees are paid by whoever initiates the action (admin or member).
+- Transaction fees for `publish` actions (register / delegate / unregister) are paid from the initiator's own wallet. 
+- For `withdraw`, the fee is taken from the member's staking-reward balance instead.
 
 ---
 
