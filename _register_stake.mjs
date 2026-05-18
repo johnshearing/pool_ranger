@@ -18,8 +18,18 @@
 // ─────────────────────────────────────────────────────────────────────────────
 //
 // Usage (from ranger/):
-//   Run the following command:
+//   Run a command like the following sample:
 //   MEMBER_ADDR_PATH=./0_member_2.addr node _register_stake.mjs
+//
+// The sample command shown above has two parts which are placed on a single line:
+// Part one tells the script where on the disk to look for the file which holds the member's address.
+// Be sure to change this part accordingly everytime you run the script.
+// MEMBER_ADDR_PATH=./0_member_2.addr
+//
+// Part two is the command to run the script. This part stays the same:
+// node _register_stake.mjs
+//
+//
 //
 // Software wallet usage:
 //   MEMBER_SK_PATH=./0_member_2.sk node _register_stake.mjs  (after uncommenting below)

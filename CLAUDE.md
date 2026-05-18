@@ -2,7 +2,6 @@
 
 These files are auto-loaded by Claude Code at the start of every session for this directory.
 **Always read `README.md` at the start of each session**.
-**Always read `/home/js/aiken/ranger/WHY_SUPPORT_POOL_RANGER.md` at the start of each session**.
 **Always read `/home/js/aiken/ranger/REQUIREMENTS.md` at the start of each session**.
 
 
