@@ -1,54 +1,122 @@
-// Delegates each member's coop stake address to a chosen pool.
+// Delegates a single member's coop stake address to a chosen pool.
 //
-// Reads a JSON config listing { memberPkh, poolId } assignments, then builds
-// one delegation transaction per member. The admin must sign each transaction.
+// Looks up the member in _1_members.json by --name, builds the delegation
+// transaction, computes its on-chain txHash, and appends a new entry to that
+// member's `delegations` history. The unsigned tx hex is printed for signing
+// by the admin's Ledger (via web/sign_tx.html). Submission happens separately
+// with _submit_tx.mjs.
+//
+// The newest entry in `delegations` is always the current/intended
+// delegation. Past entries are preserved as history — useful when reviewing
+// how the cooperative has moved stake between pools over time.
 //
 // Because the admin uses a Ledger hardware wallet (no .sk file), this script
-// prints the unsigned transaction hex for external signing. For Phase 1 testing
-// with a software admin wallet, uncomment the SOFTWARE WALLET section below.
+// only builds the tx; it never signs or submits.
 //
-// Config file format (default: delegation_config.json):
-//   [
-//     { "memberPkh": "a0627a98...", "poolId": "pool1abc..." },
-//     { "memberPkh": "b1738b09...", "poolId": "pool1xyz..." }
-//   ]
+// Delegation entry shape (appended to member.delegations):
+//   {
+//     "poolId":      "pool1...",
+//     "requestedAt": "2026-05-18T18:42:01.123Z",  // when the tx was built
+//     "txHash":      "abc123..."                   // tx body hash (stable across signing)
+//   }
 //
 // Usage (from ranger/):
-//   node _delegate.mjs
-//   node _delegate.mjs ./my_config.json
+//   node _delegate.mjs --name <member-name> --pool <pool-id>
+//   node _delegate.mjs --help                # show full help text
+//
+// Example:
+//   node _delegate.mjs --name member_1 --pool pool1knap9hldvhww0fjqew26sxkfjpj3c8tp8uuj7j3729lzqn9x70r
+//
+// The script refuses to delegate if the member's most recent delegation entry
+// already targets the same pool (nothing to do). Remove that last entry first
+// if you really want to re-issue the same delegation.
 
 import fs from 'fs';
-import {
-  deserializeAddress,
-} from '@meshsdk/core';
+import { resolveTxHash } from '@meshsdk/core';
 import {
   blockchainProvider,
   getTxBuilder,
-  loadAddressOnly,
   getCoopStakeScript,
-  // loadSoftwareWallet,  // uncomment for software wallet testing
 } from './common/common.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────
-const ADMIN_ADDR_PATH = './0_admin_0.addr';
-const CONFIG_FILE = process.argv[2] || './delegation_config.json';
+// Admin info (address, PKH) is looked up from the ADMIN_NAME entry in
+// _1_members.json — no separate .addr file is needed.
+const ADMIN_NAME   = 'admin_0';
+const MEMBERS_FILE = './_1_members.json';
 
-// ── SOFTWARE WALLET (Phase 1 testing only) ───────────────────────────────
-// Uncomment these two lines to auto-sign with a software admin wallet:
-// const ADMIN_SK_PATH = process.env.ADMIN_SK_PATH || './0_admin_test.sk';
-// const adminWallet = loadSoftwareWallet(ADMIN_SK_PATH);
-// ─────────────────────────────────────────────────────────────────────────
+// ── Parse CLI args (--name <value> --pool <bech32>) ──────────────────────
+function parseArgs(argv) {
+  const args = {};
+  for (let i = 2; i < argv.length; i++) {
+    const flag = argv[i];
+    if (flag.startsWith('--')) {
+      args[flag.slice(2)] = argv[i + 1];
+      i++;
+    }
+  }
+  return args;
+}
+
+const HELP = `Usage:
+  node _delegate.mjs --name <member-name> --pool <pool1...>
+
+Options:
+  --name <name>   Name of the member in _1_members.json to delegate.
+  --pool <id>     Bech32 pool ID (must start with "pool1").
+  -h, --help      Show this help text and exit.
+
+What this does:
+  1. Looks up the member in ./_1_members.json by --name.
+  2. Refuses if the member's latest delegation already targets the same pool.
+  3. Builds a delegation transaction (admin must sign it later).
+  4. Computes the txHash and appends {poolId, requestedAt, txHash} to the
+     member's delegations history in _1_members.json.
+  5. Prints the unsigned tx hex for signing with the admin's Ledger via
+     web/sign_tx.html.
+
+Next steps after running:
+  1. Sign the printed tx hex in web/sign_tx.html (admin's Ledger via Eternl).
+  2. Submit with:  node _submit_tx.mjs <signed-tx-hex>
+                or node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>
+  3. The submitted tx hash should match the txHash printed by this script.
+  4. If you build a tx but never submit it, remove that stale entry from the
+     member's delegations array in _1_members.json by hand.
+
+Example:
+  node _delegate.mjs --name member_1 --pool pool1knap9hldvhww0fjqew26sxkfjpj3c8tp8uuj7j3729lzqn9x70r`;
+
+const rawArgs = process.argv.slice(2);
+if (rawArgs.length === 0 || rawArgs.includes('-h') || rawArgs.includes('--help')) {
+  const askedForHelp = rawArgs.includes('-h') || rawArgs.includes('--help');
+  (askedForHelp ? console.log : console.error)(HELP);
+  process.exit(askedForHelp ? 0 : 1);
+}
+
+const args = parseArgs(process.argv);
+const missing = [];
+if (!args.name) missing.push('--name');
+if (!args.pool) missing.push('--pool');
+if (missing.length > 0) {
+  console.error(`Missing required argument(s): ${missing.join(', ')}\n`);
+  console.error(HELP);
+  process.exit(1);
+}
+if (!args.pool.startsWith('pool1')) {
+  console.error(`Error: --pool must be a bech32 pool ID starting with "pool1" (got: ${args.pool})\n`);
+  console.error(HELP);
+  process.exit(1);
+}
 
 async function buildDelegationTx(adminPkh, adminAddress, memberPkh, poolId) {
   const { scriptCbor, stakeAddress } = getCoopStakeScript(adminPkh, memberPkh);
 
-  // Fetch admin UTxOs from chain (address-only — no .sk needed for reading).
   const adminUtxos = await blockchainProvider.fetchAddressUTxOs(adminAddress);
   if (adminUtxos.length === 0) {
     throw new Error(`Admin wallet has no UTxOs. Fund ${adminAddress} first.`);
   }
 
-  // Find a pure-ADA UTxO for collateral (required for script witness).
+  // Pure-ADA UTxO required for collateral (script witness needs it).
   const collateral = adminUtxos.find(
     u => u.output.amount.length === 1 && u.output.amount[0].unit === 'lovelace',
   );
@@ -59,7 +127,7 @@ async function buildDelegationTx(adminPkh, adminAddress, memberPkh, poolId) {
   const txBuilder = getTxBuilder();
   await txBuilder
     .delegateStakeCertificate(stakeAddress, poolId)
-    .certificateScript(scriptCbor)
+    .certificateScript(scriptCbor, 'V3')
     .certificateRedeemerValue('')
     .requiredSignerHash(adminPkh)         // contract requires admin signature
     .txInCollateral(
@@ -76,45 +144,79 @@ async function buildDelegationTx(adminPkh, adminAddress, memberPkh, poolId) {
 }
 
 async function main() {
-  // Read admin address (Ledger hardware wallet — no .sk file).
-  const adminAddress = loadAddressOnly(ADMIN_ADDR_PATH);
-  const { pubKeyHash: adminPkh } = deserializeAddress(adminAddress);
+  // ── Load member directory ──────────────────────────────────────────────
+  if (!fs.existsSync(MEMBERS_FILE)) {
+    console.error(`Member directory not found: ${MEMBERS_FILE}`);
+    console.error('Register members first with _register_stake.mjs.');
+    process.exit(1);
+  }
+  const members = JSON.parse(fs.readFileSync(MEMBERS_FILE, 'utf8'));
 
-  console.log('Admin address:', adminAddress);
-  console.log('Admin PKH:    ', adminPkh);
-
-  // Read delegation config.
-  if (!fs.existsSync(CONFIG_FILE)) {
-    console.error(`\nConfig file not found: ${CONFIG_FILE}`);
-    console.error('Create a JSON file: [{ "memberPkh": "hex...", "poolId": "pool1..." }]');
+  // ── Find the requested member ──────────────────────────────────────────
+  const member = members.find(m => m.name === args.name);
+  if (!member) {
+    console.error(`Error: no member named "${args.name}" in ${MEMBERS_FILE}.`);
+    console.error('Known members:', members.map(m => m.name).join(', ') || '(none)');
     process.exit(1);
   }
 
-  const delegations = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
-  console.log(`\nProcessing ${delegations.length} delegation(s)...`);
-
-  for (const { memberPkh, poolId } of delegations) {
-    console.log(`\nMember PKH: ${memberPkh.substring(0, 12)}...  →  Pool: ${poolId}`);
-    try {
-      const unsignedTxHex = await buildDelegationTx(adminPkh, adminAddress, memberPkh, poolId);
-
-      // ── HARDWARE WALLET PATH ─────────────────────────────────────────────
-      // Admin Ledger wallet cannot sign here. Print unsigned tx for external signing.
-      console.log('  Unsigned tx (sign with Ledger via cardano-hw-cli or web tool):');
-      console.log(' ', unsignedTxHex);
-
-      // ── SOFTWARE WALLET PATH (Phase 1 testing) ───────────────────────────
-      // Uncomment to auto-sign with software wallet (requires uncomments above):
-      // const signedTx = await adminWallet.signTx(unsignedTxHex, true);
-      // const txHash = await adminWallet.submitTx(signedTx);
-      // console.log('  Tx Hash:', txHash);
-
-    } catch (err) {
-      console.error(`  FAILED:`, err.message ?? err);
-    }
+  // Defensive: older records may predate the delegations field.
+  if (!Array.isArray(member.delegations)) {
+    member.delegations = [];
   }
 
-  console.log('\nDone. Sign and submit any printed unsigned transactions to complete delegation.');
+  // Refuse a no-op redelegation to the same pool.
+  const latest = member.delegations[member.delegations.length - 1];
+  if (latest && latest.poolId === args.pool) {
+    console.error(`Error: "${member.name}" is already delegated to ${args.pool} (entry from ${latest.requestedAt}).`);
+    console.error('Nothing to do. Pick a different pool, or remove that entry to re-issue.');
+    process.exit(1);
+  }
+
+  // ── Resolve admin info from _1_members.json ────────────────────────────
+  const adminRecord = members.find(m => m.name === ADMIN_NAME);
+  if (!adminRecord) {
+    console.error(`Error: admin record "${ADMIN_NAME}" not found in ${MEMBERS_FILE}.`);
+    console.error('Register the admin as a member first via _register_stake.mjs.');
+    process.exit(1);
+  }
+  const adminAddress = adminRecord.address;
+  const adminPkh     = adminRecord.memberPkh;
+
+  console.log('Admin address:', adminAddress);
+  console.log('Admin PKH:    ', adminPkh);
+  console.log(`\nDelegating "${member.name}"  →  ${args.pool}`);
+  if (latest) {
+    console.log(`(previously: ${latest.poolId} at ${latest.requestedAt})`);
+  } else {
+    console.log('(first delegation for this member)');
+  }
+
+  // ── Build the delegation transaction ───────────────────────────────────
+  const unsignedTxHex = await buildDelegationTx(
+    adminPkh,
+    adminAddress,
+    member.memberPkh,
+    args.pool,
+  );
+  const txHash = resolveTxHash(unsignedTxHex);
+
+  // ── Append to the member's delegation history ──────────────────────────
+  member.delegations.push({
+    poolId: args.pool,
+    requestedAt: new Date().toISOString(),
+    txHash,
+  });
+  fs.writeFileSync(MEMBERS_FILE, JSON.stringify(members, null, 2) + '\n');
+  console.log(`\nAppended delegation entry to ${MEMBERS_FILE} (txHash: ${txHash}).`);
+
+  // ── Print unsigned tx for external signing ─────────────────────────────
+  console.log('\nUnsigned tx (sign with admin Ledger via web/sign_tx.html):');
+  console.log(unsignedTxHex);
+  console.log('\nAfter signing, submit with:');
+  console.log('  node _submit_tx.mjs <signed-tx-hex>');
+  console.log('  or: node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>');
+  console.log(`\nThe submitted tx hash should match: ${txHash}`);
 }
 
 main().catch(err => {

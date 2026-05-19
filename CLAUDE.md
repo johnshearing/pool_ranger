@@ -1,7 +1,8 @@
 # CLAUDE.md — Pool Ranger (ranger)
 
 These files are auto-loaded by Claude Code at the start of every session for this directory.
-**Always read `README.md` at the start of each session**.
+**Always read `README.md` at the start of each session** to get background information about the `Pool Ranger` project.  
+**Always read `REQUIREMENTS.md` at the start of each session** to get background information about the `Pool Ranger` project.    
 
 
 ---

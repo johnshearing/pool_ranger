@@ -1,93 +1,185 @@
-// Registers a member's coop stake credential on-chain.
+// Registers a member's coop stake credential on-chain and records the member
+// in the cooperative directory (_1_members.json).
 //
 // The coop stake credential is a Plutus script parameterized by admin_pkh and
 // member_pkh. Each member gets a unique stake address. Registering it costs a
 // 2 ADA deposit (refunded on deregistration). The member pays and signs.
 //
-// After registration, the member should move their ADA to the printed
-// "coop base address" — that address has their own spending key as payment
-// credential and the coop script as stake credential.
+// After successful registration, the member should move their ADA to the
+// printed "contract address" — that address has the member's own spending key
+// as payment credential and the coop script as stake credential.
 //
-// ── SIGNING MODES ────────────────────────────────────────────────────────────
-// HARDWARE WALLET (default): reads member address from an .addr file, builds
-//   the transaction, and prints the unsigned tx hex for signing via Ledger
-//   (cardano-hw-cli or a web tool). Submit the signed tx separately.
+// On each run the script:
+//   1. Reads --name and --addr from the command line.
+//   2. Loads _1_members.json (creates it as [] if missing).
+//   3. Errors if the name or memberPkh is already present (no duplicates).
+//   4. Derives memberPkh, stake address, contract address, and script hash.
+//   5. Appends a new record to _1_members.json.
+//   6. Builds the on-chain stake-registration tx and prints the unsigned hex.
 //
-// SOFTWARE WALLET (testing): uncomment the SOFTWARE WALLET section below.
-//   The wallet auto-signs and submits in one step.
-// ─────────────────────────────────────────────────────────────────────────────
+// Member record shape:
+//   {
+//     "name":            "member_3",
+//     "address":         "addr_test1q...",   // member's base address
+//     "memberPkh":       "a0627a98...",       // payment PKH of `address`
+//     "stakeAddress":    "stake_test17...",   // coop stake address (script-controlled)
+//     "contractAddress": "addr_test1y...",    // member's payment key + coop stake script
+//     "scriptHash":      "c5097507...",       // parameterized coop stake script hash
+//     "registration":    { "txHash": "...", "requestedAt": "<ISO 8601>" },
+//     "delegations":     []                   // appended to by _delegate.mjs over time
+//   }
+//
+// Each delegation entry has the shape:
+//   { "poolId": "pool1...", "requestedAt": "<ISO 8601>", "txHash": "<hex>" }
 //
 // Usage (from ranger/):
-//   Run a command like the following sample:
-//   MEMBER_ADDR_PATH=./0_member_2.addr node _register_stake.mjs
+//   node _register_stake.mjs --name member_3 --addr ./0_member_3.addr
+//   node _register_stake.mjs --help          # show full help text
 //
-// The sample command shown above has two parts which are placed on a single line:
-// Part one tells the script where on the disk to look for the file which holds the member's address.
-// Be sure to change this part accordingly everytime you run the script.
-// MEMBER_ADDR_PATH=./0_member_2.addr
-//
-// Part two is the command to run the script. This part stays the same:
-// node _register_stake.mjs
-//
-//
-//
-// Software wallet usage:
-//   MEMBER_SK_PATH=./0_member_2.sk node _register_stake.mjs  (after uncommenting below)
+// Re-running for an existing name or PKH will error. To re-derive values for
+// an existing member, remove that member's entry from _1_members.json first.
 
+import fs from 'fs';
 import {
   deserializeAddress,
+  resolveTxHash,
 } from '@meshsdk/core';
 import {
   blockchainProvider,
   getTxBuilder,
-  loadSoftwareWallet,
   loadAddressOnly,
   getCoopStakeScript,
 } from './common/common.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────
-const ADMIN_ADDR_PATH = './0_admin_0.addr';
+// Admin info is normally looked up from the ADMIN_NAME entry in _1_members.json.
+// Special case: when the directory is empty (bootstrap), the very first
+// registration MUST be the admin — in that case --addr supplies both the
+// member's and the admin's address (they are the same person).
+const ADMIN_NAME   = 'admin_0';
+const MEMBERS_FILE = './_1_members.json';
 
-// ── HARDWARE WALLET (default) ─────────────────────────────────────────────
-const MEMBER_ADDR_PATH = process.env.MEMBER_ADDR_PATH || './0_admin_0.addr';
+// ── Parse CLI args (--name <value> --addr <path>) ─────────────────────────
+function parseArgs(argv) {
+  const args = {};
+  for (let i = 2; i < argv.length; i++) {
+    const flag = argv[i];
+    if (flag.startsWith('--')) {
+      args[flag.slice(2)] = argv[i + 1];
+      i++;
+    }
+  }
+  return args;
+}
 
-// ── SOFTWARE WALLET (Phase 1 testing) — uncomment both lines to enable ────
-// const MEMBER_SK_PATH = process.env.MEMBER_SK_PATH || './0_member_1.sk';
-// const memberWallet = loadSoftwareWallet(MEMBER_SK_PATH);
-// ─────────────────────────────────────────────────────────────────────────
+const HELP = `Usage:
+  node _register_stake.mjs --name <member-name> --addr <path/to/0_member_X.addr>
+
+Options:
+  --name <name>   Human-readable label for the member (e.g. "member_3"). Must be
+                  unique within _1_members.json.
+  --addr <path>   Path to a .addr file containing the member's bech32 base
+                  address. memberPkh, stakeAddress, contractAddress, and
+                  scriptHash are all derived from this address.
+  -h, --help      Show this help text and exit.
+
+What this does:
+  1. Loads ./_1_members.json (creates [] if the file is missing).
+  2. Errors if a member with this --name or derived memberPkh is already in the file.
+  3. Derives the parameterized coop stake script for this member.
+  4. Builds a stake-registration transaction (2 ADA deposit, refunded on deregister).
+  5. Computes the registration txHash via resolveTxHash on the unsigned tx.
+  6. Appends the new member record to _1_members.json with the registration
+     { txHash, requestedAt } stamped in, and an empty delegations: [] array.
+  7. Prints the unsigned tx hex for signing with the member's Ledger via
+     web/sign_tx.html.
+
+Next steps after running:
+  1. Sign the printed tx hex in web/sign_tx.html (member's Ledger via Eternl).
+  2. Submit with:  node _submit_tx.mjs <signed-tx-hex>
+                or node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>
+  3. The submitted tx hash should match the registration txHash printed.
+  4. Once confirmed on-chain, move the member's ADA to the printed contract address.
+
+Example:
+  node _register_stake.mjs --name member_3 --addr ./0_member_3.addr`;
+
+const rawArgs = process.argv.slice(2);
+if (rawArgs.length === 0 || rawArgs.includes('-h') || rawArgs.includes('--help')) {
+  // No args, -h, or --help: print help and exit (0 if user asked for it, 1 otherwise).
+  const askedForHelp = rawArgs.includes('-h') || rawArgs.includes('--help');
+  (askedForHelp ? console.log : console.error)(HELP);
+  process.exit(askedForHelp ? 0 : 1);
+}
+
+const args = parseArgs(process.argv);
+const missing = [];
+if (!args.name) missing.push('--name');
+if (!args.addr) missing.push('--addr');
+if (missing.length > 0) {
+  console.error(`Missing required argument(s): ${missing.join(', ')}\n`);
+  console.error(HELP);
+  process.exit(1);
+}
 
 async function main() {
-  // ── Resolve member address and PKH ──────────────────────────────────────
-  // HARDWARE WALLET: read address from file.
-  const memberAddress = loadAddressOnly(MEMBER_ADDR_PATH);
-  // SOFTWARE WALLET: derive address from wallet object instead:
-  // const memberAddress = (await memberWallet.getUsedAddresses())[0]
-  //                    ?? (await memberWallet.getUnusedAddresses())[0];
+  // ── Load member directory (or start fresh) ─────────────────────────────
+  const members = fs.existsSync(MEMBERS_FILE)
+    ? JSON.parse(fs.readFileSync(MEMBERS_FILE, 'utf8'))
+    : [];
 
+  // ── Resolve member address and PKH ─────────────────────────────────────
+  const memberAddress = loadAddressOnly(args.addr);
   const { pubKeyHash: memberPkh } = deserializeAddress(memberAddress);
+  console.log('Member name:   ', args.name);
   console.log('Member address:', memberAddress);
   console.log('Member PKH:    ', memberPkh);
 
-  // Read admin address (Ledger hardware wallet — no .sk file).
-  const adminAddress = loadAddressOnly(ADMIN_ADDR_PATH);
-  const { pubKeyHash: adminPkh } = deserializeAddress(adminAddress);
+  // ── Uniqueness checks (name and memberPkh) ─────────────────────────────
+  const dupName = members.find(m => m.name === args.name);
+  if (dupName) {
+    console.error(`\nError: a member named "${args.name}" already exists in ${MEMBERS_FILE}.`);
+    process.exit(1);
+  }
+  const dupPkh = members.find(m => m.memberPkh === memberPkh);
+  if (dupPkh) {
+    console.error(`\nError: memberPkh ${memberPkh} is already registered as "${dupPkh.name}" in ${MEMBERS_FILE}.`);
+    process.exit(1);
+  }
+
+  // ── Resolve admin info ─────────────────────────────────────────────────
+  // Normal path: look up the ADMIN_NAME record in _1_members.json.
+  // Bootstrap path: if the directory is empty, the first member must be the
+  // admin, and admin == this member.
+  const adminRecord = members.find(m => m.name === ADMIN_NAME);
+  let adminAddress, adminPkh;
+  if (adminRecord) {
+    adminAddress = adminRecord.address;
+    adminPkh     = adminRecord.memberPkh;
+  } else {
+    if (args.name !== ADMIN_NAME) {
+      console.error(`\nError: ${MEMBERS_FILE} has no "${ADMIN_NAME}" entry yet.`);
+      console.error(`The admin must be registered before any other member. Run first:`);
+      console.error(`  node _register_stake.mjs --name ${ADMIN_NAME} --addr <path-to-admin-addr>`);
+      process.exit(1);
+    }
+    adminAddress = memberAddress;
+    adminPkh     = memberPkh;
+  }
   console.log('Admin address: ', adminAddress);
   console.log('Admin PKH:     ', adminPkh);
 
-  // Derive the parameterized coop stake script for this member.
-  const { scriptCbor, scriptHash, stakeAddress, memberCoopBaseAddress } =
+  // ── Derive parameterized coop stake script for this member ─────────────
+  const { scriptHash, stakeAddress, memberCoopBaseAddress } =
     getCoopStakeScript(adminPkh, memberPkh);
+  const contractAddress = memberCoopBaseAddress;
 
   console.log('\nCoop stake script hash:', scriptHash);
   console.log('Coop stake address:    ', stakeAddress);
-  console.log('Member coop base addr: ', memberCoopBaseAddress);
+  console.log('Member contract addr:  ', contractAddress);
 
-  // ── Fetch member UTxOs ───────────────────────────────────────────────────
-  // HARDWARE WALLET: fetch from chain using address only.
+  // ── Fetch member UTxOs ─────────────────────────────────────────────────
   const memberUtxos = await blockchainProvider.fetchAddressUTxOs(memberAddress);
-  // SOFTWARE WALLET: fetch from wallet object instead:
-  // const memberUtxos = await memberWallet.getUtxos();
-
   if (memberUtxos.length === 0) {
     console.error('\nMember wallet has no UTxOs. Fund it first.');
     process.exit(1);
@@ -105,22 +197,36 @@ async function main() {
     .complete();
 
   const unsignedTxHex = txBuilder.txHex;
+  const registrationTxHash = resolveTxHash(unsignedTxHex);
 
-  // ── Sign and submit ──────────────────────────────────────────────────────
-  // HARDWARE WALLET: print unsigned tx for external signing.
-  console.log('\nUnsigned tx (sign with Ledger via cardano-hw-cli or web tool):');
+  // ── Append to member directory ─────────────────────────────────────────
+  members.push({
+    name: args.name,
+    address: memberAddress,
+    memberPkh,
+    stakeAddress,
+    contractAddress,
+    scriptHash,
+    registration: {
+      txHash: registrationTxHash,
+      requestedAt: new Date().toISOString(),
+    },
+    delegations: [],
+  });
+  fs.writeFileSync(MEMBERS_FILE, JSON.stringify(members, null, 2) + '\n');
+  console.log(`\nAppended "${args.name}" to ${MEMBERS_FILE} (registration txHash: ${registrationTxHash}).`);
+
+  // ── Print unsigned tx for external signing ─────────────────────────────
+  console.log('\nUnsigned tx (sign with Ledger via web/sign_tx.html):');
   console.log(unsignedTxHex);
   console.log('\nAfter signing, submit with:');
-  console.log('  cardano-cli transaction submit --tx-file signed.tx --testnet-magic 2');
+  console.log('  node _submit_tx.mjs <signed-tx-hex>');
+  console.log('  or: node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>');
+  console.log(`\nThe submitted tx hash should match: ${registrationTxHash}`);
 
-  // SOFTWARE WALLET: uncomment to auto-sign and submit:
-  // const signedTx = await memberWallet.signTx(unsignedTxHex);
-  // const txHash = await memberWallet.submitTx(signedTx);
-  // console.log('\nRegistration submitted! Tx Hash:', txHash);
-
-  console.log('\nOnce confirmed, move your ADA to your coop base address:');
-  console.log(' ', memberCoopBaseAddress);
-  console.log('\nSave this address — it is where your ADA should live in the cooperative.');
+  console.log('\nOnce confirmed, move your ADA to your contract address:');
+  console.log(' ', contractAddress);
+  console.log('\nThis is where your ADA must live to participate in the cooperative.');
 }
 
 main().catch(err => {

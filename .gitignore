@@ -24,3 +24,6 @@ Thumbs.db
 epoch_agent/reports/
 epoch_agent/ranger_state.json
 epoch_agent/candidate_pools.json
+
+# Cooperative state — member directory and delegation history (contains PKHs)
+_1_members.json
