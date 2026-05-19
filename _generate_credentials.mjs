@@ -1,13 +1,18 @@
-// Creates the Pool Ranger administrator wallet.
-// Run this once to generate the admin's root key and save the address.
+// Creates a software wallet for testing.
 //
-// Output files (written to the current directory):
+// Output:
 //   0_admin_0.sk   — root private key (BIP32 bech32) — KEEP SECRET, never share
-//   0_admin_0.addr — first unused address for the admin wallet
 //
-// Hardware wallet support is scaffolded at the bottom of this file.
-// Members will use a hardware wallet (Ledger / Trezor) for their staking key
-// so their spending key is never exposed to the cooperative.
+// The wallet's address is printed to the console. There are no .addr files
+// anymore — addresses live in _1_members.json. To enrol this wallet into the
+// cooperative, copy the printed address and run:
+//
+//   node _register_stake.mjs --name <name> --addr <printed-address>
+//
+// The production admin and members all use a Ledger hardware wallet, not a
+// software wallet — this script is kept around only for automated testing
+// scenarios. See the hardware-wallet scaffold at the bottom of this file for
+// integration paths.
 
 import fs from 'node:fs';
 import {
@@ -31,14 +36,15 @@ const admin_wallet = new MeshWallet({
   },
 });
 
-// Save first unused address to file
+// Print the first unused address — copy this into _register_stake.mjs --addr.
 const admin_address = (await admin_wallet.getUnusedAddresses())[0];
-fs.writeFileSync('0_admin_0.addr', admin_address);
 
 console.log('Admin wallet created successfully.');
-console.log('Address :', admin_address);
+console.log('Address  :', admin_address);
 console.log('Key file : 0_admin_0.sk  (keep secret)');
-console.log('Addr file: 0_admin_0.addr');
+console.log('');
+console.log('Next step: enrol this wallet by copying the address above into:');
+console.log(`  node _register_stake.mjs --name admin_0 --addr ${admin_address}`);
 
 
 // --- Hardware wallet scaffold (not yet implemented) ---

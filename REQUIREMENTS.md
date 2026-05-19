@@ -79,26 +79,34 @@ Use `vesting/` as the code and workflow model.
 - `blockchainProvider` — Blockfrost, Preview testnet
 - `getTxBuilder()` — fresh `MeshTxBuilder` factory
 - `loadSoftwareWallet(skPath)` — loads a wallet from a `.sk` root key file
-- `loadAddressOnly(addrPath)` — reads an address file (for Ledger; no signing)
 - `getCoopStakeScript(adminPkh, memberPkh)` — central factory that applies parameters to
   the compiled script  
   - Returns `{ scriptCbor, scriptHash, stakeAddress, memberCoopBaseAddress }`
+
+Hardware-wallet (Ledger) addresses are not loaded from disk — every script reads them
+from the `address` field of each member's record in `_1_members.json`.
 
 ### Signing modes
 
 All scripts that require a signature support two modes, following the same pattern:
 
-**Hardware wallet (default — current active workflow):** reads the signer's address from an
-`.addr` file, fetches UTxOs via Blockfrost, builds the transaction, and prints the unsigned tx
-hex. The unsigned hex is signed using the custom web tool at `web/dist/sign_tx.html` (open
-in Chrome with the Eternl extension installed). The resulting signed tx hex is submitted using
+**Hardware wallet (default — current active workflow):** reads the signer's address from the
+matching entry in `_1_members.json` (look up by `--name`; the bech32 `address` is on the record),
+fetches UTxOs via Blockfrost, builds the transaction, and prints the unsigned tx hex. The
+unsigned hex is signed using the custom web tool at `web/dist/sign_tx.html` (open in Chrome
+with the Eternl extension installed). The resulting signed tx hex is submitted using
 `_submit_tx.mjs`:
 
 ```
 node _submit_tx.mjs <signed-tx-hex>
 ```
 
-Both admin and member wallets use Ledger hardware wallets. Neither has a `.sk` file.
+Both admin and member wallets use Ledger hardware wallets. Neither has a `.sk` or `.addr`
+file on disk — the only persistent record of either party's address is the matching entry in
+`_1_members.json`. The very first time a new member is onboarded the admin must obtain that
+member's bech32 receive address out-of-band (email, signal, in person) and pass it directly
+on the command line to `_register_stake.mjs --addr <addr>`; from that point forward the
+record in `_1_members.json` is the source of truth.
 
 **Software wallet (future testing only):** each script contains a commented `SOFTWARE WALLET`
 block. When uncommented, the wallet loads from a `.sk` root key file and auto-signs and submits
@@ -119,6 +127,7 @@ This applies equally to admin scripts and member scripts.
 - [ ] `_push_rewards.mjs` — admin withdraws rewards and routes 99% to member, keeps 1% fee
 - [ ] `_member_withdraw.mjs` — member withdraws 100% after the 1-epoch admin window expires
 - [ ] `_revoke_membership.mjs` — member (or admin) deregisters the coop stake credential; returns 2 ADA deposit
+- [x] `_view_delegations.mjs` — admin view: for each member, fetch the on-chain delegation and compare it to the most recent entry in `_1_members.json`; flags mismatches (tx built but never submitted, still pending, etc.)
 - [ ] `_view_members.mjs` — list all registered coop stake addresses, delegation status, and pending rewards
 - [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
 
@@ -137,19 +146,36 @@ This applies equally to admin scripts and member scripts.
 - [ ] `web/admin_push_rewards.html` — admin pushes reward distribution (collects 1% fee)
 - [ ] `web/admin_dashboard.html` — admin view of all members, pools, saturation, rewards
 
+### Data files
+
+Pool Ranger keeps its off-chain state in JSON files alongside the scripts.
+These files are read by the scripts at runtime and updated as new members
+register, delegate, withdraw, or leave.
+
+- [x] `_1_members.json` — **the working member directory and single source of truth for every wallet address Pool Ranger knows about.** Every script that touches a member (register, delegate, withdraw, revoke, view) reads or writes this file. It holds one entry per member: `name`, `address` (the bech32 Ledger receive address — admin and members alike), `memberPkh`, `stakeAddress`, `contractAddress`, `scriptHash`, `registration`, and a `delegations` history (newest entry = current intended delegation). On testnet today this file is committed. On mainnet it is expected to grow to thousands of entries of real cooperative membership data, and will not be committed to the public repo.
+- [x] `_1_members_sample.json` — **a tiny shape-only sample committed to the public GitHub repo.** Its only purpose is to show readers of the repo what `_1_members.json` looks like (the field names and the nested `delegations` array) without exposing real cooperative membership data. The two files are intentionally *not* expected to match — `_1_members.json` will eventually contain thousands of real entries, while `_1_members_sample.json` stays small. Scripts must never compare the two or treat divergence as an error.
+- [x] `.env` — `BLOCKFROST_API=previewXXXXX`. Not committed.
+
+There are no `.addr` files in `ranger/`. Earlier in development each Ledger wallet had its
+own `0_<name>.addr` file on disk; those files have been removed. Every script now reads
+addresses from `_1_members.json` by name. A wallet only exists from Pool Ranger's point of
+view once it has a row in `_1_members.json`.
+
 ### Admin wallet
 
 The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview testnet).
-- Address is in `0_admin_0.addr`. There is **no `0_admin_0.sk`**.
+- Address lives in the `admin_0` row of `_1_members.json` (the `address` field). There is
+  **no `0_admin_0.sk` and no `0_admin_0.addr`** file on disk.
 - Hardware wallet signing mode (default) is the active workflow. 
 - The software wallet block in each script is commented out and used only for automated testing.
 
 ### Member wallets
 
-Member wallets are also **Ledger hardware wallets**. Each member has a `0_member_N.addr` file
-and **no `0_member_N.sk`**.
-- Scripts read the member address from the `.addr` file, build an unsigned tx, and print the
-  unsigned hex for the member to sign on their Ledger device.
+Member wallets are also **Ledger hardware wallets**. Each member's address is stored in
+the `address` field of their `_1_members.json` row. There are **no `0_member_N.sk` or
+`0_member_N.addr`** files on disk.
+- Scripts look up the member's address by `--name` from `_1_members.json`, build an unsigned
+  tx, and print the unsigned hex for the member to sign on their Ledger device.
 - After signing, the member (or admin on their behalf) submits with `_submit_tx.mjs`.
 
 ---
@@ -162,15 +188,17 @@ This is the step-by-step process a Pool Ranger member follows, from joining to w
 1. Get a Ledger hardware wallet. Install the **Cardano app** on it.
 2. Install the **Eternl browser extension** in Chrome or Edge. Connect your Ledger to Eternl.
 3. In Eternl: switch the network to **Preview testnet** (Settings → General → Network).
-4. Send your wallet address (from your `0_member_N.addr` file) to the admin so they know your
-   public key hash and can parameterize your Pool Ranger stake script.
+4. Send your Ledger receive address (the bech32 string from Eternl) to the admin so they
+   know your public key hash and can parameterize your Pool Ranger stake script.
 
 ### Joining the Pool Ranger
-5. Run `_register_stake.mjs` to build the stake registration transaction:
+5. The admin runs `_register_stake.mjs` on your behalf to build the stake registration
+   transaction, passing your bech32 address directly:
    ```
-   MEMBER_ADDR_PATH=./0_member_N.addr node _register_stake.mjs
+   node _register_stake.mjs --name member_N --addr addr_test1q...
    ```
-   This prints your unique **coop base address** and an **unsigned tx hex**.
+   This appends your row to `_1_members.json` and prints your unique **coop base address**
+   plus an **unsigned tx hex** for you to sign.
 6. Open `web/dist/sign_tx.html` in Chrome. Paste the unsigned tx hex. Click
    "Sign with Eternl (Ledger)". Approve on your Ledger device. Copy the signed tx hex.
 7. Submit:
@@ -204,13 +232,16 @@ This is the step-by-step process a Pool Ranger member follows, from joining to w
 This is the step-by-step process the Pool Ranger administrator follows.
 
 ### One-time setup
-1. Admin wallet is a **Ledger hardware wallet**. Address is in `0_admin_0.addr`. No `.sk` file.
+1. Admin wallet is a **Ledger hardware wallet**. Address lives in the `admin_0` row of
+   `_1_members.json`. No `.sk` or `.addr` file on disk.
 2. Admin installs **Eternl** in Chrome with the Ledger connected, Preview testnet selected.
 3. Fund the admin wallet with enough preview ADA to pay delegation transaction fees.
 
 ### Onboarding a new member
-4. Receive the member's `.addr` file (or the address string from their file).
-5. The member runs `_register_stake.mjs` themselves (they pay the 2 ADA deposit and sign).
+4. Receive the new member's bech32 receive address from them (email, signal, in person).
+5. Run `_register_stake.mjs --name member_N --addr <bech32-address>` to add the member's
+   row to `_1_members.json` and build the registration tx; the member then signs it on
+   their Ledger and pays the 2 ADA deposit.
 6. Once confirmed, the member moves their ADA to their printed **coop base address**.
 
 ### Delegating stake to a pool
@@ -356,8 +387,10 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 4. `npm run build` in `ranger/web/` — produces `ranger/web/dist/sign_tx.html`
 5. Install Aiken CLI v1.1.21
 6. Create `.env` with `BLOCKFROST_API=previewXXXXX`
-7. Admin address is already in `0_admin_0.addr`. Run `_generate_credentials.mjs` only
-   to create additional software wallets for testing.
+7. Admin address is already recorded in `_1_members.json` under the `admin_0` row. Run
+   `_generate_credentials.mjs` only when you need to spin up an additional software wallet
+   for testing — it prints the new address, which you then pass to `_register_stake.mjs
+   --addr <addr>` to enrol it.
 8. Run `aiken build` after any change to `.ak` files to regenerate `plutus.json`.
 9. Install **Eternl** browser extension in Chrome or Edge. Connect Ledger. Set network to
    Preview testnet. Open `web/dist/sign_tx.html` via `\\wsl$\Ubuntu\home\js\aiken\ranger\web\dist\sign_tx.html`.
@@ -372,7 +405,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 | Directory / filenames | `ranger` |
 | Script prefix | `_` (matches vesting pattern) |
 | Word separator in filenames | `_` (underscores, not dashes) |
-| Wallet files | `0_admin_0.addr`, `0_member_N.addr` — Ledger hardware wallets, no .sk files |
+| Wallet records | All wallet addresses (admin and members) live in `_1_members.json` — no `.addr` or `.sk` files on disk |
 | Config | `common/common.mjs` |
 | Tests | inline in `.ak` files, run with `aiken check` |
 

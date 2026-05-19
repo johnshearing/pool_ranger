@@ -10,7 +10,9 @@
 // as payment credential and the coop script as stake credential.
 //
 // On each run the script:
-//   1. Reads --name and --addr from the command line.
+//   1. Reads --name and --addr from the command line. --addr is the member's
+//      bech32 base address (addr_test1... or addr1...) supplied directly on
+//      the command line — there are no separate .addr files.
 //   2. Loads _1_members.json (creates it as [] if missing).
 //   3. Errors if the name or memberPkh is already present (no duplicates).
 //   4. Derives memberPkh, stake address, contract address, and script hash.
@@ -33,7 +35,7 @@
 //   { "poolId": "pool1...", "requestedAt": "<ISO 8601>", "txHash": "<hex>" }
 //
 // Usage (from ranger/):
-//   node _register_stake.mjs --name member_3 --addr ./0_member_3.addr
+//   node _register_stake.mjs --name member_3 --addr addr_test1q...
 //   node _register_stake.mjs --help          # show full help text
 //
 // Re-running for an existing name or PKH will error. To re-derive values for
@@ -47,7 +49,6 @@ import {
 import {
   blockchainProvider,
   getTxBuilder,
-  loadAddressOnly,
   getCoopStakeScript,
 } from './common/common.mjs';
 
@@ -59,7 +60,7 @@ import {
 const ADMIN_NAME   = 'admin_0';
 const MEMBERS_FILE = './_1_members.json';
 
-// ── Parse CLI args (--name <value> --addr <path>) ─────────────────────────
+// ── Parse CLI args (--name <value> --addr <bech32>) ───────────────────────
 function parseArgs(argv) {
   const args = {};
   for (let i = 2; i < argv.length; i++) {
@@ -73,14 +74,17 @@ function parseArgs(argv) {
 }
 
 const HELP = `Usage:
-  node _register_stake.mjs --name <member-name> --addr <path/to/0_member_X.addr>
+  node _register_stake.mjs --name <member-name> --addr <bech32-address>
 
 Options:
   --name <name>   Human-readable label for the member (e.g. "member_3"). Must be
                   unique within _1_members.json.
-  --addr <path>   Path to a .addr file containing the member's bech32 base
-                  address. memberPkh, stakeAddress, contractAddress, and
-                  scriptHash are all derived from this address.
+  --addr <addr>   Member's bech32 base address (addr_test1... on Preview,
+                  addr1... on mainnet). memberPkh, stakeAddress,
+                  contractAddress, and scriptHash are all derived from this
+                  address. There are no .addr files — paste the address
+                  directly. The admin obtains a new member's address from the
+                  member (email, message, etc.) at onboarding time.
   -h, --help      Show this help text and exit.
 
 What this does:
@@ -102,7 +106,7 @@ Next steps after running:
   4. Once confirmed on-chain, move the member's ADA to the printed contract address.
 
 Example:
-  node _register_stake.mjs --name member_3 --addr ./0_member_3.addr`;
+  node _register_stake.mjs --name member_3 --addr addr_test1qz...`;
 
 const rawArgs = process.argv.slice(2);
 if (rawArgs.length === 0 || rawArgs.includes('-h') || rawArgs.includes('--help')) {
@@ -121,6 +125,11 @@ if (missing.length > 0) {
   console.error(HELP);
   process.exit(1);
 }
+if (!(args.addr.startsWith('addr_test1') || args.addr.startsWith('addr1'))) {
+  console.error(`Error: --addr must be a bech32 Cardano address (addr_test1... or addr1...), got: ${args.addr}\n`);
+  console.error(HELP);
+  process.exit(1);
+}
 
 async function main() {
   // ── Load member directory (or start fresh) ─────────────────────────────
@@ -129,7 +138,7 @@ async function main() {
     : [];
 
   // ── Resolve member address and PKH ─────────────────────────────────────
-  const memberAddress = loadAddressOnly(args.addr);
+  const memberAddress = args.addr;
   const { pubKeyHash: memberPkh } = deserializeAddress(memberAddress);
   console.log('Member name:   ', args.name);
   console.log('Member address:', memberAddress);
@@ -160,7 +169,7 @@ async function main() {
     if (args.name !== ADMIN_NAME) {
       console.error(`\nError: ${MEMBERS_FILE} has no "${ADMIN_NAME}" entry yet.`);
       console.error(`The admin must be registered before any other member. Run first:`);
-      console.error(`  node _register_stake.mjs --name ${ADMIN_NAME} --addr <path-to-admin-addr>`);
+      console.error(`  node _register_stake.mjs --name ${ADMIN_NAME} --addr <admin-bech32-address>`);
       process.exit(1);
     }
     adminAddress = memberAddress;

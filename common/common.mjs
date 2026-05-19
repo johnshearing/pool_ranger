@@ -74,11 +74,11 @@ export function loadSoftwareWallet(skPath) {
   });
 }
 
-// For address-only wallets (Ledger hardware wallet — admin and production members).
-// Returns the address string; cannot be used to sign.
-export function loadAddressOnly(addrPath) {
-  return fs.readFileSync(addrPath, 'utf8').trim();
-}
+// Address-only wallets (Ledger hardware wallet — admin and production members)
+// are not loaded from files anymore. Their bech32 address lives in
+// _1_members.json (see the `address` field on each member record) and scripts
+// read it from there. Pass that string directly to blockchainProvider
+// methods such as fetchAddressUTxOs().
 
 // ── Plutus blueprint ───────────────────────────────────────────────────────
 // Loaded relative to the script working directory (ranger/).
