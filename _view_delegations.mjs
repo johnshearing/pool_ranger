@@ -6,9 +6,21 @@
 //
 // For each member it prints:
 //   - stakeAddress           — the bech32 stake address being checked
-//   - on-chain pool          — the pool the network says is the current delegation
-//   - expected pool          — the pool stored as the latest delegations entry
-//   - status                 — ok / mismatch / unregistered / pending
+//   - contractAddress        — the member's coop base address (where their ADA lives)
+//   - contract balance       — total ADA currently held at the contract address
+//   - active                 — ledger's view of the stake credential:
+//                                true  = currently registered (2 ADA deposit held by
+//                                        the ledger; can delegate and earn rewards)
+//                                false = was registered, then deregistered (deposit
+//                                        refunded; cannot delegate until re-registered)
+//                              Not shown at all when the credential was never
+//                              registered — that case prints "NOT REGISTERED" instead.
+//   - on-chain pool          — full bech32 pool ID the network says is delegating
+//   - expected pool          — full bech32 pool ID stored as the latest delegations entry
+//   - status                 — this script's verdict comparing chain vs file:
+//                                ok       = on-chain pool matches the newest
+//                                           member.delegations[] entry (or both are empty)
+//                                MISMATCH = chain and file disagree (see below)
 //
 // A "mismatch" usually means one of:
 //   - A delegation tx was built (entry appended) but never submitted.
@@ -64,11 +76,27 @@ async function fetchAccount(stakeAddress) {
   }
 }
 
-// Shortens long bech32 pool IDs for readable terminal output.
+// Returns the full bech32 pool ID, or "(none)" when there is no delegation.
 function fmtPool(poolId) {
-  if (!poolId) return '(none)';
-  if (poolId.length <= 24) return poolId;
-  return `${poolId.slice(0, 16)}…${poolId.slice(-8)}`;
+  return poolId ?? '(none)';
+}
+
+// Sums the lovelace held in every UTxO at the given address.
+// Returns a plain Number (Cardano's max supply fits comfortably in a JS Number).
+async function fetchContractBalanceLovelace(address) {
+  const utxos = await blockchainProvider.fetchAddressUTxOs(address);
+  let total = 0;
+  for (const u of utxos) {
+    const lov = u.output.amount.find(a => a.unit === 'lovelace');
+    if (lov) total += parseInt(lov.quantity, 10);
+  }
+  return total;
+}
+
+// Renders a lovelace amount as "1234.567890 tADA (1234567890 lovelace)".
+function fmtAda(lovelace) {
+  const ada = (lovelace / 1_000_000).toFixed(6);
+  return `${ada} tADA (${lovelace} lovelace)`;
 }
 
 async function main() {
@@ -92,7 +120,17 @@ async function main() {
     const expectedPool = latest?.poolId ?? null;
 
     console.log(`── ${m.name} ──────────────────────────────────────────`);
-    console.log(`  stakeAddress : ${m.stakeAddress}`);
+    console.log(`  stakeAddress   : ${m.stakeAddress}`);
+    console.log(`  contractAddr   : ${m.contractAddress}`);
+
+    // Contract balance — query the base address directly so this works even
+    // when the stake credential is not yet registered.
+    try {
+      const lovelace = await fetchContractBalanceLovelace(m.contractAddress);
+      console.log(`  contract bal   : ${fmtAda(lovelace)}`);
+    } catch (err) {
+      console.log(`  contract bal   : ERROR (${err.message ?? err})`);
+    }
 
     let account;
     try {
@@ -103,13 +141,13 @@ async function main() {
     }
 
     if (!account) {
-      console.log('  on-chain     : NOT REGISTERED');
+      console.log('  on-chain       : NOT REGISTERED');
       if (expectedPool) {
-        console.log(`  expected pool: ${fmtPool(expectedPool)}`);
-        console.log('  status       : MISMATCH (file claims a delegation, chain says not registered)');
+        console.log(`  expected pool  : ${fmtPool(expectedPool)}`);
+        console.log('  status         : MISMATCH (file claims a delegation, chain says not registered)');
         mismatchCount++;
       } else {
-        console.log('  status       : ok (no delegation recorded, none on-chain)');
+        console.log('  status         : ok (no delegation recorded, none on-chain)');
         unregisteredCount++;
       }
       console.log();
@@ -117,19 +155,19 @@ async function main() {
     }
 
     const onChainPool = account.pool_id ?? null;
-    console.log(`  active       : ${account.active}`);
-    console.log(`  on-chain pool: ${fmtPool(onChainPool)}`);
-    console.log(`  expected pool: ${fmtPool(expectedPool)}`);
+    console.log(`  active         : ${account.active}`);
+    console.log(`  on-chain pool  : ${fmtPool(onChainPool)}`);
+    console.log(`  expected pool  : ${fmtPool(expectedPool)}`);
 
     if (onChainPool === expectedPool) {
-      console.log('  status       : ok');
+      console.log('  status         : ok');
       okCount++;
     } else {
-      console.log('  status       : MISMATCH');
+      console.log('  status         : MISMATCH');
       if (latest) {
-        console.log(`                 file entry recorded at ${latest.requestedAt}`);
-        console.log(`                 file txHash: ${latest.txHash}`);
-        console.log('                 The tx may not have been submitted yet, or is still pending.');
+        console.log(`                   file entry recorded at ${latest.requestedAt}`);
+        console.log(`                   file txHash: ${latest.txHash}`);
+        console.log('                   The tx may not have been submitted yet, or is still pending.');
       }
       mismatchCount++;
     }
