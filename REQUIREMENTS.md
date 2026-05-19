@@ -124,10 +124,15 @@ This applies equally to admin scripts and member scripts.
 - [x] `_register_stake.mjs` — member registers their coop stake credential on-chain (pays 2 ADA deposit); hardware and software wallet signing
 - [x] `_delegate.mjs` — admin delegates each member's stake to a chosen pool (per-member granular control); hardware and software wallet signing
 - [x] `_submit_tx.mjs` — submits a signed tx hex to the network via Blockfrost; used after Ledger signing
-- [ ] `_push_rewards.mjs` — admin withdraws rewards and routes 99% to member, keeps 1% fee
-- [ ] `_member_withdraw.mjs` — member withdraws 100% after the 1-epoch admin window expires
+- [ ] `_withdraw_rewards.mjs` — either admin or member can initiate.  
+  - The contract enforces the 99/1 split on-chain regardless of signer  
+  - (admin ≤ 1%, member ≥ 99% − tx.fee, fee paid from the rewards themselves)  
 - [ ] `_revoke_membership.mjs` — member (or admin) deregisters the coop stake credential; returns 2 ADA deposit
-- [x] `_view_delegations.mjs` — admin view: for each member, fetch the on-chain delegation and compare it to the most recent entry in `_1_members.json`; flags mismatches (tx built but never submitted, still pending, etc.)
+- [x] `_view_delegations.mjs` — admin view: for each member, fetch the on-chain delegation and compare it to `_1_members.json`;  
+  - flags mismatches (tx built but never submitted, still pending, etc.).  
+  - Shows contract ADA balance and if active.
+- [x] `_view_wallet_balances.mjs` —  Shows wallet ADA balances.  
+  - This the amount not sent to the contract address.
 - [ ] `_view_members.mjs` — list all registered coop stake addresses, delegation status, and pending rewards
 - [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
 
@@ -214,9 +219,9 @@ This is the step-by-step process a Pool Ranger member follows, from joining to w
 - You receive 99% of your staking rewards automatically. No action required on your part.
 - You can check balances and rewards at any time with `_view_wallet_balances.mjs`.
 
-### Withdrawing rewards yourself
-9. You can run `_member_withdraw.mjs` to claim your rewards.  
-99% is sent to you, the member. 1% is sent to the administrator.  
+### Withdrawing rewards
+9. Either you or the admin can run `_withdraw_rewards.mjs` to trigger a reward distribution at any time.  
+The contract enforces the split on-chain: 99% (minus the small transaction fee) goes to you, 1% goes to the administrator. The transaction fee is paid from the rewards themselves, so neither party needs spare ADA on hand.  
 *(Script not yet built.)*
 
 ### Leaving Pool Ranger
@@ -256,11 +261,13 @@ This is the step-by-step process the Pool Ranger administrator follows.
    `_submit_tx.mjs`. *(One delegation tx per member.)*
 
 ### Distributing rewards (each epoch)
-10. At each epoch boundary, run `_push_rewards.mjs` *(not yet built)* to:
-    - Withdraw all accumulated rewards from each member's coop stake address.
-    - Route 99% back to the member's coop base address.
-    - Keep 1% as the admin fee.
-    - Sign each withdrawal tx with the admin Ledger via the web signing tool.
+10. At each epoch boundary, run `_withdraw_rewards.mjs` *(not yet built)* — once per member — to:
+    - Withdraw the member's accumulated rewards from their coop stake address.
+    - Route ≥ 99% (minus tx.fee) back to the member's coop base address.
+    - Keep ≤ 1% as the admin fee.
+    - Sign the withdrawal tx with the admin Ledger via the web signing tool.
+
+    The same script is what a member runs to withdraw their own rewards — the contract enforces the 99/1 split on-chain regardless of who signs, so there is no separate admin-vs-member version and no time-locked admin window.
 
 ### Monitoring
 12. Use `_view_members.mjs` *(not yet built)* to see all registered members and their reward balances.
