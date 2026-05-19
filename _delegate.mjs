@@ -124,7 +124,7 @@ async function buildDelegationTx(adminPkh, adminAddress, memberPkh, poolId) {
     throw new Error('No pure-ADA UTxO for collateral in admin wallet.');
   }
 
-  const txBuilder = getTxBuilder();
+  const txBuilder = await getTxBuilder();
   await txBuilder
     .delegateStakeCertificate(stakeAddress, poolId)
     .certificateScript(scriptCbor, 'V3')

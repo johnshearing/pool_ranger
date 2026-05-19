@@ -1,0 +1,59 @@
+[
+  {
+    "name": "admin_0",
+    "address": "addr_test1qztu6w6r3uy842psrgg2qy6ac0vcxyzsp9qfywwurklv6p0t693rv2hr6qgn749hq33hmv96y7jfht0ahxteqkt6h2ushnz6ln",
+    "memberPkh": "97cd3b438f087aa8301a10a0135dc3d983105009409239dc1dbecd05",
+    "stakeAddress": "stake_test17rzsjag809x0f0gsjca4z8zrns4yy90ct27x8fxn3g42p8sqtsq3x",
+    "contractAddress": "addr_test1yztu6w6r3uy842psrgg2qy6ac0vcxyzsp9qfywwurklv6pw9p96sw72v7j73p93m2ywy88p2gg2lsk4uvwjd8z325z0qhfkszc",
+    "scriptHash": "c5097507794cf4bd10963b511c439c2a4215f85abc63a4d38a2aa09e",
+    "registration": {
+      "txHash": "803be6dc61f1ad3bc97df9eb00befdf6bd1ab1cc4cb484467f544554fef37a57",
+      "requestedAt": "2026-05-18T00:00:00.000Z"
+    },
+    "delegations": [
+      {
+        "poolId": "pool1y0uxkqyplyx6ld25e976t0s35va3ysqcscatwvy2sd2cwcareq7",
+        "requestedAt": "2026-05-19T11:50:47.645Z",
+        "txHash": "13c7ae4e4e87249a5970156ff1e67a83ee93469d972c160b63e5ecd59fbf6a03"
+      }
+    ]
+  },
+  {
+    "name": "member_1",
+    "address": "addr_test1qzsxy75c7tw3ahlx55t9jfwnqpzvl2rqtca5vp7hhspkth8pktslyqc2l3xa8rll790c2jm9wddcea862h8zcqqxtd4qazy4vu",
+    "memberPkh": "a0627a98f2dd1edfe6a5165925d30044cfa8605e3b4607d7bc0365dc",
+    "stakeAddress": "stake_test17zkhqw7htyku6fqu6r8wwgwh6nf9dlzyj37757fv4zewtdgyhtx00",
+    "contractAddress": "addr_test1yzsxy75c7tw3ahlx55t9jfwnqpzvl2rqtca5vp7hhspkth9dwqaawkfde5jpe5xwuusa04xj2m7yf9raafuje29juk6s587zqv",
+    "scriptHash": "ad703bd7592dcd241cd0cee721d7d4d256fc44947dea792ca8b2e5b5",
+    "registration": {
+      "txHash": "725e78e335cd232bc4a7568125c05a1138b5deba28813261ea8f58adccf03748",
+      "requestedAt": "2026-05-18T00:00:00.000Z"
+    },
+    "delegations": [
+      {
+        "poolId": "pool1knap9hldvhww0fjqew26sxkfjpj3c8tp8uuj7j3729lzqn9x70r",
+        "requestedAt": "2026-05-19T12:05:24.831Z",
+        "txHash": "b96f8908e774e5665334f7319f701feca406ddbb020f8f3ccd840a6f7103c87e"
+      }
+    ]
+  },
+  {
+    "name": "member_2",
+    "address": "addr_test1qqya3xyp93ysu44cre96p6rccv9et7437x0pv8k8tyftqa2phm2p4p0utqf6eucxdw9wq5xhm4j0c9vcej53x0fswstq9eh9qw",
+    "memberPkh": "09d898812c490e56b81e4ba0e878c30b95fab1f19e161ec75912b075",
+    "stakeAddress": "stake_test17qkjdpdj7txkztm7xy64tk90asqlhd9fstjf5we2tj7fwage7cdef",
+    "contractAddress": "addr_test1yqya3xyp93ysu44cre96p6rccv9et7437x0pv8k8tyftqafdy6zm9ukdvyhhuvf42hv2lmqplw62nqhyngaj5h9uja6sgzckud",
+    "scriptHash": "2d2685b2f2cd612f7e313555d8afec01fbb4a982e49a3b2a5cbc9775",
+    "registration": {
+      "txHash": "279d844f3adcb3038797477800ad514316e22c034205be00a36db72d882eefb9",
+      "requestedAt": "2026-05-18T00:00:00.000Z"
+    },
+    "delegations": [
+      {
+        "poolId": "pool1knap9hldvhww0fjqew26sxkfjpj3c8tp8uuj7j3729lzqn9x70r",
+        "requestedAt": "2026-05-19T12:08:07.258Z",
+        "txHash": "f32f98eb649ac8578098b98ac7f1d336a6abe3e23d74e2f97eb7d778c683e14d"
+      }
+    ]
+  }
+]

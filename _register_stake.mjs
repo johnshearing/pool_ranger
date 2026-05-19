@@ -189,7 +189,7 @@ async function main() {
 
   // Stake registration does NOT execute the script — it only pays the 2 ADA deposit.
   // Script execution happens during withdrawal and deregistration, not here.
-  const txBuilder = getTxBuilder();
+  const txBuilder = await getTxBuilder();
   await txBuilder
     .registerStakeCertificate(stakeAddress)
     .changeAddress(memberAddress)

@@ -14,13 +14,44 @@ import {
   applyParamsToScript,
 } from '@meshsdk/core';
 import { serializeAddress } from '@meshsdk/core-csl';
+import { DEFAULT_V3_COST_MODEL_LIST } from '@meshsdk/common';
 
 // ── Blockchain provider (Blockfrost, Preview testnet) ──────────────────────
 export const blockchainProvider = new BlockfrostProvider(process.env.BLOCKFROST_API);
 
+// ── Plutus V3 cost-model patch ────────────────────────────────────────────
+// MeshSDK 1.9.0-beta.102 ships a bundled DEFAULT_V3_COST_MODEL_LIST that lags
+// behind the live Preview/mainnet networks (e.g., Preview currently has 350
+// entries, MeshSDK ships 297). When MeshSDK computes the tx's
+// script_data_hash, it uses the stale list, producing a hash the ledger
+// rejects with `ScriptIntegrityHashMismatch`.
+//
+// Fix: fetch live V3 cost models from Blockfrost and mutate the imported
+// array in place. Because `@meshsdk/core-cst` imports this binding from
+// `@meshsdk/common`, the mutation is visible to the txBuilder's internal
+// hashScriptData() call. We patch lazily on first getTxBuilder() to avoid
+// blocking module load.
+let v3CostModelsPatched = false;
+async function patchV3CostModelsOnce() {
+  if (v3CostModelsPatched) return;
+  const params = await blockchainProvider.get('/epochs/latest/parameters');
+  const liveV3 = params.cost_models?.PlutusV3;
+  if (liveV3 && typeof liveV3 === 'object') {
+    const liveList = Object.values(liveV3);
+    if (liveList.length > 0) {
+      DEFAULT_V3_COST_MODEL_LIST.length = 0;
+      DEFAULT_V3_COST_MODEL_LIST.push(...liveList);
+    }
+  }
+  v3CostModelsPatched = true;
+}
+
 // ── TxBuilder factory ──────────────────────────────────────────────────────
 // Returns a fresh MeshTxBuilder per transaction. Do not reuse across txs.
-export function getTxBuilder() {
+// Async because we lazily fetch and patch live V3 cost models on first call
+// (see patchV3CostModelsOnce above).
+export async function getTxBuilder() {
+  await patchV3CostModelsOnce();
   return new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
