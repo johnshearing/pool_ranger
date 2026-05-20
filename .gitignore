@@ -28,3 +28,5 @@ epoch_agent/candidate_pools.json
 # Cooperative state — member directory and delegation history (contains PKHs)
 _1_members.json
 _1_members_BU.json
+_1_members_PRE_BATCH.json
+_1_delegation_config.json
