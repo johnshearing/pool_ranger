@@ -50,7 +50,7 @@ Below those thresholds the admin loses money on that member. For Pool Ranger to 
 
 The highest-leverage fix is to put many members' delegations into a single transaction. Each parameterized stake script (one per member) is roughly 400 bytes once compiled; the 16 KB Cardano tx-size cap leaves room for somewhere on the order of 25–35 delegations per tx. That shifts the break-even thresholds by ~25× and makes the 1% fee sustainable for almost any member.
 
-The contract does **not** need to change to allow this — multiple `DelegateCredential` certs in one tx is a standard Cardano feature. Only the off-chain script changes.
+The contract does **not** need to change to allow this — multiple `DelegateCredential` certs in one tx is a standard Cardano feature. Only the off-chain tooling changes, and even then by **addition**: a new `_batch_delegate.mjs` script is added alongside the existing `_delegate.mjs`, which keeps working as-is for single-member delegations.
 
 A future contract change is also planned to track delegation costs on-chain explicitly, but that work is deferred until the cooperative is large enough that batched-fee economics no longer suffice. See [Part 3](#part-3--future-contract-change-on-chain-cost-tracking).
 
@@ -163,15 +163,23 @@ Until then, the best validation is to:
 
 ---
 
-## Part 2 — Batched delegation (`_delegate.mjs` rewrite)
+## Part 2 — Batched delegation (new `_batch_delegate.mjs` script)
 
 ### Goal
 
-Replace the current one-tx-per-member delegation flow with one tx that delegates many members at once. This is the change we need *now*, because every new test member we onboard costs ~1 ADA in delegation fees under the current script. Batching brings the per-member cost down to a small fraction of an ADA.
+Add a **new** script that delegates many members in a single transaction. This is the change we need *now*, because every new test member we onboard costs ~1 ADA in delegation fees under the current per-member flow. Batching brings the per-member cost down to a small fraction of an ADA.
+
+### Relationship to the existing `_delegate.mjs`
+
+The existing `_delegate.mjs` is **not** being replaced. It works as-is and remains the right tool for one-off, single-member delegations (onboarding a new member, fixing one member's delegation, etc.). It stays in place, unchanged.
+
+The new script (`_batch_delegate.mjs`) lives alongside it and is the right tool for the recurring "delegate everyone according to the config" workflow. The two scripts share concepts and helpers — anything currently inline in `_delegate.mjs` that the batch script also needs (admin lookup, `getCoopStakeScript()` usage, the `delegations[]` history append, collateral selection, etc.) should be **lifted into a shared helper** in `common/common.mjs` (or a sibling module) so both scripts call the same code. `_delegate.mjs` itself is refactored only to the extent needed to consume the shared helper; its CLI, behavior, and output stay the same.
+
+In short: borrow the ideas and the helpers from `_delegate.mjs`. Do not overwrite it.
 
 ### Why we can do this without changing the contract
 
-Cardano allows any number of `DelegateCredential` certificates in a single transaction. Each cert independently passes through its corresponding stake script's `publish` handler. The current `publish` handler in `coop_stake.ak` only requires `signed_by_admin` for delegation, and that signature is satisfied once for the whole tx — not once per cert. So bundling N delegations under one admin signature is exactly what the contract was already built to allow.
+Cardano allows any number of `DelegateCredential` certificates in a single transaction. Each cert independently passes through its corresponding stake script's `publish` handler. The current `publish` handler in `coop_stake.ak` only requires `signed_by_admin` for delegation, and that signature is satisfied once for the whole tx — not once per cert. So bundling N delegations under one admin signature is exactly what the contract was already built to allow. The existing single-member `_delegate.mjs` already exercises this same `publish` path; the new batch script just stacks more certs into one tx.
 
 ### Tx-size budget
 
@@ -198,7 +206,7 @@ Before relying on this number, the implementation must **measure the actual comp
 node _batch_delegate.mjs
 ```
 
-No flags. The script reads `delegation_config.json` (same file the current `_delegate.mjs` reads), groups assignments into size-bounded batches, builds one unsigned tx per batch, and prints them.
+No flags. The script reads `delegation_config.json` (a new config file — see "Input" below; the existing `_delegate.mjs` does not use this file and continues to take `--name` and `--pool` flags as it does today), groups assignments into size-bounded batches, builds one unsigned tx per batch, and prints them.
 
 If `delegation_config.json` has, say, 47 members assigned to pools, the script prints three unsigned tx hexes:
 
@@ -217,7 +225,7 @@ The admin signs each in turn via `web/dist/sign_tx.html` and submits via `_submi
 
 ### Input — `delegation_config.json`
 
-The same format the current `_delegate.mjs` uses. A flat array:
+A new config file for the batch script. The existing `_delegate.mjs` does **not** read this file — it continues to take `--name` and `--pool` flags. The batch script reads a flat array:
 
 ```json
 [
@@ -226,7 +234,7 @@ The same format the current `_delegate.mjs` uses. A flat array:
 ]
 ```
 
-Members not in `delegation_config.json` are not delegated this run. Members whose current on-chain delegation already matches `delegation_config.json` should be **skipped** — there is no reason to pay a fee to re-delegate to the same pool. The skip check requires a per-member lookup of the current delegation via Blockfrost. The existing `_view_delegations.mjs` already does this; the relevant logic can be lifted into a shared helper.
+Members not in `delegation_config.json` are not delegated this run. Members whose current on-chain delegation already matches `delegation_config.json` should be **skipped** — there is no reason to pay a fee to re-delegate to the same pool. The skip check requires a per-member lookup of the current delegation via Blockfrost. The existing `_view_delegations.mjs` already does this, and `_delegate.mjs` already has a similar "refuse no-op redelegation" check against the `delegations[]` history; the relevant logic can be lifted into a shared helper that both `_delegate.mjs` and `_batch_delegate.mjs` call.
 
 ### Algorithm (step by step)
 
@@ -246,33 +254,39 @@ Members not in `delegation_config.json` are not delegated this run. Members whos
    - Call `complete()` and print the unsigned hex.
 5. After all batches are emitted, update the in-memory representation of `_1_members.json` to record the *intended* delegation: append a new entry to each affected member's `delegations[]` history with status `pending` (or similar — match the field the current script uses). Write the file. The on-chain state will be reconciled by `_view_delegations.mjs` after the admin signs and submits.
 
-### What stays the same as the current `_delegate.mjs`
+### What `_batch_delegate.mjs` reuses from `_delegate.mjs`
 
-- Reads `delegation_config.json`.
-- Uses `getCoopStakeScript()` from `common/common.mjs` for parameter application.
-- Ledger-signing flow via `web/dist/sign_tx.html` is unchanged — the unsigned hex is just larger.
-- Submission via `_submit_tx.mjs` is unchanged.
-- The `delegations[]` history in `_1_members.json` is updated the same way.
+These pieces are conceptually identical in both scripts and should be shared via helpers rather than copy-pasted:
 
-### What changes
+- Admin lookup from `_1_members.json` (the `ADMIN_NAME = 'admin_0'` row).
+- `getCoopStakeScript(adminPkh, memberPkh)` from `common/common.mjs` for per-member parameter application.
+- Collateral UTxO selection from the admin wallet (pure-ADA UTxO).
+- The `delegations[]` history append shape: `{ poolId, requestedAt, txHash }` per member.
+- Ledger-signing flow via `web/dist/sign_tx.html` — unchanged; the unsigned hex is just larger.
+- Submission via `_submit_tx.mjs` — unchanged.
 
-- One tx per batch instead of one tx per member.
-- A skip-if-unchanged check that avoids redundant delegations.
+### What is new in `_batch_delegate.mjs`
+
+- Reads `delegation_config.json` instead of `--name`/`--pool` CLI flags.
+- Builds one tx per batch (many certs + many script witnesses per tx) instead of one tx per member.
+- A skip-if-unchanged check (against on-chain delegation via Blockfrost) that avoids redundant delegations.
 - A `BATCH_SIZE` constant (start at 20, document the reasoning in a comment that names the 16 KB cap and the measured script size).
+- Emits N unsigned tx hexes labeled "Batch i of N" instead of one.
 
-### Backwards compatibility
+### Coexistence with `_delegate.mjs`
 
-The current `_delegate.mjs` can be replaced outright. There is no use case where building N separate txs is preferable to one batched tx for the same set of members. Keep the filename `_delegate.mjs` so the workflow docs and habits do not need to change; the rewrite happens under that name.
+The single-member `_delegate.mjs` stays. It is the right tool when the admin wants to delegate exactly one member without preparing a config file (onboarding, ad-hoc fixes, one-off pool moves). `_batch_delegate.mjs` is the right tool for the recurring "delegate everyone in the config" workflow. Both scripts share helpers, update `_1_members.json` the same way, and produce hex that the same `web/dist/sign_tx.html` and `_submit_tx.mjs` consume.
 
 ### Testing approach
 
 Because we add test members one at a time as the project grows, we can validate batching incrementally:
 
-1. **Batch of 1.** Onboard one test member, run `_delegate.mjs`. The unsigned hex should be a normal single-delegation tx. Sign, submit, confirm via `_view_delegations.mjs`.
-2. **Batch of 2.** Onboard a second test member, run `_delegate.mjs`. Confirm one tx contains both certs and both witnesses. Sign, submit, confirm.
+1. **Batch of 1.** Onboard one test member, populate `delegation_config.json` with that one entry, run `_batch_delegate.mjs`. The unsigned hex should look like a normal single-delegation tx (same shape `_delegate.mjs` would produce for the same member). Sign, submit, confirm via `_view_delegations.mjs`.
+2. **Batch of 2.** Onboard a second test member, add their entry to `delegation_config.json`, run `_batch_delegate.mjs`. Confirm one tx contains both certs and both witnesses. Sign, submit, confirm.
 3. **Batch of 5, 10, 20.** Continue scaling. At each step, note the actual tx size from MeshJS and compare against the 16 KB cap to validate the script-size estimate.
 4. **Batch overflow.** Once 21+ members are eligible, confirm the script splits into 20-then-N. Sign and submit each batch; confirm via `_view_delegations.mjs` that all batches landed.
 5. **Skip-if-unchanged.** With no config changes, re-running the script should produce zero batches and exit cleanly.
+6. **`_delegate.mjs` still works.** After the shared-helper refactor, run `_delegate.mjs --name member_X --pool pool1...` and confirm its behavior is identical to before — same unsigned hex shape, same `delegations[]` append, same console output. This is the regression check on the single-member script.
 
 No staking rewards are required for any of this testing — the batched-delegate flow is independent of the reward-withdrawal flow.
 
@@ -320,6 +334,6 @@ None of this needs to be designed in detail now. The note exists so that future 
 These are questions that don't block writing either script today, but that should be answered before either goes to production.
 
 1. **Exact compiled size of one parameterized `coop_stake` script.** Affects the `BATCH_SIZE` constant. One quick measurement during implementation.
-2. **Does MeshTxBuilder need any special handling to attach N different scripts to N different certs in one tx?** Likely yes — the API is set up for spending scripts most prominently. Worth a short investigation before committing to the rewrite.
+2. **Does MeshTxBuilder need any special handling to attach N different scripts to N different certs in one tx?** Likely yes — the API is set up for spending scripts most prominently. Worth a short investigation before committing to the new batch script. (The existing `_delegate.mjs` attaches one script to one cert, so the per-cert mechanics are already proven; the question is just whether stacking N of them in the builder requires anything beyond looping.)
 3. **Sweep mode for `_withdraw_rewards.mjs`?** Once the per-member version is proven, a `_withdraw_rewards_all.mjs` that iterates all members with non-zero rewards may be worth building. Probably not until the cooperative has more than a handful of members.
 4. **Tax reporting for the admin's 1%.** Already listed as a "to design" decision in `REQUIREMENTS.md`. The withdraw script's output log is the natural place to record the data — keep that in mind when designing the per-tx summary printout.
