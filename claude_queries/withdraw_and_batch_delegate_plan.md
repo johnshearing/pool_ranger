@@ -10,7 +10,7 @@
 
 1. [Background and motivation](#background-and-motivation)
 2. [Part 1 — `_withdraw_rewards.mjs`](#part-1--_withdraw_rewardsmjs)
-3. [Part 2 — Batched delegation (`_delegate.mjs` rewrite)](#part-2--batched-delegation-_delegatemjs-rewrite)
+3. [Part 2 — Batched delegation (new `_batch_delegate.mjs` script based on `_delegate.mjs`)](#part-2--batched-delegation-_delegatemjs-rewrite)
 4. [Part 3 — Future contract change: on-chain cost tracking](#part-3--future-contract-change-on-chain-cost-tracking)
 5. [Open questions for later](#open-questions-for-later)
 
