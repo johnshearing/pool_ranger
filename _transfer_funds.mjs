@@ -24,7 +24,7 @@ dotenv.config(); // loads BLOCKFROST_API from .env
 
 // ==================== CONFIG ====================
 const SOURCE_SK_PATH  = "../hello-world/me.sk";  // funding wallet (software, has .sk)
-const AMOUNT_ADA      = "200";                   // tADA to send — edit if you need a different amount
+const AMOUNT_ADA      = "400";                   // tADA to send — edit if you need a different amount
 const AMOUNT_LOVELACE = String(Number(AMOUNT_ADA) * 1_000_000);
 const NETWORK_ID      = 0;                       // 0 = Preview testnet
 // ===============================================

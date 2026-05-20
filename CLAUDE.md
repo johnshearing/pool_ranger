@@ -1,8 +1,8 @@
 # CLAUDE.md — Pool Ranger (ranger)
-
-These files are auto-loaded by Claude Code at the start of every session for this directory.
+These files are auto-loaded by Claude Code at the start of every session for this directory.  
 **Always read `README.md` at the start of each session** to get background information about the `Pool Ranger` project.  
 **Always read `REQUIREMENTS.md` at the start of each session** to get background information about the `Pool Ranger` project.    
+**Always read `/home/js/aiken/ranger/claude_queries/withdraw_and_batch_delegate_plan.md` at the start of each session** to get background information on the new `_batch_delegate.mjs` script.  
 
 
 ---
