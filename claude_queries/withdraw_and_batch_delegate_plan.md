@@ -206,9 +206,9 @@ Before relying on this number, the implementation must **measure the actual comp
 node _batch_delegate.mjs
 ```
 
-No flags. The script reads `delegation_config.json` (a new config file — see "Input" below; the existing `_delegate.mjs` does not use this file and continues to take `--name` and `--pool` flags as it does today), groups assignments into size-bounded batches, builds one unsigned tx per batch, and prints them.
+No flags. The script reads `_1_delegation_config.json` (a new config file — see "Input" below; the existing `_delegate.mjs` does not use this file and continues to take `--name` and `--pool` flags as it does today), groups assignments into size-bounded batches, builds one unsigned tx per batch, and prints them.
 
-If `delegation_config.json` has, say, 47 members assigned to pools, the script prints three unsigned tx hexes:
+If `_1_delegation_config.json` has, say, 47 members assigned to pools, the script prints three unsigned tx hexes:
 
 ```
 === Batch 1 of 3 (20 delegations) ===
@@ -223,7 +223,7 @@ If `delegation_config.json` has, say, 47 members assigned to pools, the script p
 
 The admin signs each in turn via `web/dist/sign_tx.html` and submits via `_submit_tx.mjs`.
 
-### Input — `delegation_config.json`
+### Input — `_1_delegation_config.json`
 
 A new config file for the batch script. The existing `_delegate.mjs` does **not** read this file — it continues to take `--name` and `--pool` flags. The batch script reads a flat array:
 
@@ -234,12 +234,12 @@ A new config file for the batch script. The existing `_delegate.mjs` does **not*
 ]
 ```
 
-Members not in `delegation_config.json` are not delegated this run. Members whose current on-chain delegation already matches `delegation_config.json` should be **skipped** — there is no reason to pay a fee to re-delegate to the same pool. The skip check requires a per-member lookup of the current delegation via Blockfrost. The existing `_view_delegations.mjs` already does this, and `_delegate.mjs` already has a similar "refuse no-op redelegation" check against the `delegations[]` history; the relevant logic can be lifted into a shared helper that both `_delegate.mjs` and `_batch_delegate.mjs` call.
+Members not in `_1_delegation_config.json` are not delegated this run. Members whose current on-chain delegation already matches `_1_delegation_config.json` should be **skipped** — there is no reason to pay a fee to re-delegate to the same pool. The skip check requires a per-member lookup of the current delegation via Blockfrost. The existing `_view_delegations.mjs` already does this, and `_delegate.mjs` already has a similar "refuse no-op redelegation" check against the `delegations[]` history; the relevant logic can be lifted into a shared helper that both `_delegate.mjs` and `_batch_delegate.mjs` call.
 
 ### Algorithm (step by step)
 
-1. Read `_1_members.json` and `delegation_config.json`.
-2. For each entry in `delegation_config.json`:
+1. Read `_1_members.json` and `_1_delegation_config.json`.
+2. For each entry in `_1_delegation_config.json`:
    - Look up the member row by `memberPkh`.
    - Query Blockfrost for current on-chain delegation at `member.stakeAddress`.
    - If current delegation == `poolId`, skip with a "no change needed" message.
@@ -267,7 +267,7 @@ These pieces are conceptually identical in both scripts and should be shared via
 
 ### What is new in `_batch_delegate.mjs`
 
-- Reads `delegation_config.json` instead of `--name`/`--pool` CLI flags.
+- Reads `_1_delegation_config.json` instead of `--name`/`--pool` CLI flags.
 - Builds one tx per batch (many certs + many script witnesses per tx) instead of one tx per member.
 - A skip-if-unchanged check (against on-chain delegation via Blockfrost) that avoids redundant delegations.
 - A `BATCH_SIZE` constant (start at 20, document the reasoning in a comment that names the 16 KB cap and the measured script size).
@@ -281,8 +281,8 @@ The single-member `_delegate.mjs` stays. It is the right tool when the admin wan
 
 Because we add test members one at a time as the project grows, we can validate batching incrementally:
 
-1. **Batch of 1.** Onboard one test member, populate `delegation_config.json` with that one entry, run `_batch_delegate.mjs`. The unsigned hex should look like a normal single-delegation tx (same shape `_delegate.mjs` would produce for the same member). Sign, submit, confirm via `_view_delegations.mjs`.
-2. **Batch of 2.** Onboard a second test member, add their entry to `delegation_config.json`, run `_batch_delegate.mjs`. Confirm one tx contains both certs and both witnesses. Sign, submit, confirm.
+1. **Batch of 1.** Onboard one test member, populate `_1_delegation_config.json` with that one entry, run `_batch_delegate.mjs`. The unsigned hex should look like a normal single-delegation tx (same shape `_delegate.mjs` would produce for the same member). Sign, submit, confirm via `_view_delegations.mjs`.
+2. **Batch of 2.** Onboard a second test member, add their entry to `_1_delegation_config.json`, run `_batch_delegate.mjs`. Confirm one tx contains both certs and both witnesses. Sign, submit, confirm.
 3. **Batch of 5, 10, 20.** Continue scaling. At each step, note the actual tx size from MeshJS and compare against the 16 KB cap to validate the script-size estimate.
 4. **Batch overflow.** Once 21+ members are eligible, confirm the script splits into 20-then-N. Sign and submit each batch; confirm via `_view_delegations.mjs` that all batches landed.
 5. **Skip-if-unchanged.** With no config changes, re-running the script should produce zero batches and exit cleanly.

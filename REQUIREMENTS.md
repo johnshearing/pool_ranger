@@ -120,9 +120,9 @@ This applies equally to admin scripts and member scripts.
 **Node.js scripts:**
 - [x] `_generate_credentials.mjs` — creates software wallets; scaffolds Ledger support
 - [x] `_transfer_funds.mjs` — sends ADA between wallets for testing
-- [x] `_view_wallet_balances.mjs` — inspect ADA and reward balances
 - [x] `_register_stake.mjs` — member registers their coop stake credential on-chain (pays 2 ADA deposit); hardware and software wallet signing
-- [x] `_delegate.mjs` — admin delegates each member's stake to a chosen pool (per-member granular control); hardware and software wallet signing
+- [x] `_delegate.mjs` — admin delegates **one** member's stake to a chosen pool (per-member granular control via `--name` / `--pool` CLI flags); refuses on no-op (already delegated to that pool) and on drift (local history disagrees with on-chain state); hardware and software wallet signing
+- [x] `_batch_delegate.mjs` — admin delegates **many** members in a single transaction (up to `BATCH_SIZE = 12` per run); pays one Cardano tx fee and asks for one Ledger signature for the whole batch. Reads `_1_delegation_config.json`, auto-snapshots `_1_members.json` to `_1_members_PRE_BATCH.json` for one-command rollback, and refuses the whole batch if any entry is in drift. Single-batch v1; multi-batch in one run deferred until the cooperative exceeds 12 active delegations (see source header for why)
 - [x] `_submit_tx.mjs` — submits a signed tx hex to the network via Blockfrost; used after Ledger signing
 - [ ] `_withdraw_rewards.mjs` — either admin or member can initiate.  
   - The contract enforces the 99/1 split on-chain regardless of signer  
@@ -135,6 +135,7 @@ This applies equally to admin scripts and member scripts.
   - This the amount not sent to the contract address.
 - [ ] `_view_members.mjs` — list all registered coop stake addresses, delegation status, and pending rewards
 - [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
+- [x] `_measure_batch_size.mjs` — diagnostic / developer tool. Builds a multi-delegation tx in memory (no submission) using the current `_1_delegation_config.json`, then reports the per-script CBOR size, the per-tx baseline overhead, and a recommended `BATCH_SIZE` that leaves ~25% headroom against the 16 KB tx cap. Re-run after any change to `validators/coop_stake.ak` to validate that the `BATCH_SIZE` constant in `_batch_delegate.mjs` is still appropriate. Read-only — safe to run any time.
 
 **Web signing tool (`web/`) — Phase 1 bridge for Ledger signing:**
 - [x] `web/package.json` — browser build dependencies (MeshJS + Vite + Node.js polyfills)
@@ -159,6 +160,8 @@ register, delegate, withdraw, or leave.
 
 - [x] `_1_members.json` — **the working member directory and single source of truth for every wallet address Pool Ranger knows about.** Every script that touches a member (register, delegate, withdraw, revoke, view) reads or writes this file. It holds one entry per member: `name`, `address` (the bech32 Ledger receive address — admin and members alike), `memberPkh`, `stakeAddress`, `contractAddress`, `scriptHash`, `registration`, and a `delegations` history (newest entry = current intended delegation). On testnet today this file is committed. On mainnet it is expected to grow to thousands of entries of real cooperative membership data, and will not be committed to the public repo.
 - [x] `_1_members_sample.json` — **a tiny shape-only sample committed to the public GitHub repo.** Its only purpose is to show readers of the repo what `_1_members.json` looks like (the field names and the nested `delegations` array) without exposing real cooperative membership data. The two files are intentionally *not* expected to match — `_1_members.json` will eventually contain thousands of real entries, while `_1_members_sample.json` stays small. Scripts must never compare the two or treat divergence as an error.
+- [x] `_1_delegation_config.json` — **the admin's batched delegation plan.** A flat JSON array of `{ name, memberPkh, poolId }` entries, consumed by `_batch_delegate.mjs`. Lookup is by `memberPkh`; the `name` field is human-readable only (audit aid so the admin can read the file without cross-referencing 56-character pkh strings). Members not listed here are not touched on a batch run. On testnet this file is committed alongside `_1_members.json`; on mainnet it will hold real cooperative assignments and will not be committed.
+- [x] `_1_members_PRE_BATCH.json` — **auto-snapshot of `_1_members.json` written by `_batch_delegate.mjs`** immediately before it overwrites the live file. Provides a one-command rollback (`cp _1_members_PRE_BATCH.json _1_members.json`) if the admin decides not to submit the tx, or if anything else goes wrong post-build. Overwritten on every batch run that produces pending delegations; not written when the script exits early (drift, no-op, or over-cap), so a useful prior snapshot is not clobbered by a no-op run. Not committed.
 - [x] `.env` — `BLOCKFROST_API=previewXXXXX`. Not committed.
 
 There are no `.addr` files in `ranger/`. Earlier in development each Ledger wallet had its
@@ -250,15 +253,41 @@ This is the step-by-step process the Pool Ranger administrator follows.
 6. Once confirmed, the member moves their ADA to their printed **coop base address**.
 
 ### Delegating stake to a pool
-7. Prepare (or update) `delegation_config.json` — a JSON file listing `{ memberPkh, poolId }`
-   assignments. *(File format defined in `_delegate.mjs` header comments.)*
-8. Run `_delegate.mjs` to build a delegation transaction for each member:
-   ```
-   node _delegate.mjs
-   ```
-   This prints unsigned tx hex for each delegation.
-9. For each unsigned tx, open `web/dist/sign_tx.html`, sign with the admin Ledger, submit with
-   `_submit_tx.mjs`. *(One delegation tx per member.)*
+
+Two scripts handle delegation. Both build unsigned txs for Ledger signing and share the
+same on-chain `publish` handler — the contract treats N delegation certs in one tx the same
+as N separate transactions.
+
+**One member at a time — `_delegate.mjs`:**
+
+7a. Run `node _delegate.mjs --name member_N --pool pool1...`. Best for onboarding a new
+    member, ad-hoc fixes, or one-off pool moves. The script refuses if the requested pool
+    already matches both the member's local history and the on-chain delegation (no-op), or
+    if those two disagree (drift — reconcile manually before retrying).
+8a. Sign the printed unsigned tx hex in `web/dist/sign_tx.html`, then submit with
+    `node _submit_tx.mjs <signed-tx-hex>`.
+
+**Many members at once — `_batch_delegate.mjs`:**
+
+7b. Prepare or update `_1_delegation_config.json` — a flat JSON array of
+    `{ name, memberPkh, poolId }` entries. The format is documented in the
+    `_batch_delegate.mjs` header comments.
+8b. Run `node _batch_delegate.mjs`. The script reads `_1_delegation_config.json`, classifies
+    each entry against history + chain (skip / drift / build), builds **one** transaction
+    with one cert + one parameterized script witness per pending member, snapshots
+    `_1_members.json` to `_1_members_PRE_BATCH.json` for rollback, and prints the unsigned
+    tx hex. Up to `BATCH_SIZE = 12` delegations fit in one tx; over that the script refuses
+    until the config is trimmed.
+9b. Sign the unsigned tx in `web/dist/sign_tx.html` (one signature for the whole batch),
+    then submit with `_submit_tx.mjs`. Verify with `_view_delegations.mjs` after a minute.
+
+If you decide not to submit the tx, restore the pre-batch state with
+`cp _1_members_PRE_BATCH.json _1_members.json` — otherwise drift detection will block the
+next batch run.
+
+If you change the validator (`validators/coop_stake.ak`), re-run `_measure_batch_size.mjs`
+to confirm the `BATCH_SIZE = 12` constant still leaves enough headroom against the 16 KB
+tx cap.
 
 ### Distributing rewards (each epoch)
 10. At each epoch boundary, run `_withdraw_rewards.mjs` *(not yet built)* — once per member — to:

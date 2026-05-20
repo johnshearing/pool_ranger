@@ -31,18 +31,21 @@
 // already targets the same pool (nothing to do). Remove that last entry first
 // if you really want to re-issue the same delegation.
 
-import fs from 'fs';
 import { resolveTxHash } from '@meshsdk/core';
 import {
   blockchainProvider,
   getTxBuilder,
-  getCoopStakeScript,
+  loadMembers,
+  writeMembers,
+  findAdmin,
+  findMember,
+  pickAdaCollateral,
+  addDelegationCert,
+  appendDelegationHistory,
+  checkDelegationStatus,
 } from './common/common.mjs';
 
 // ── Config ────────────────────────────────────────────────────────────────
-// Admin info (address, PKH) is looked up from the ADMIN_NAME entry in
-// _1_members.json — no separate .addr file is needed.
-const ADMIN_NAME   = 'admin_0';
 const MEMBERS_FILE = './_1_members.json';
 
 // ── Parse CLI args (--name <value> --pool <bech32>) ──────────────────────
@@ -68,7 +71,11 @@ Options:
 
 What this does:
   1. Looks up the member in ./_1_members.json by --name.
-  2. Refuses if the member's latest delegation already targets the same pool.
+  2. Refuses if either:
+     - the requested pool already matches both the local history and the
+       on-chain delegation (no-op — would just pay a fee for nothing), or
+     - the local history and the on-chain delegation disagree (drift —
+       you need to reconcile manually before re-running).
   3. Builds a delegation transaction (admin must sign it later).
   4. Computes the txHash and appends {poolId, requestedAt, txHash} to the
      member's delegations history in _1_members.json.
@@ -108,106 +115,74 @@ if (!args.pool.startsWith('pool1')) {
   process.exit(1);
 }
 
-async function buildDelegationTx(adminPkh, adminAddress, memberPkh, poolId) {
-  const { scriptCbor, stakeAddress } = getCoopStakeScript(adminPkh, memberPkh);
+async function main() {
+  // ── Load directory and look up the requested member + admin ────────────
+  const members = loadMembers(MEMBERS_FILE);
+  const member  = findMember(members, args.name);
+  const admin   = findAdmin(members);
 
-  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(adminAddress);
-  if (adminUtxos.length === 0) {
-    throw new Error(`Admin wallet has no UTxOs. Fund ${adminAddress} first.`);
+  // ── No-op / drift check ────────────────────────────────────────────────
+  // Compares the requested pool against BOTH the local history and the
+  // current on-chain delegation. Refuses on drift and lets the user
+  // reconcile manually (see checkDelegationStatus in common.mjs).
+  const status = await checkDelegationStatus(member, args.pool);
+
+  if (status.drift) {
+    console.error(`Error: drift detected on "${member.name}":`);
+    console.error(`  history says : ${status.historyPool ?? '(none)'}`);
+    console.error(`  chain says   : ${status.chainPool ?? '(none)'}`);
+    console.error('Reconcile manually before retrying. Common causes:');
+    console.error('  - a previous delegation tx was built but never submitted');
+    console.error('  - _1_members.json was edited by hand');
+    console.error('Run _view_delegations.mjs to inspect, then either submit the');
+    console.error('pending tx or remove the stale delegations[] entry.');
+    process.exit(1);
   }
 
-  // Pure-ADA UTxO required for collateral (script witness needs it).
-  const collateral = adminUtxos.find(
-    u => u.output.amount.length === 1 && u.output.amount[0].unit === 'lovelace',
-  );
-  if (!collateral) {
-    throw new Error('No pure-ADA UTxO for collateral in admin wallet.');
+  if (status.skip) {
+    const when = status.latestEntry?.requestedAt ?? 'unknown';
+    console.error(`Error: "${member.name}" is already delegated to ${args.pool} (entry from ${when}).`);
+    console.error('Nothing to do. Pick a different pool, or remove that entry to re-issue.');
+    process.exit(1);
   }
+
+  console.log('Admin address:', admin.address);
+  console.log('Admin PKH:    ', admin.memberPkh);
+  console.log(`\nDelegating "${member.name}"  →  ${args.pool}`);
+  if (status.latestEntry) {
+    console.log(`(previously: ${status.latestEntry.poolId} at ${status.latestEntry.requestedAt})`);
+  } else {
+    console.log('(first delegation for this member)');
+  }
+
+  // ── Build the delegation transaction ───────────────────────────────────
+  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.address);
+  const collateral = pickAdaCollateral(adminUtxos, admin.address);
 
   const txBuilder = await getTxBuilder();
+  addDelegationCert(txBuilder, {
+    adminPkh:  admin.memberPkh,
+    memberPkh: member.memberPkh,
+    poolId:    args.pool,
+  });
   await txBuilder
-    .delegateStakeCertificate(stakeAddress, poolId)
-    .certificateScript(scriptCbor, 'V3')
-    .certificateRedeemerValue('')
-    .requiredSignerHash(adminPkh)         // contract requires admin signature
+    .requiredSignerHash(admin.memberPkh)   // contract requires admin signature
     .txInCollateral(
       collateral.input.txHash,
       collateral.input.outputIndex,
       collateral.output.amount,
       collateral.output.address,
     )
-    .changeAddress(adminAddress)
+    .changeAddress(admin.address)
     .selectUtxosFrom(adminUtxos)
     .complete();
 
-  return txBuilder.txHex;
-}
-
-async function main() {
-  // ── Load member directory ──────────────────────────────────────────────
-  if (!fs.existsSync(MEMBERS_FILE)) {
-    console.error(`Member directory not found: ${MEMBERS_FILE}`);
-    console.error('Register members first with _register_stake.mjs.');
-    process.exit(1);
-  }
-  const members = JSON.parse(fs.readFileSync(MEMBERS_FILE, 'utf8'));
-
-  // ── Find the requested member ──────────────────────────────────────────
-  const member = members.find(m => m.name === args.name);
-  if (!member) {
-    console.error(`Error: no member named "${args.name}" in ${MEMBERS_FILE}.`);
-    console.error('Known members:', members.map(m => m.name).join(', ') || '(none)');
-    process.exit(1);
-  }
-
-  // Defensive: older records may predate the delegations field.
-  if (!Array.isArray(member.delegations)) {
-    member.delegations = [];
-  }
-
-  // Refuse a no-op redelegation to the same pool.
-  const latest = member.delegations[member.delegations.length - 1];
-  if (latest && latest.poolId === args.pool) {
-    console.error(`Error: "${member.name}" is already delegated to ${args.pool} (entry from ${latest.requestedAt}).`);
-    console.error('Nothing to do. Pick a different pool, or remove that entry to re-issue.');
-    process.exit(1);
-  }
-
-  // ── Resolve admin info from _1_members.json ────────────────────────────
-  const adminRecord = members.find(m => m.name === ADMIN_NAME);
-  if (!adminRecord) {
-    console.error(`Error: admin record "${ADMIN_NAME}" not found in ${MEMBERS_FILE}.`);
-    console.error('Register the admin as a member first via _register_stake.mjs.');
-    process.exit(1);
-  }
-  const adminAddress = adminRecord.address;
-  const adminPkh     = adminRecord.memberPkh;
-
-  console.log('Admin address:', adminAddress);
-  console.log('Admin PKH:    ', adminPkh);
-  console.log(`\nDelegating "${member.name}"  →  ${args.pool}`);
-  if (latest) {
-    console.log(`(previously: ${latest.poolId} at ${latest.requestedAt})`);
-  } else {
-    console.log('(first delegation for this member)');
-  }
-
-  // ── Build the delegation transaction ───────────────────────────────────
-  const unsignedTxHex = await buildDelegationTx(
-    adminPkh,
-    adminAddress,
-    member.memberPkh,
-    args.pool,
-  );
+  const unsignedTxHex = txBuilder.txHex;
   const txHash = resolveTxHash(unsignedTxHex);
 
   // ── Append to the member's delegation history ──────────────────────────
-  member.delegations.push({
-    poolId: args.pool,
-    requestedAt: new Date().toISOString(),
-    txHash,
-  });
-  fs.writeFileSync(MEMBERS_FILE, JSON.stringify(members, null, 2) + '\n');
+  appendDelegationHistory(member, { poolId: args.pool, txHash });
+  writeMembers(MEMBERS_FILE, members);
   console.log(`\nAppended delegation entry to ${MEMBERS_FILE} (txHash: ${txHash}).`);
 
   // ── Print unsigned tx for external signing ─────────────────────────────
