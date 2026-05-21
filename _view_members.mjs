@@ -116,6 +116,17 @@
 // no balance and is omitted from the sum.
 //
 // ───────────────────────────────────────────────────────────────────────────
+// REGISTRATION
+//
+// Read straight from member.registration in _1_members.json (no Blockfrost
+// call). Two fields:
+//   requestedAt — ISO timestamp the registration tx was built by
+//                 _register_stake.mjs. Treat as "approximate join date".
+//   txHash      — the registration transaction hash. Useful as the audit
+//                 trail for "when and how did this member join Pool Ranger".
+// Omitted entirely if the row has no registration field (older records).
+//
+// ───────────────────────────────────────────────────────────────────────────
 // DELEGATION
 //
 // One on-chain call (the same /accounts/{stake_address} request used for
@@ -248,14 +259,14 @@ async function fetchStakeAccount(stakeAddress) {
 // Blockfrost paginates at 100 per page; we walk pages until we get an empty one.
 // Returns [] (with note flag) if the stake credential was never registered
 // on-chain — that case is normal for a brand-new wallet.
-async function fetchAddressesForWalletReward(WalletRewardAddress) {
+async function fetchAddressesForWalletReward(walletRewardAddress) {
   const all = [];
   let page = 1;
   while (true) {
     let chunk;
     try {
       chunk = await blockchainProvider.get(
-        `/accounts/${WalletRewardAddress}/addresses?page=${page}&count=100`,
+        `/accounts/${walletRewardAddress}/addresses?page=${page}&count=100`,
       );
     } catch (err) {
       const status = err.status_code ?? err.status ?? err.response?.status;
@@ -285,6 +296,13 @@ function deriveWalletRewardAddress(memberAddress) {
 async function reportMember(member) {
   console.log(`── ${member.name} ──────────────────────────────────────────`);
 
+  // Registration metadata (when the member joined, what tx registered them)
+  if (member.registration) {
+    console.log('  Registration:');
+    console.log(`    requestedAt              : ${member.registration.requestedAt ?? '(unknown)'}`);
+    console.log(`    txHash                   : ${member.registration.txHash ?? '(unknown)'}`);
+  }
+
   // A. Registered receive address
   let balA = { lovelace: 0, utxoCount: 0 };
   try {
@@ -295,13 +313,13 @@ async function reportMember(member) {
 
   // B. WalletRewardAddress + C. Other wallet receive addresses (sharing wallet stake credential)
   let balB = { lovelace: 0, utxoCount: 0, count: 0 };
-  let WalletRewardAddress = null;
+  let walletRewardAddress = null;
   let walletRewardRegistered = true;
   let walletRewardWarning = null;
   try {
-    WalletRewardAddress = deriveWalletRewardAddress(member.address);
-    if (WalletRewardAddress) {
-      const { addresses, registered } = await fetchAddressesForWalletReward(WalletRewardAddress);
+    walletRewardAddress = deriveWalletRewardAddress(member.address);
+    if (walletRewardAddress) {
+      const { addresses, registered } = await fetchAddressesForWalletReward(walletRewardAddress);
       walletRewardRegistered = registered;
       if (!registered) {
         walletRewardWarning =
@@ -339,8 +357,8 @@ async function reportMember(member) {
   console.log('  Wallet balances:');
   console.log(`    A. Registered receive addr        : ${member.address}`);
   console.log(`       balance                        : ${fmtAda(balA.lovelace)} across ${balA.utxoCount} UTxO(s)`);
-  if (WalletRewardAddress) {
-    console.log(`    B. WalletRewardAddress            : ${WalletRewardAddress}`);
+  if (walletRewardAddress) {
+    console.log(`    B. WalletRewardAddress            : ${walletRewardAddress}`);
     console.log(`       (handle only — does not contribute to wallet total)`);
     console.log(`    C. Other wallet receive addresses : ${balB.count} sibling address(es) sharing the wallet's stake key`);
     if (walletRewardWarning) {
