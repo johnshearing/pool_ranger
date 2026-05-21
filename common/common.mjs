@@ -55,6 +55,7 @@ export async function getTxBuilder() {
   return new MeshTxBuilder({
     fetcher: blockchainProvider,
     submitter: blockchainProvider,
+    evaluator: blockchainProvider,   // replaces 7M-mem default with real ex-units
     network: 0,   // 0 = testnet
     verbose: true,
   });
