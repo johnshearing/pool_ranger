@@ -12,7 +12,7 @@
 ## What Pool Ranger Is
 
 Pool Ranger is a Cardano staking management platform built on Plutus V3 smart contracts.  
-Members join by moving their ADA to a Pool Ranger base address
+Members join by moving their ADA to a Pool Ranger staking address
 where:
 - The **payment credential** is the member's own spending key 
   - Members always have full control their own funds.
@@ -133,7 +133,7 @@ This applies equally to admin scripts and member scripts.
   - Shows contract ADA balance and if active.
 - [x] `_view_wallet_balances.mjs` —  Shows wallet ADA balances.  
   - This the amount not sent to the contract address.
-- [x] `_view_members.mjs` — combined per-member report. For each row in `_1_members.json` (or just the one matched by an optional `--name` flag), prints three side-by-side balances — **registered receive address**, **other wallet addresses** (enumerated via Blockfrost `/accounts/{walletStakeAddress}/addresses` so funds Eternl has scattered across sibling derived addresses are visible), and **Pool Ranger base address** — followed by the on-chain delegation drift check and pending staking rewards (withdrawable now + lifetime earned). The leading comment block of the script is the canonical reference for the three address kinds it surfaces (stake address, registered receive base address, Pool Ranger base address). Strict superset of `_view_delegations.mjs` and `_view_wallet_balances.mjs`; those two are deliberately retained as focused single-purpose tools that are faster and clearer when only one piece of the picture is needed.
+- [x] `_view_members.mjs` — combined per-member report. For each row in `_1_members.json` (or just the one matched by an optional `--name` flag), prints three side-by-side balances — **registered receive address** (`member.address`), **other wallet receive addresses** (sibling addresses sharing the wallet's reward-address handle, enumerated via Blockfrost `/accounts/{WalletRewardAddress}/addresses` so funds Eternl has scattered across derived addresses are visible), and **Pool Ranger staking address** (`member.contractAddress`) — followed by the on-chain delegation drift check and pending staking rewards (withdrawable now + lifetime earned). The leading comment block of the script is the canonical reference for the address model; it explicitly distinguishes the two reward-address labels the script displays — `WalletRewardAddress` (handle for the wallet's own stake key) and `PoolRangerRewardAddress` (handle for the parameterized Pool Ranger script credential; stored on disk as `stakeAddress` for historical reasons). Strict superset of `_view_delegations.mjs` and `_view_wallet_balances.mjs`; those two are deliberately retained as focused single-purpose tools that are faster and clearer when only one piece of the picture is needed.
 - [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
 - [x] `_measure_batch_size.mjs` — diagnostic / developer tool. Builds a multi-delegation tx in memory (no submission) using the current `_1_delegation_config.json`, then reports the per-script CBOR size, the per-tx baseline overhead, and a recommended `BATCH_SIZE` that leaves ~25% headroom against the 16 KB tx cap. Re-run after any change to `validators/coop_stake.ak` to validate that the `BATCH_SIZE` constant in `_batch_delegate.mjs` is still appropriate. Read-only — safe to run any time.
 
@@ -213,7 +213,7 @@ This is the step-by-step process a Pool Ranger member follows, from joining to w
    ```
    node _submit_tx.mjs <signed-tx-hex>
    ```
-8. Move your ADA to your **Pool Ranger base address** (printed in step 5). This is the address where
+8. Move your ADA to your **Pool Ranger staking address** (printed in step 5). This is the address where
    your ADA lives while staking with Pool Ranger. Your spending key still controls the funds —  
    Pool Ranger cannot take them.
 
@@ -291,7 +291,7 @@ tx cap.
 
 ### Distributing rewards (each epoch)
 10. At each epoch boundary, run `_withdraw_rewards.mjs` *(not yet built)* — once per member — to:
-    - Withdraw the member's accumulated rewards from their coop stake address.
+    - Withdraw the member's accumulated rewards from their coop reward address.
     - Route ≥ 99% (minus tx.fee) back to the member's coop base address.
     - Keep ≤ 1% as the admin fee.
     - Sign the withdrawal tx with the admin Ledger via the web signing tool.
@@ -375,7 +375,7 @@ module).
 
 ### Admin WebUI (Phase 2b)
 
-- View all registered members and their coop stake addresses
+- View all registered members and their coop reward addresses
 - Assign members to pools (granular — each member to a specific pool)
 - Push reward withdrawals (collect 1% fee)
 - Monitor pool saturation levels
@@ -453,7 +453,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 |---|----------|--------|
 | 1 | Smart contract language: Aiken (Plutus V3) | Decided |
 | 2 | Hardware wallet for admin AND members: Ledger, no .sk files | Decided |
-| 3 | Oversaturation prevention: parameterized script per member → each member has a unique stake address → admin can delegate each independently | Decided |
+| 3 | Oversaturation prevention: parameterized script per member → each member has a unique reward address → admin can delegate each independently | Decided |
 | 4 | Member identity: proven by `member_pkh` baked into their script instance; admin identity proven by `admin_pkh` | Decided |
 | 5 | Member registry: implicit — the set of registered coop stake credentials on-chain is the registry; no separate registry UTxO needed | Decided |
 | 6 | Reward fee enforcement: admin always gets 1%, fee comes from rewards (`tx.fee` deducted from member floor) | Decided |
