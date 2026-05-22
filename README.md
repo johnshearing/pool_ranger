@@ -1,6 +1,6 @@
 # Pool Ranger
 
-> **Status: Under Construction** — This project is actively being developed and is not yet ready for use.
+> **Status: Running on testnet** — Will be testing on mainnet shortly.
 
 ---
 
@@ -8,7 +8,7 @@
 
 Pool Ranger is a Cardano staking management platform built on Plutus V3 smart contracts.  
 Members delegate their stake to Pool Ranger, which routes the delegation to stake pools carefully chosen every epoch for maximum return.  
-Rewards are destributed at the end of every epoch.  
+Rewards are distributed at the end of every epoch.  
 Members receive 99% of their maximized staking rewards and Pool Ranger receives 1% for ensuring delegators the highest possible return.  
 
 The key insight: **You never give up control of your ADA.**  
