@@ -1,7 +1,18 @@
 # How to Sign a Transaction with Your Ledger
 
-Use this page after running `_register_stake.mjs` (or any other script that prints an
-unsigned tx hex). No build step is needed — the page uses the browser's Eternl API directly.
+Two pages live in this folder, for two different audiences:
+
+- **`sign_tx.html`** — admin tool. Accepts an unsigned tx hex from any Pool Ranger
+  `_*.mjs` script, signs it with Eternl/Ledger, and prints a copy-pasteable
+  `node _submit_tx.mjs …` command. Submission is a separate step.
+- **`send_from_staking.html`** — member tool (built from source via `npm run build`).
+  A permissionless page: a member pastes their own Pool Ranger staking address
+  (no admin server, no API key needed), types a recipient and amount, and the
+  page builds, signs (via Eternl/Ledger), and submits the transaction in one
+  step. See the "Member page" section at the bottom of this file.
+
+The rest of this document describes the `sign_tx.html` (admin) flow.
+No build step is needed for `sign_tx.html` — it uses the browser's Eternl API directly.
 
 ---
 
@@ -116,3 +127,53 @@ The Ledger signed with the wrong key. Check:
 **`_submit_tx.mjs` fails with a CBOR or import error.**
 Make sure you are running Node.js 18 or later (`node --version`). Run the command from
 inside `ranger/`, not from `ranger/web/` or any other folder.
+
+---
+
+## Member Page — `send_from_staking.html`
+
+A separate page for cooperative members who want to spend ADA from their Pool
+Ranger staking address without un-staking the change. It does NOT replace
+`sign_tx.html`; it is a self-contained sign-and-submit tool with three pasted
+inputs (staking address, recipient, amount) and one button.
+
+### What it does
+
+- Fetches the member's UTxOs at the staking address using Koios (no API key needed).
+- Builds a transaction that sends the requested amount to the recipient and
+  returns ALL change to the SAME staking address — so the unspent ADA stays
+  delegated through the cooperative.
+- Signs via Eternl/Ledger (`partialSign=true`, same as `sign_tx.html`).
+- Submits via Koios. Displays the resulting tx hash with a Cardanoscan link.
+
+There is no copy-a-command step. Members do not need a terminal or any
+admin-run service.
+
+### Building the page (admin only — members open the hosted version)
+
+```bash
+cd /home/js/aiken/ranger/web
+npm install            # first time only
+npm run build
+```
+
+`dist/send_from_staking.html` and `dist/sign_tx.html` are produced together.
+Host the `dist/` directory wherever the rest of the Pool Ranger pages live
+(GitHub Pages).
+
+### Local preview
+
+```bash
+cd /home/js/aiken/ranger/web
+npm run build
+npx serve dist
+# open http://localhost:3000/send_from_staking.html
+```
+
+### Member checklist
+
+Same as the admin checklist above: Eternl extension installed, correct Ledger
+account selected in Eternl, Ledger plugged in with the Cardano app open. The
+member's "Pool Ranger staking address" is the value on the
+`D. Pool Ranger staking address` line of the report the admin generates with
+`_view_members.mjs`.

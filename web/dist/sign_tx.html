@@ -12,7 +12,6 @@
     button { padding: 10px 22px; font-size: 15px; cursor: pointer; margin-right: 8px; }
     #status { margin-top: 14px; font-size: 14px; min-height: 1.4em; }
   </style>
-  <script type="module" crossorigin src="/assets/sign_tx-DPVURu7n.js"></script>
 </head>
 <body>
   <h2>Pool Ranger — Sign Transaction</h2>
@@ -22,12 +21,12 @@
   <textarea id="tx-hex" placeholder="84a500d9..."></textarea>
 
   <button id="btn-sign">Sign with Eternl (Ledger)</button>
-
   <div id="status"></div>
 
-  <label for="signed-hex">2. Signed tx hex — copy and run <code>node _submit_tx.mjs &lt;hex&gt;</code>:</label>
-  <textarea id="signed-hex" readonly placeholder="Signed hex will appear here..."></textarea>
-  <button id="btn-copy">Copy</button>
+  <label>2. Copy this command and run it from <code>ranger/</code> to submit:</label>
+  <textarea id="cmd-out" readonly placeholder="node _submit_tx.mjs ... will appear here after signing"></textarea>
+  <button id="btn-copy">Copy Command</button>
 
+  <script src="./sign_tx.js"></script>
 </body>
 </html>
