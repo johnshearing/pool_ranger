@@ -94,12 +94,15 @@ All scripts that require a signature support two modes, following the same patte
 matching entry in `_1_members.json` (look up by `--name`; the bech32 `registeredReceiveAddress` is on the record),
 fetches UTxOs via Blockfrost, builds the transaction, and prints the unsigned tx hex. The
 unsigned hex is signed using the custom web tool at `web/dist/sign_tx.html` (open in Chrome
-with the Eternl extension installed). The resulting signed tx hex is submitted using
-`_submit_tx.mjs`:
+with the Eternl extension installed). After the Ledger signs, the page prints a complete
+copy-pasteable submit command with both the unsigned tx hex and the witness hex pre-filled:
 
 ```
-node _submit_tx.mjs <signed-tx-hex>
+node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>
 ```
+
+`_submit_tx.mjs` merges the witness into the unsigned tx server-side and broadcasts via
+Blockfrost.
 
 Both admin and member wallets use Ledger hardware wallets. Neither has a `.sk` or `.addr`
 file on disk — the only persistent record of either party's address is the matching entry in
@@ -123,7 +126,8 @@ This applies equally to admin scripts and member scripts.
 - [x] `_register_stake.mjs` — member registers their coop stake credential on-chain (pays 2 ADA deposit); hardware and software wallet signing
 - [x] `_delegate.mjs` — admin delegates **one** member's stake to a chosen pool (per-member granular control via `--name` / `--pool` CLI flags); refuses on no-op (already delegated to that pool) and on drift (local history disagrees with on-chain state); hardware and software wallet signing
 - [x] `_batch_delegate.mjs` — admin delegates **many** members in a single transaction (up to `BATCH_SIZE = 12` per run); pays one Cardano tx fee and asks for one Ledger signature for the whole batch. Reads `_1_delegation_config.json`, auto-snapshots `_1_members.json` to `_1_members_PRE_BATCH.json` for one-command rollback, and refuses the whole batch if any entry is in drift. Single-batch v1; multi-batch in one run deferred until the cooperative exceeds 12 active delegations (see source header for why)
-- [x] `_submit_tx.mjs` — submits a signed tx hex to the network via Blockfrost; used after Ledger signing
+- [x] `_submit_tx.mjs` — takes `<unsigned-tx-hex> <witness-hex>`, merges the Ledger witness into the unsigned tx, and submits to the network via Blockfrost; used after Ledger signing in `web/dist/sign_tx.html`
+- [x] `_spend_from_staking.mjs` — terminal counterpart to the browser-only `web/send_from_staking.html`. Builds a tx that sends `--amount` tADA from a member's Pool Ranger staking address (`member.poolRangerStakingAddress`) to a `--to` recipient and returns **all change to the SAME staking address** so unspent ADA stays delegated through the cooperative. Fetches UTxOs via Blockfrost, prints the unsigned tx hex for signing in `web/dist/sign_tx.html`, then submission via `_submit_tx.mjs` — the standard Pool Ranger build-then-sign-then-submit flow. The tx does not invoke the coop Plutus script (only the payment-key side is checked — no Plutus cost models, no ex-units), and the script does not mutate `_1_members.json` since sends have no audit-trail field.
 - [ ] `_withdraw_rewards.mjs` — either admin or member can initiate.  
   - The contract enforces the 99/1 split on-chain regardless of signer  
   - (admin ≤ 1%, member ≥ 99% − tx.fee, fee paid from the rewards themselves)  
@@ -140,9 +144,13 @@ This applies equally to admin scripts and member scripts.
 **Web signing tool (`web/`) — Phase 1 bridge for Ledger signing:**
 - [x] `web/package.json` — browser build dependencies (MeshJS + Vite + Node.js polyfills)
 - [x] `web/vite.config.js` — Vite bundler config; aliases `crypto`/`stream`/`buffer`/`events` to browser polyfills so MeshJS builds for the browser
-- [x] `web/sign_tx.html` — source HTML for the signing page
-- [x] `web/sign_tx.js` — source JS; uses `BrowserWallet.enable('eternl')` and `wallet.signTx()` to sign via CIP-30 and return the complete signed tx hex
-- [x] `web/dist/sign_tx.html` — **built output** — this is the file opened in the browser (run `npm run build` inside `web/` to regenerate)
+- [x] `web/sign_tx.html` — source HTML for the **admin** signing page
+- [x] `web/sign_tx.js` — source JS; uses `BrowserWallet.enable('eternl')` and `wallet.signTx(tx, true)` (partialSign) to sign via CIP-30 and returns a copy-pasteable `node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>` command for the admin to run in a WSL2 terminal
+- [x] `web/send_from_staking.html` — source HTML for the **member** spend-from-staking page
+- [x] `web/send_from_staking.js` — source JS for the member spend-from-staking page.
+  **Why this page exists:** a member's ADA lives at their Pool Ranger staking address (payment key = member, stake credential = the parameterized script). They can spend it from any normal Cardano wallet, but a normal wallet's change handler will send the change back to a plain (un-staked) address, silently un-staking whatever ADA was not spent. This page solves that: **all change returns to the SAME staking address so unspent ADA stays delegated through the cooperative.** It is also fully **permissionless** — no admin server, no API key, no terminal step — so members are not dependent on the admin being online to spend their own money.
+  **How it works:** three pasted inputs (staking address, recipient, amount) and one button. Reads UTxOs at the staking address via CIP-30 `wallet.getUtxos()` (Eternl already tracks the hybrid address because the member owns its payment key); builds the tx with MeshSDK's `MeshTxBuilder` using its built-in protocol parameters; signs via Eternl/Ledger (`partialSign=true`); submits via `wallet.submitTx()` and displays the tx hash with a Cardanoscan link.
+- [x] `web/dist/sign_tx.html` and `web/dist/send_from_staking.html` — **built outputs** — both produced together by a single `npm run build` inside `web/`. These are the files opened in the browser. `HOW_TO_SIGN.md` in the same folder is the canonical operator guide for both pages.
 
 **Future web pages (Phase 2 WebUI — not yet built):**
 - [ ] `web/register.html` — member self-service: register stake, view coop base address
@@ -161,6 +169,7 @@ register, delegate, withdraw, or leave.
 - [x] `_1_members.json` — **the working member directory and single source of truth for every wallet address Pool Ranger knows about.** Every script that touches a member (register, delegate, withdraw, revoke, view) reads or writes this file. It holds one entry per member: `name`, `registeredReceiveAddress` (the bech32 Ledger receive address — admin and members alike), `memberPkh`, `poolRangerRewardAddress`, `poolRangerStakingAddress`, `scriptHash`, `registration`, and a `delegations` history (newest entry = current intended delegation). On testnet today this file is committed. On mainnet it is expected to grow to thousands of entries of real cooperative membership data, and will not be committed to the public repo.
 - [x] `_1_members_sample.json` — **a tiny shape-only sample committed to the public GitHub repo.** Its only purpose is to show readers of the repo what `_1_members.json` looks like (the field names and the nested `delegations` array) without exposing real cooperative membership data. The two files are intentionally *not* expected to match — `_1_members.json` will eventually contain thousands of real entries, while `_1_members_sample.json` stays small. Scripts must never compare the two or treat divergence as an error.
 - [x] `_1_delegation_config.json` — **the admin's batched delegation plan.** A flat JSON array of `{ name, memberPkh, poolId }` entries, consumed by `_batch_delegate.mjs`. Lookup is by `memberPkh`; the `name` field is human-readable only (audit aid so the admin can read the file without cross-referencing 56-character pkh strings). Members not listed here are not touched on a batch run. On testnet this file is committed alongside `_1_members.json`; on mainnet it will hold real cooperative assignments and will not be committed.
+- [x] `_1_delegation_config_sample.json` — **a tiny shape-only sample committed to the public GitHub repo.** Mirrors the role of `_1_members_sample.json`: shows readers what `_1_delegation_config.json` looks like (the flat `[{ name, memberPkh, poolId }, …]` array consumed by `_batch_delegate.mjs`) without exposing real cooperative delegation assignments. The two files are intentionally not expected to match; scripts must never compare them or treat divergence as an error.
 - [x] `_1_members_PRE_BATCH.json` — **auto-snapshot of `_1_members.json` written by `_batch_delegate.mjs`** immediately before it overwrites the live file. Provides a one-command rollback (`cp _1_members_PRE_BATCH.json _1_members.json`) if the admin decides not to submit the tx, or if anything else goes wrong post-build. Overwritten on every batch run that produces pending delegations; not written when the script exits early (drift, no-op, or over-cap), so a useful prior snapshot is not clobbered by a no-op run. Not committed.
 - [x] `.env` — `BLOCKFROST_API=previewXXXXX`. Not committed.
 
@@ -208,10 +217,11 @@ This is the step-by-step process a Pool Ranger member follows, from joining to w
    This appends your row to `_1_members.json` and prints your unique **coop base address**
    plus an **unsigned tx hex** for you to sign.
 6. Open `web/dist/sign_tx.html` in Chrome. Paste the unsigned tx hex. Click
-   "Sign with Eternl (Ledger)". Approve on your Ledger device. Copy the signed tx hex.
-7. Submit:
+   "Sign with Eternl (Ledger)". Approve on your Ledger device. The page prints a complete
+   `node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>` command. Click "Copy Command".
+7. Submit — paste the copied command into a WSL2 terminal from `ranger/`:
    ```
-   node _submit_tx.mjs <signed-tx-hex>
+   node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>
    ```
 8. Move your ADA to your **Pool Ranger staking address** (printed in step 5). This is the address where
    your ADA lives while staking with Pool Ranger. Your spending key still controls the funds —  
@@ -221,6 +231,7 @@ This is the step-by-step process a Pool Ranger member follows, from joining to w
 - The admin will delegate your stake to a pool each epoch and push reward distributions after each epoch.
 - You receive 99% of your staking rewards automatically. No action required on your part.
 - You can check balances and rewards at any time with `_view_wallet_balances.mjs`.
+- **To spend ADA from your Pool Ranger staking address without un-staking your change**, open `web/dist/send_from_staking.html` in Chrome. Paste your staking address, the recipient address, and the amount; click the button; approve on your Ledger. The page sends the requested ADA to the recipient and returns all change to the SAME staking address so the unspent ADA stays delegated. This page is permissionless — no admin involvement, no terminal, no API key.
 
 ### Withdrawing rewards
 9. Either you or the admin can run `_withdraw_rewards.mjs` to trigger a reward distribution at any time.  
@@ -264,8 +275,9 @@ as N separate transactions.
     member, ad-hoc fixes, or one-off pool moves. The script refuses if the requested pool
     already matches both the member's local history and the on-chain delegation (no-op), or
     if those two disagree (drift — reconcile manually before retrying).
-8a. Sign the printed unsigned tx hex in `web/dist/sign_tx.html`, then submit with
-    `node _submit_tx.mjs <signed-tx-hex>`.
+8a. Sign the printed unsigned tx hex in `web/dist/sign_tx.html`; copy the
+    `node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>` command the page prints and run it
+    in a WSL2 terminal from `ranger/`.
 
 **Many members at once — `_batch_delegate.mjs`:**
 
@@ -278,8 +290,10 @@ as N separate transactions.
     `_1_members.json` to `_1_members_PRE_BATCH.json` for rollback, and prints the unsigned
     tx hex. Up to `BATCH_SIZE = 12` delegations fit in one tx; over that the script refuses
     until the config is trimmed.
-9b. Sign the unsigned tx in `web/dist/sign_tx.html` (one signature for the whole batch),
-    then submit with `_submit_tx.mjs`. Verify with `_view_delegations.mjs` after a minute.
+9b. Sign the unsigned tx in `web/dist/sign_tx.html` (one signature for the whole batch);
+    copy the `node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>` command the page prints
+    and run it in a WSL2 terminal from `ranger/`. Verify with `_view_delegations.mjs` after
+    a minute.
 
 If you decide not to submit the tx, restore the pre-batch state with
 `cp _1_members_PRE_BATCH.json _1_members.json` — otherwise drift detection will block the
@@ -420,7 +434,7 @@ Assumed starting point: Windows 10 + WSL2 (Ubuntu).
 1. Install Node.js (LTS) in WSL
 2. `npm install` in `ranger/` — installs `@meshsdk/core`, `@meshsdk/core-csl`, `dotenv`
 3. `npm install` in `ranger/web/` — installs MeshJS + Vite + browser polyfills
-4. `npm run build` in `ranger/web/` — produces `ranger/web/dist/sign_tx.html`
+4. `npm run build` in `ranger/web/` — produces `ranger/web/dist/sign_tx.html` (admin signing page) and `ranger/web/dist/send_from_staking.html` (member spend-from-staking page) together
 5. Install Aiken CLI v1.1.21
 6. Create `.env` with `BLOCKFROST_API=previewXXXXX`
 7. Admin address is already recorded in `_1_members.json` under the `admin_0` row. Run
