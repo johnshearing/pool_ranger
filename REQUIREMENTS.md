@@ -138,8 +138,8 @@ This applies equally to admin scripts and member scripts.
 - [x] `_view_wallet_balances.mjs` —  Shows wallet ADA balances.  
   - This the amount not sent to the contract address.
 - [x] `_view_members.mjs` — combined per-member report. For each row in `_1_members.json` (or just the one matched by an optional `--name` flag), prints three side-by-side balances — **registered receive address** (`member.registeredReceiveAddress`), **other wallet receive addresses** (sibling addresses sharing the wallet's reward-address handle, enumerated via Blockfrost `/accounts/{WalletRewardAddress}/addresses` so funds Eternl has scattered across derived addresses are visible), and **Pool Ranger staking address** (`member.poolRangerStakingAddress`) — followed by the on-chain delegation drift check and pending staking rewards (withdrawable now + lifetime earned). The leading comment block of the script is the canonical reference for the address model; it explicitly distinguishes the two reward-address labels the script displays — `WalletRewardAddress` (handle for the wallet's own stake key) and `PoolRangerRewardAddress` (handle for the parameterized Pool Ranger script credential; stored on disk as `member.poolRangerRewardAddress`). Strict superset of `_view_delegations.mjs` and `_view_wallet_balances.mjs`; those two are deliberately retained as focused single-purpose tools that are faster and clearer when only one piece of the picture is needed.
-- [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
 - [x] `_measure_batch_size.mjs` — diagnostic / developer tool. Builds a multi-delegation tx in memory (no submission) using the current `_1_delegation_config.json`, then reports the per-script CBOR size, the per-tx baseline overhead, and a recommended `BATCH_SIZE` that leaves ~25% headroom against the 16 KB tx cap. Re-run after any change to `validators/coop_stake.ak` to validate that the `BATCH_SIZE` constant in `_batch_delegate.mjs` is still appropriate. Read-only — safe to run any time.
+- [x] `_select_delegations.mjs` *(not yet built)* Looks at epoch_agent/ranger_state.json, the most recent epoch report found in epoch_agent/reports, _1_members.json, the output of _view_members.mjs and then creates _1_delegation_config.json which is read by _batch_delegate.mjs which moves all the delegation and records history of those move back to ranger_state.json and _1_members.json.
 
 **Web signing tool (`web/`) — Phase 1 bridge for Ledger signing:**
 - [x] `web/package.json` — browser build dependencies (MeshJS + Vite + Node.js polyfills)
@@ -313,8 +313,12 @@ tx cap.
     The same script is what a member runs to withdraw their own rewards — the contract enforces the 99/1 split on-chain regardless of who signs, so there is no separate admin-vs-member version and no time-locked admin window.
 
 ### Monitoring
-12. Use `_view_members.mjs` *(not yet built)* to see all registered members and their reward balances.
-13. Use `_view_pool_info.mjs` *(not yet built)* to track pool saturation and choose pools wisely.
+12. Use `_view_members.mjs` to see all registered members and their reward balances.
+13. Use the `Epoch Reporting System` *(covered in the next section)* to track pool saturation and choose pools wisely.
+
+### Moving Delegation Each Epoch
+14. Use `_select_delegations.mjs` *(not yet built)* which looks at epoch_agent/ranger_state.json, the most recent epoch report found in epoch_agent/reports, _1_members and the output of ranger/_view_members.mjs.json and then creates _1_delegation_config.json.
+15. Use _batch_delegate.mjs to move all the delegation and record history of those moves back to ranger_state.json and _1_members.json.
 
 ---
 
