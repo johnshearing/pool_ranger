@@ -57,8 +57,8 @@ async function main() {
   // ── Build a multi-delegation tx in memory ──────────────────────────────
   // Adds one cert + one script witness per config entry. Single collateral
   // input is enough — collateral is per-tx, not per-script-purpose.
-  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.address);
-  const collateral = pickAdaCollateral(adminUtxos, admin.address);
+  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.registeredReceiveAddress);
+  const collateral = pickAdaCollateral(adminUtxos, admin.registeredReceiveAddress);
   const txBuilder  = await getTxBuilder();
 
   for (const entry of config) {
@@ -78,7 +78,7 @@ async function main() {
       collateral.output.amount,
       collateral.output.address,
     )
-    .changeAddress(admin.address)
+    .changeAddress(admin.registeredReceiveAddress)
     .selectUtxosFrom(adminUtxos)
     .complete();
 

@@ -1,10 +1,10 @@
 [
   {
     "name": "admin_0",
-    "address": "addr_test1qztu6w6r3uy842psrgg2qy6ac0vcxyzsp9qfywwurklv6p0t693rv2hr6qgn749hq33hmv96y7jfht0ahxteqkt6h2ushnz6ln",
+    "registeredReceiveAddress": "addr_test1qztu6w6r3uy842psrgg2qy6ac0vcxyzsp9qfywwurklv6p0t693rv2hr6qgn749hq33hmv96y7jfht0ahxteqkt6h2ushnz6ln",
     "memberPkh": "97cd3b438f087aa8301a10a0135dc3d983105009409239dc1dbecd05",
-    "stakeAddress": "stake_test17rzsjag809x0f0gsjca4z8zrns4yy90ct27x8fxn3g42p8sqtsq3x",
-    "contractAddress": "addr_test1yztu6w6r3uy842psrgg2qy6ac0vcxyzsp9qfywwurklv6pw9p96sw72v7j73p93m2ywy88p2gg2lsk4uvwjd8z325z0qhfkszc",
+    "poolRangerRewardAddress": "stake_test17rzsjag809x0f0gsjca4z8zrns4yy90ct27x8fxn3g42p8sqtsq3x",
+    "poolRangerStakingAddress": "addr_test1yztu6w6r3uy842psrgg2qy6ac0vcxyzsp9qfywwurklv6pw9p96sw72v7j73p93m2ywy88p2gg2lsk4uvwjd8z325z0qhfkszc",
     "scriptHash": "c5097507794cf4bd10963b511c439c2a4215f85abc63a4d38a2aa09e",
     "registration": {
       "txHash": "803be6dc61f1ad3bc97df9eb00befdf6bd1ab1cc4cb484467f544554fef37a57",
@@ -20,10 +20,10 @@
   },
   {
     "name": "member_1",
-    "address": "addr_test1qzsxy75c7tw3ahlx55t9jfwnqpzvl2rqtca5vp7hhspkth8pktslyqc2l3xa8rll790c2jm9wddcea862h8zcqqxtd4qazy4vu",
+    "registeredReceiveAddress": "addr_test1qzsxy75c7tw3ahlx55t9jfwnqpzvl2rqtca5vp7hhspkth8pktslyqc2l3xa8rll790c2jm9wddcea862h8zcqqxtd4qazy4vu",
     "memberPkh": "a0627a98f2dd1edfe6a5165925d30044cfa8605e3b4607d7bc0365dc",
-    "stakeAddress": "stake_test17zkhqw7htyku6fqu6r8wwgwh6nf9dlzyj37757fv4zewtdgyhtx00",
-    "contractAddress": "addr_test1yzsxy75c7tw3ahlx55t9jfwnqpzvl2rqtca5vp7hhspkth9dwqaawkfde5jpe5xwuusa04xj2m7yf9raafuje29juk6s587zqv",
+    "poolRangerRewardAddress": "stake_test17zkhqw7htyku6fqu6r8wwgwh6nf9dlzyj37757fv4zewtdgyhtx00",
+    "poolRangerStakingAddress": "addr_test1yzsxy75c7tw3ahlx55t9jfwnqpzvl2rqtca5vp7hhspkth9dwqaawkfde5jpe5xwuusa04xj2m7yf9raafuje29juk6s587zqv",
     "scriptHash": "ad703bd7592dcd241cd0cee721d7d4d256fc44947dea792ca8b2e5b5",
     "registration": {
       "txHash": "725e78e335cd232bc4a7568125c05a1138b5deba28813261ea8f58adccf03748",
@@ -39,10 +39,10 @@
   },
   {
     "name": "member_2",
-    "address": "addr_test1qqya3xyp93ysu44cre96p6rccv9et7437x0pv8k8tyftqa2phm2p4p0utqf6eucxdw9wq5xhm4j0c9vcej53x0fswstq9eh9qw",
+    "registeredReceiveAddress": "addr_test1qqya3xyp93ysu44cre96p6rccv9et7437x0pv8k8tyftqa2phm2p4p0utqf6eucxdw9wq5xhm4j0c9vcej53x0fswstq9eh9qw",
     "memberPkh": "09d898812c490e56b81e4ba0e878c30b95fab1f19e161ec75912b075",
-    "stakeAddress": "stake_test17qkjdpdj7txkztm7xy64tk90asqlhd9fstjf5we2tj7fwage7cdef",
-    "contractAddress": "addr_test1yqya3xyp93ysu44cre96p6rccv9et7437x0pv8k8tyftqafdy6zm9ukdvyhhuvf42hv2lmqplw62nqhyngaj5h9uja6sgzckud",
+    "poolRangerRewardAddress": "stake_test17qkjdpdj7txkztm7xy64tk90asqlhd9fstjf5we2tj7fwage7cdef",
+    "poolRangerStakingAddress": "addr_test1yqya3xyp93ysu44cre96p6rccv9et7437x0pv8k8tyftqafdy6zm9ukdvyhhuvf42hv2lmqplw62nqhyngaj5h9uja6sgzckud",
     "scriptHash": "2d2685b2f2cd612f7e313555d8afec01fbb4a982e49a3b2a5cbc9775",
     "registration": {
       "txHash": "279d844f3adcb3038797477800ad514316e22c034205be00a36db72d882eefb9",
@@ -53,6 +53,68 @@
         "poolId": "pool1knap9hldvhww0fjqew26sxkfjpj3c8tp8uuj7j3729lzqn9x70r",
         "requestedAt": "2026-05-19T12:08:07.258Z",
         "txHash": "f32f98eb649ac8578098b98ac7f1d336a6abe3e23d74e2f97eb7d778c683e14d"
+      }
+    ]
+  },
+  {
+    "name": "member_3",
+    "registeredReceiveAddress": "addr_test1qzc7ymslcm4gq4h3v2slmjzg2fwq9w9fge35wju6wg49dpl73wupxnrvg245nz6frg9zglx2c4qgclt7g8g85t50k3kq6757uf",
+    "memberPkh": "b1e26e1fc6ea8056f162a1fdc848525c02b8a94663474b9a722a5687",
+    "poolRangerRewardAddress": "stake_test17qswlwlxn9nc96u5gw70dz2smumlt63vtv2g9utzvathl8cfn64kn",
+    "poolRangerStakingAddress": "addr_test1yzc7ymslcm4gq4h3v2slmjzg2fwq9w9fge35wju6wg49dpeqa7a7dxt8st4egsau76y4pheh7h4zckc5stckye6h070s89ydmg",
+    "scriptHash": "20efbbe6996782eb9443bcf68950df37f5ea2c5b1482f16267577f9f",
+    "registration": {
+      "txHash": "f36412a129dfc655cae0f2da4470e07dcdbc979c6c10a9e0ce1413b732e8beaf",
+      "requestedAt": "2026-05-20T11:56:04.327Z"
+    },
+    "delegations": [
+      {
+        "poolId": "pool1de0f0sv3hfyjrr5x6yxlrfyw3el7d588w2fuqjg65cr8gevdvpz",
+        "requestedAt": "2026-05-20T19:42:37.670Z",
+        "txHash": "7cee8e5577d17ad1124fe9136712923e65d4d685b4eb139314ceb84b1526ce72"
+      },
+      {
+        "poolId": "pool1ynfnjspgckgxjf2zeye8s33jz3e3ndk9pcwp0qzaupzvvd8ukwt",
+        "requestedAt": "2026-05-20T20:39:15.653Z",
+        "txHash": "a7e5bac7aa4a095d8472a117ed63316d1fe6320d75a621bdc9a56ad1a84a5388"
+      }
+    ]
+  },
+  {
+    "name": "member_4",
+    "registeredReceiveAddress": "addr_test1qpeakflqmqg30rvzxx2q8mreasg3pgjvzkrfkmnmr87acmpk5t28eqjck4nmu4va3nc2pfh0mvjze40hnw28rra5q38ss7kk0p",
+    "memberPkh": "73db27e0d811178d82319403ec79ec1110a24c15869b6e7b19fddc6c",
+    "poolRangerRewardAddress": "stake_test17qs398dlzp7an92awxmtkdcxppjvk6kdmvuvcem6y5yhs5sg87r0k",
+    "poolRangerStakingAddress": "addr_test1ypeakflqmqg30rvzxx2q8mreasg3pgjvzkrfkmnmr87acmppz2wm7yramx246udkhvmsvzryed4vmkece3nh5fgf0pfquzlzzn",
+    "scriptHash": "21129dbf107dd9955d71b6bb37060864cb6acddb38cc677a25097852",
+    "registration": {
+      "txHash": "2e7993628a7eecd202600a98e3a9cc16ccc2b4f334acc0390c1b1b9236aca4cd",
+      "requestedAt": "2026-05-20T12:21:08.001Z"
+    },
+    "delegations": [
+      {
+        "poolId": "pool1p9xu88dzmpp5l8wmjd6f5xfs9z89mky6up86ty2wz4aavmm8f3m",
+        "requestedAt": "2026-05-20T20:39:15.653Z",
+        "txHash": "a7e5bac7aa4a095d8472a117ed63316d1fe6320d75a621bdc9a56ad1a84a5388"
+      }
+    ]
+  },
+  {
+    "name": "member_5",
+    "registeredReceiveAddress": "addr_test1qppqt2etwx5zuqfz5d2nnvg6ymqtl6ms7jgc3vcc94xps6409tdg3wwspeq4ahq00l9ayl0uhdsgexrj4sp95lkgccns952nsk",
+    "memberPkh": "4205ab2b71a82e0122a35539b11a26c0bfeb70f49188b3182d4c186a",
+    "poolRangerRewardAddress": "stake_test17p59r25xanhxuzek7qcumaqfetg86f7q57guhzxymkluedspdygm7",
+    "poolRangerStakingAddress": "addr_test1yppqt2etwx5zuqfz5d2nnvg6ymqtl6ms7jgc3vcc94xps6ng2x4gdm8wdc9ndup3eh6qnjks05nupfu3ewyvfhdlejmqtwrshv",
+    "scriptHash": "6851aa86ecee6e0b36f031cdf409cad07d27c0a791cb88c4ddbfccb6",
+    "registration": {
+      "txHash": "8785a901c03f5b6d4d729d3409cbd0aa2b050db856ff6669240e1dafaed83ef9",
+      "requestedAt": "2026-05-20T12:38:27.324Z"
+    },
+    "delegations": [
+      {
+        "poolId": "pool1de0f0sv3hfyjrr5x6yxlrfyw3el7d588w2fuqjg65cr8gevdvpz",
+        "requestedAt": "2026-05-20T20:39:15.653Z",
+        "txHash": "a7e5bac7aa4a095d8472a117ed63316d1fe6320d75a621bdc9a56ad1a84a5388"
       }
     ]
   }

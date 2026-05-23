@@ -15,20 +15,20 @@
 //      the command line — there are no separate .addr files.
 //   2. Loads _1_members.json (creates it as [] if missing).
 //   3. Errors if the name or memberPkh is already present (no duplicates).
-//   4. Derives memberPkh, stake address, contract address, and script hash.
+//   4. Derives memberPkh, PoolRangerRewardAddress, Pool Ranger staking address, and script hash.
 //   5. Appends a new record to _1_members.json.
 //   6. Builds the on-chain stake-registration tx and prints the unsigned hex.
 //
 // Member record shape:
 //   {
-//     "name":            "member_3",
-//     "address":         "addr_test1q...",   // member's base address
-//     "memberPkh":       "a0627a98...",       // payment PKH of `address`
-//     "stakeAddress":    "stake_test17...",   // coop stake address (script-controlled)
-//     "contractAddress": "addr_test1y...",    // member's payment key + coop stake script
-//     "scriptHash":      "c5097507...",       // parameterized coop stake script hash
-//     "registration":    { "txHash": "...", "requestedAt": "<ISO 8601>" },
-//     "delegations":     []                   // appended to by _delegate.mjs over time
+//     "name":                       "member_3",
+//     "registeredReceiveAddress":   "addr_test1q...",   // member's base address (their Ledger receive addr)
+//     "memberPkh":                  "a0627a98...",      // payment PKH of registeredReceiveAddress
+//     "poolRangerRewardAddress":    "stake_test17...",  // coop stake/reward address (script-controlled)
+//     "poolRangerStakingAddress":   "addr_test1y...",   // member's payment key + coop stake script
+//     "scriptHash":                 "c5097507...",      // parameterized coop stake script hash
+//     "registration":               { "txHash": "...", "requestedAt": "<ISO 8601>" },
+//     "delegations":                []                  // appended to by _delegate.mjs over time
 //   }
 //
 // Each delegation entry has the shape:
@@ -80,9 +80,9 @@ Options:
   --name <name>   Human-readable label for the member (e.g. "member_3"). Must be
                   unique within _1_members.json.
   --addr <addr>   Member's bech32 base address (addr_test1... on Preview,
-                  addr1... on mainnet). memberPkh, stakeAddress,
-                  contractAddress, and scriptHash are all derived from this
-                  address. There are no .addr files — paste the address
+                  addr1... on mainnet). memberPkh, poolRangerRewardAddress,
+                  poolRangerStakingAddress, and scriptHash are all derived
+                  from this address. There are no .addr files — paste the address
                   directly. The admin obtains a new member's address from the
                   member (email, message, etc.) at onboarding time.
   -h, --help      Show this help text and exit.
@@ -163,7 +163,7 @@ async function main() {
   const adminRecord = members.find(m => m.name === ADMIN_NAME);
   let adminAddress, adminPkh;
   if (adminRecord) {
-    adminAddress = adminRecord.address;
+    adminAddress = adminRecord.registeredReceiveAddress;
     adminPkh     = adminRecord.memberPkh;
   } else {
     if (args.name !== ADMIN_NAME) {
@@ -183,9 +183,9 @@ async function main() {
     getCoopStakeScript(adminPkh, memberPkh);
   const contractAddress = memberCoopBaseAddress;
 
-  console.log('\nCoop stake script hash:', scriptHash);
-  console.log('Coop stake address:    ', stakeAddress);
-  console.log('Member contract addr:  ', contractAddress);
+  console.log('\nCoop stake script hash:        ', scriptHash);
+  console.log('PoolRangerRewardAddress:       ', stakeAddress);
+  console.log('Pool Ranger staking address:   ', contractAddress);
 
   // ── Fetch member UTxOs ─────────────────────────────────────────────────
   const memberUtxos = await blockchainProvider.fetchAddressUTxOs(memberAddress);
@@ -211,10 +211,10 @@ async function main() {
   // ── Append to member directory ─────────────────────────────────────────
   members.push({
     name: args.name,
-    address: memberAddress,
+    registeredReceiveAddress: memberAddress,
     memberPkh,
-    stakeAddress,
-    contractAddress,
+    poolRangerRewardAddress: stakeAddress,
+    poolRangerStakingAddress: contractAddress,
     scriptHash,
     registration: {
       txHash: registrationTxHash,
@@ -233,7 +233,7 @@ async function main() {
   console.log('  or: node _submit_tx.mjs <unsigned-tx-hex> <witness-hex>');
   console.log(`\nThe submitted tx hash should match: ${registrationTxHash}`);
 
-  console.log('\nOnce confirmed, move your ADA to your contract address:');
+  console.log('\nOnce confirmed, move your ADA to your Pool Ranger staking address:');
   console.log(' ', contractAddress);
   console.log('\nThis is where your ADA must live to participate in the cooperative.');
 }

@@ -1,6 +1,6 @@
 # CLAUDE.md — Pool Ranger (ranger)         
-**Always read the "Member Page" section of `web/HOW_TO_SIGN.md` at the start of each session**. 
-
+**Always read the "Member Page" section of `/home/js/aiken/ranger/_register_stake.mjs` at the start of each session**. 
+**Always read the "Member Page" section of `/home/js/aiken/ranger/_view_members.mjs` at the start of each session**. 
 
 ---
 

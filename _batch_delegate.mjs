@@ -142,7 +142,7 @@ async function main() {
   }
 
   console.log(`Loaded ${config.length} delegation request(s) from ${CONFIG_FILE}.`);
-  console.log('Admin address:', admin.address);
+  console.log('Admin address:', admin.registeredReceiveAddress);
   console.log('Admin PKH:    ', admin.memberPkh);
   console.log('');
 
@@ -239,8 +239,8 @@ async function main() {
   // is per-tx, not per-script-purpose). Single requiredSignerHash for the
   // admin satisfies the publish handler's signed_by_admin check across
   // every cert in this tx.
-  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.address);
-  const collateral = pickAdaCollateral(adminUtxos, admin.address);
+  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.registeredReceiveAddress);
+  const collateral = pickAdaCollateral(adminUtxos, admin.registeredReceiveAddress);
 
   const txBuilder = await getTxBuilder();
   for (const { member, entry } of pending) {
@@ -259,7 +259,7 @@ async function main() {
       collateral.output.amount,
       collateral.output.address,
     )
-    .changeAddress(admin.address)
+    .changeAddress(admin.registeredReceiveAddress)
     .selectUtxosFrom(adminUtxos)
     .complete();
 

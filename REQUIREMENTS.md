@@ -84,14 +84,14 @@ Use `vesting/` as the code and workflow model.
   - Returns `{ scriptCbor, scriptHash, stakeAddress, memberCoopBaseAddress }`
 
 Hardware-wallet (Ledger) addresses are not loaded from disk — every script reads them
-from the `address` field of each member's record in `_1_members.json`.
+from the `registeredReceiveAddress` field of each member's record in `_1_members.json`.
 
 ### Signing modes
 
 All scripts that require a signature support two modes, following the same pattern:
 
 **Hardware wallet (default — current active workflow):** reads the signer's address from the
-matching entry in `_1_members.json` (look up by `--name`; the bech32 `address` is on the record),
+matching entry in `_1_members.json` (look up by `--name`; the bech32 `registeredReceiveAddress` is on the record),
 fetches UTxOs via Blockfrost, builds the transaction, and prints the unsigned tx hex. The
 unsigned hex is signed using the custom web tool at `web/dist/sign_tx.html` (open in Chrome
 with the Eternl extension installed). The resulting signed tx hex is submitted using
@@ -133,7 +133,7 @@ This applies equally to admin scripts and member scripts.
   - Shows contract ADA balance and if active.
 - [x] `_view_wallet_balances.mjs` —  Shows wallet ADA balances.  
   - This the amount not sent to the contract address.
-- [x] `_view_members.mjs` — combined per-member report. For each row in `_1_members.json` (or just the one matched by an optional `--name` flag), prints three side-by-side balances — **registered receive address** (`member.address`), **other wallet receive addresses** (sibling addresses sharing the wallet's reward-address handle, enumerated via Blockfrost `/accounts/{WalletRewardAddress}/addresses` so funds Eternl has scattered across derived addresses are visible), and **Pool Ranger staking address** (`member.contractAddress`) — followed by the on-chain delegation drift check and pending staking rewards (withdrawable now + lifetime earned). The leading comment block of the script is the canonical reference for the address model; it explicitly distinguishes the two reward-address labels the script displays — `WalletRewardAddress` (handle for the wallet's own stake key) and `PoolRangerRewardAddress` (handle for the parameterized Pool Ranger script credential; stored on disk as `stakeAddress` for historical reasons). Strict superset of `_view_delegations.mjs` and `_view_wallet_balances.mjs`; those two are deliberately retained as focused single-purpose tools that are faster and clearer when only one piece of the picture is needed.
+- [x] `_view_members.mjs` — combined per-member report. For each row in `_1_members.json` (or just the one matched by an optional `--name` flag), prints three side-by-side balances — **registered receive address** (`member.registeredReceiveAddress`), **other wallet receive addresses** (sibling addresses sharing the wallet's reward-address handle, enumerated via Blockfrost `/accounts/{WalletRewardAddress}/addresses` so funds Eternl has scattered across derived addresses are visible), and **Pool Ranger staking address** (`member.poolRangerStakingAddress`) — followed by the on-chain delegation drift check and pending staking rewards (withdrawable now + lifetime earned). The leading comment block of the script is the canonical reference for the address model; it explicitly distinguishes the two reward-address labels the script displays — `WalletRewardAddress` (handle for the wallet's own stake key) and `PoolRangerRewardAddress` (handle for the parameterized Pool Ranger script credential; stored on disk as `member.poolRangerRewardAddress`). Strict superset of `_view_delegations.mjs` and `_view_wallet_balances.mjs`; those two are deliberately retained as focused single-purpose tools that are faster and clearer when only one piece of the picture is needed.
 - [ ] `_view_pool_info.mjs` — view chosen pool(s), saturation level, recent epoch rewards
 - [x] `_measure_batch_size.mjs` — diagnostic / developer tool. Builds a multi-delegation tx in memory (no submission) using the current `_1_delegation_config.json`, then reports the per-script CBOR size, the per-tx baseline overhead, and a recommended `BATCH_SIZE` that leaves ~25% headroom against the 16 KB tx cap. Re-run after any change to `validators/coop_stake.ak` to validate that the `BATCH_SIZE` constant in `_batch_delegate.mjs` is still appropriate. Read-only — safe to run any time.
 
@@ -158,7 +158,7 @@ Pool Ranger keeps its off-chain state in JSON files alongside the scripts.
 These files are read by the scripts at runtime and updated as new members
 register, delegate, withdraw, or leave.
 
-- [x] `_1_members.json` — **the working member directory and single source of truth for every wallet address Pool Ranger knows about.** Every script that touches a member (register, delegate, withdraw, revoke, view) reads or writes this file. It holds one entry per member: `name`, `address` (the bech32 Ledger receive address — admin and members alike), `memberPkh`, `stakeAddress`, `contractAddress`, `scriptHash`, `registration`, and a `delegations` history (newest entry = current intended delegation). On testnet today this file is committed. On mainnet it is expected to grow to thousands of entries of real cooperative membership data, and will not be committed to the public repo.
+- [x] `_1_members.json` — **the working member directory and single source of truth for every wallet address Pool Ranger knows about.** Every script that touches a member (register, delegate, withdraw, revoke, view) reads or writes this file. It holds one entry per member: `name`, `registeredReceiveAddress` (the bech32 Ledger receive address — admin and members alike), `memberPkh`, `poolRangerRewardAddress`, `poolRangerStakingAddress`, `scriptHash`, `registration`, and a `delegations` history (newest entry = current intended delegation). On testnet today this file is committed. On mainnet it is expected to grow to thousands of entries of real cooperative membership data, and will not be committed to the public repo.
 - [x] `_1_members_sample.json` — **a tiny shape-only sample committed to the public GitHub repo.** Its only purpose is to show readers of the repo what `_1_members.json` looks like (the field names and the nested `delegations` array) without exposing real cooperative membership data. The two files are intentionally *not* expected to match — `_1_members.json` will eventually contain thousands of real entries, while `_1_members_sample.json` stays small. Scripts must never compare the two or treat divergence as an error.
 - [x] `_1_delegation_config.json` — **the admin's batched delegation plan.** A flat JSON array of `{ name, memberPkh, poolId }` entries, consumed by `_batch_delegate.mjs`. Lookup is by `memberPkh`; the `name` field is human-readable only (audit aid so the admin can read the file without cross-referencing 56-character pkh strings). Members not listed here are not touched on a batch run. On testnet this file is committed alongside `_1_members.json`; on mainnet it will hold real cooperative assignments and will not be committed.
 - [x] `_1_members_PRE_BATCH.json` — **auto-snapshot of `_1_members.json` written by `_batch_delegate.mjs`** immediately before it overwrites the live file. Provides a one-command rollback (`cp _1_members_PRE_BATCH.json _1_members.json`) if the admin decides not to submit the tx, or if anything else goes wrong post-build. Overwritten on every batch run that produces pending delegations; not written when the script exits early (drift, no-op, or over-cap), so a useful prior snapshot is not clobbered by a no-op run. Not committed.
@@ -172,7 +172,7 @@ view once it has a row in `_1_members.json`.
 ### Admin wallet
 
 The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview testnet).
-- Address lives in the `admin_0` row of `_1_members.json` (the `address` field). There is
+- Address lives in the `admin_0` row of `_1_members.json` (the `registeredReceiveAddress` field). There is
   **no `0_admin_0.sk` and no `0_admin_0.addr`** file on disk.
 - Hardware wallet signing mode (default) is the active workflow. 
 - The software wallet block in each script is commented out and used only for automated testing.
@@ -180,7 +180,7 @@ The admin wallet is a **Ledger hardware wallet** (created 2026-04-17 on Preview 
 ### Member wallets
 
 Member wallets are also **Ledger hardware wallets**. Each member's address is stored in
-the `address` field of their `_1_members.json` row. There are **no `0_member_N.sk` or
+the `registeredReceiveAddress` field of their `_1_members.json` row. There are **no `0_member_N.sk` or
 `0_member_N.addr`** files on disk.
 - Scripts look up the member's address by `--name` from `_1_members.json`, build an unsigned
   tx, and print the unsigned hex for the member to sign on their Ledger device.

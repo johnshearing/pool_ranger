@@ -18,7 +18,7 @@
 // On each run the script:
 //   1. Reads --name, --to, --amount from the command line.
 //   2. Loads _1_members.json and finds the member by --name.
-//   3. Fetches UTxOs at member.contractAddress (the addr_test1y... address).
+//   3. Fetches UTxOs at member.poolRangerStakingAddress (the addr_test1y... address).
 //   4. Builds a tx with one txOut to --to, change back to contractAddress.
 //   5. Prints the unsigned tx hex for signing with the member's Ledger via
 //      web/sign_tx.html.
@@ -54,7 +54,7 @@ const HELP = `Usage:
 
 Options:
   --name <name>     Member label in ${MEMBERS_FILE} whose Pool Ranger staking
-                    address (contractAddress) is the source of the funds.
+                    address (poolRangerStakingAddress) is the source of the funds.
                     Must already exist in the directory.
   --to <addr>       Recipient bech32 address (addr_test1... on Preview,
                     addr1... on mainnet). Where the --amount goes.
@@ -67,7 +67,7 @@ Options:
 What this does:
   1. Loads ${MEMBERS_FILE} and finds the --name row.
   2. Fetches UTxOs at the member's Pool Ranger staking address
-     (member.contractAddress, an addr_test1y... / addr1y... address).
+     (member.poolRangerStakingAddress, an addr_test1y... / addr1y... address).
   3. Builds a tx that sends --amount lovelace to --to and returns ALL change
      to the SAME staking address, preserving the coop stake credential.
   4. Prints the unsigned tx hex for signing with the member's Ledger via
@@ -123,7 +123,7 @@ async function main() {
   const members = loadMembers(MEMBERS_FILE);
   const member  = findMember(members, args.name);
 
-  const sourceAddress = member.contractAddress;
+  const sourceAddress = member.poolRangerStakingAddress;
   console.log('Member:                 ', member.name);
   console.log('Source (staking) address:', sourceAddress);
   console.log('Recipient:              ', args.to);

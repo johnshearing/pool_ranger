@@ -146,7 +146,7 @@ async function main() {
     process.exit(1);
   }
 
-  console.log('Admin address:', admin.address);
+  console.log('Admin address:', admin.registeredReceiveAddress);
   console.log('Admin PKH:    ', admin.memberPkh);
   console.log(`\nDelegating "${member.name}"  →  ${args.pool}`);
   if (status.latestEntry) {
@@ -156,8 +156,8 @@ async function main() {
   }
 
   // ── Build the delegation transaction ───────────────────────────────────
-  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.address);
-  const collateral = pickAdaCollateral(adminUtxos, admin.address);
+  const adminUtxos = await blockchainProvider.fetchAddressUTxOs(admin.registeredReceiveAddress);
+  const collateral = pickAdaCollateral(adminUtxos, admin.registeredReceiveAddress);
 
   const txBuilder = await getTxBuilder();
   addDelegationCert(txBuilder, {
@@ -173,7 +173,7 @@ async function main() {
       collateral.output.amount,
       collateral.output.address,
     )
-    .changeAddress(admin.address)
+    .changeAddress(admin.registeredReceiveAddress)
     .selectUtxosFrom(adminUtxos)
     .complete();
 

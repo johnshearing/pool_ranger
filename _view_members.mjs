@@ -30,7 +30,7 @@
 //             key — i.e. the staking of the Ledger wallet itself, separate
 //             from Pool Ranger. Pool Ranger does NOT control this; the
 //             member's own wallet does (Eternl may or may not have delegated
-//             it on its own). We derive this at runtime from member.address.
+//             it on its own). We derive this at runtime from member.registeredReceiveAddress.
 //             The script uses it only to enumerate every receive address
 //             belonging to the wallet (see "Other wallet receive addresses" below).
 //
@@ -40,10 +40,7 @@
 //             Ranger's admin controls delegation here; this is the credential
 //             that earns the cooperative's allocated staking rewards on the
 //             ADA parked at the Pool Ranger staking address (see 2b below).
-//             Stored as member.stakeAddress in _1_members.json — the JSON
-//             field name pre-dates this terminology cleanup, so on disk it
-//             is still spelled "stakeAddress" while the on-screen label is
-//             "PoolRangerRewardAddress".
+//             Stored as member.poolRangerRewardAddress in _1_members.json.
 //
 // 2. Base address — bech32 prefix "addr_test1…".
 //      THIS is where ADA lives. Every base address glues together two halves:
@@ -51,7 +48,7 @@
 //        - stake credential   (controls who can DELEGATE the stake).
 //      Pool Ranger uses two distinct base addresses per member:
 //
-//        a. Registered receive address (member.address)
+//        a. Registered receive address (member.registeredReceiveAddress)
 //             payment_cred = member's own payment key (member can spend)
 //             stake_cred   = member's own stake key   (the wallet's own staking)
 //           This is the bech32 address the member sent to the admin out-of-band
@@ -63,7 +60,7 @@
 //           WalletRewardAddress (1a) is the reward-address handle for the
 //           stake_cred of this address and all its siblings.
 //
-//        b. Pool Ranger staking address (member.contractAddress)
+//        b. Pool Ranger staking address (member.poolRangerStakingAddress)
 //             payment_cred = member's own payment key (member can still spend)
 //             stake_cred   = the Pool Ranger script  (admin controls delegation)
 //           This is the address members move ADA TO once they join. The
@@ -78,7 +75,7 @@
 // THE FOUR ADDRESS LINES IN THE OUTPUT, AND WHY EACH EXISTS.
 //
 // A. Registered receive addr
-//      UTxOs at member.address only. Equal to what _view_wallet_balances.mjs
+//      UTxOs at member.registeredReceiveAddress only. Equal to what _view_wallet_balances.mjs
 //      already shows. Useful to recognise the address from the receipt the
 //      member originally sent.
 //
@@ -107,7 +104,7 @@
 //      Ranger staking address if they want it staking via the cooperative.
 //
 // D. Pool Ranger staking address
-//      UTxOs at member.contractAddress. This IS the ADA being staked via
+//      UTxOs at member.poolRangerStakingAddress. This IS the ADA being staked via
 //      Pool Ranger. Equal to what _view_delegations.mjs calls "contract bal".
 //
 // The "Wallet total" line below the four address lines is A + C + D — the
@@ -282,7 +279,7 @@ async function fetchAddressesForWalletReward(walletRewardAddress) {
 }
 
 // Derive the wallet's reward (stake) address from the member's base address.
-// Returns null if member.address is an enterprise address (no stake half) or
+// Returns null if member.registeredReceiveAddress is an enterprise address (no stake half) or
 // if its stake credential is a script (shouldn't happen for a Ledger receive
 // address, but we guard).
 function deriveWalletRewardAddress(memberAddress) {
@@ -306,7 +303,7 @@ async function reportMember(member) {
   // A. Registered receive address
   let balA = { lovelace: 0, utxoCount: 0 };
   try {
-    balA = await fetchBalance(member.address);
+    balA = await fetchBalance(member.registeredReceiveAddress);
   } catch (err) {
     console.log(`  ERROR fetching registered receive addr: ${err.message ?? err}`);
   }
@@ -317,7 +314,7 @@ async function reportMember(member) {
   let walletRewardRegistered = true;
   let walletRewardWarning = null;
   try {
-    walletRewardAddress = deriveWalletRewardAddress(member.address);
+    walletRewardAddress = deriveWalletRewardAddress(member.registeredReceiveAddress);
     if (walletRewardAddress) {
       const { addresses, registered } = await fetchAddressesForWalletReward(walletRewardAddress);
       walletRewardRegistered = registered;
@@ -325,7 +322,7 @@ async function reportMember(member) {
         walletRewardWarning =
           'wallet stake key not yet registered on-chain — siblings cannot be enumerated';
       } else {
-        const others = addresses.filter(a => a !== member.address);
+        const others = addresses.filter(a => a !== member.registeredReceiveAddress);
         balB.count = others.length;
         for (const addr of others) {
           try {
@@ -339,7 +336,7 @@ async function reportMember(member) {
       }
     } else {
       walletRewardWarning =
-        'member.address has no normal stake credential — cannot enumerate sibling addresses';
+        'member.registeredReceiveAddress has no normal stake credential — cannot enumerate sibling addresses';
     }
   } catch (err) {
     console.log(`  ERROR enumerating wallet addresses: ${err.message ?? err}`);
@@ -348,14 +345,14 @@ async function reportMember(member) {
   // D. Pool Ranger staking address
   let balC = { lovelace: 0, utxoCount: 0 };
   try {
-    balC = await fetchBalance(member.contractAddress);
+    balC = await fetchBalance(member.poolRangerStakingAddress);
   } catch (err) {
     console.log(`  ERROR fetching Pool Ranger base addr: ${err.message ?? err}`);
   }
 
   // Print balances
   console.log('  Wallet balances:');
-  console.log(`    A. Registered receive addr        : ${member.address}`);
+  console.log(`    A. Registered receive addr        : ${member.registeredReceiveAddress}`);
   console.log(`       balance                        : ${fmtAda(balA.lovelace)} across ${balA.utxoCount} UTxO(s)`);
   if (walletRewardAddress) {
     console.log(`    B. WalletRewardAddress            : ${walletRewardAddress}`);
@@ -371,7 +368,7 @@ async function reportMember(member) {
     console.log(`    C. Other wallet receive addresses : (skipped)`);
     console.log(`       note                           : ${walletRewardWarning}`);
   }
-  console.log(`    D. Pool Ranger staking address    : ${member.contractAddress}`);
+  console.log(`    D. Pool Ranger staking address    : ${member.poolRangerStakingAddress}`);
   console.log(`       balance                        : ${fmtAda(balC.lovelace)} across ${balC.utxoCount} UTxO(s)`);
 
   const total = balA.lovelace + balB.lovelace + balC.lovelace;
@@ -389,7 +386,7 @@ async function reportMember(member) {
   // Delegation + rewards (one call, two pieces of info)
   let account = null;
   try {
-    account = await fetchStakeAccount(member.stakeAddress);
+    account = await fetchStakeAccount(member.poolRangerRewardAddress);
   } catch (err) {
     console.log(`  ERROR fetching stake account: ${err.message ?? err}`);
   }
@@ -399,7 +396,7 @@ async function reportMember(member) {
   const expected    = latest?.poolId ?? null;
 
   console.log('  Delegation status (at PoolRangerRewardAddress):');
-  console.log(`    PoolRangerRewardAddress  : ${member.stakeAddress}`);
+  console.log(`    PoolRangerRewardAddress  : ${member.poolRangerRewardAddress}`);
   if (!account) {
     console.log('    on-chain                 : NOT REGISTERED');
     if (expected) {

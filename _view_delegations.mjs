@@ -5,9 +5,9 @@
 // then compares it to the most recent entry in member.delegations[].
 //
 // For each member it prints:
-//   - stakeAddress           — the bech32 stake address being checked
-//   - contractAddress        — the member's coop base address (where their ADA lives)
-//   - contract balance       — total ADA currently held at the contract address
+//   - PoolRangerRewardAddress    — the bech32 stake/reward address being checked
+//   - Pool Ranger staking address — the member's coop base address (where their ADA lives)
+//   - contract balance           — total ADA currently held at the staking address
 //   - active                 — ledger's view of the stake credential:
 //                                true  = currently registered (2 ADA deposit held by
 //                                        the ledger; can delegate and earn rewards)
@@ -43,7 +43,7 @@ const HELP = `Usage:
 What this does:
   1. Loads ${MEMBERS_FILE}.
   2. For each member, queries Blockfrost for the on-chain delegation
-     associated with their coop stakeAddress.
+     associated with their PoolRangerRewardAddress.
   3. Prints the current pool, expected pool (from the latest delegations
      entry), and whether they match.
 
@@ -120,13 +120,13 @@ async function main() {
     const expectedPool = latest?.poolId ?? null;
 
     console.log(`── ${m.name} ──────────────────────────────────────────`);
-    console.log(`  stakeAddress   : ${m.stakeAddress}`);
-    console.log(`  contractAddr   : ${m.contractAddress}`);
+    console.log(`  PoolRangerRewardAddress     : ${m.poolRangerRewardAddress}`);
+    console.log(`  Pool Ranger staking address : ${m.poolRangerStakingAddress}`);
 
     // Contract balance — query the base address directly so this works even
     // when the stake credential is not yet registered.
     try {
-      const lovelace = await fetchContractBalanceLovelace(m.contractAddress);
+      const lovelace = await fetchContractBalanceLovelace(m.poolRangerStakingAddress);
       console.log(`  contract bal   : ${fmtAda(lovelace)}`);
     } catch (err) {
       console.log(`  contract bal   : ERROR (${err.message ?? err})`);
@@ -134,7 +134,7 @@ async function main() {
 
     let account;
     try {
-      account = await fetchAccount(m.stakeAddress);
+      account = await fetchAccount(m.poolRangerRewardAddress);
     } catch (err) {
       console.log(`  ERROR fetching account: ${err.message ?? err}\n`);
       continue;

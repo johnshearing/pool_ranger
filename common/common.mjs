@@ -77,9 +77,9 @@ export function loadSoftwareWallet(skPath) {
 
 // Address-only wallets (Ledger hardware wallet — admin and production members)
 // are not loaded from files anymore. Their bech32 address lives in
-// _1_members.json (see the `address` field on each member record) and scripts
-// read it from there. Pass that string directly to blockchainProvider
-// methods such as fetchAddressUTxOs().
+// _1_members.json (see the `registeredReceiveAddress` field on each member
+// record) and scripts read it from there. Pass that string directly to
+// blockchainProvider methods such as fetchAddressUTxOs().
 
 // ── Plutus blueprint ───────────────────────────────────────────────────────
 // Loaded relative to the script working directory (ranger/).
@@ -269,8 +269,8 @@ export async function fetchStakeAccount(stakeAddress) {
 // checkDelegationStatus — decide whether a planned delegation is a no-op,
 // drifted, or worth proceeding with.
 //
-//   member:        a row from _1_members.json (uses member.stakeAddress and
-//                  member.delegations).
+//   member:        a row from _1_members.json (uses member.poolRangerRewardAddress
+//                  and member.delegations).
 //   targetPoolId:  the pool we are about to delegate to (bech32 'pool1...').
 //
 // Returns { skip, drift, chainPool, historyPool, latestEntry }:
@@ -291,7 +291,7 @@ export async function checkDelegationStatus(member, targetPoolId) {
   const latestEntry = delegations.length > 0 ? delegations[delegations.length - 1] : null;
   const historyPool = latestEntry?.poolId ?? null;
 
-  const account   = await fetchStakeAccount(member.stakeAddress);
+  const account   = await fetchStakeAccount(member.poolRangerRewardAddress);
   const chainPool = account?.pool_id ?? null;
 
   return {

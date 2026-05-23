@@ -1,8 +1,9 @@
 // Checks wallet balances for everyone in the cooperative.
 //
 // Source of truth: ./_1_members.json. The script reads the member directory,
-// then for each member queries Blockfrost for the UTxOs at member.address
-// (their Ledger receive address) and prints the ADA balance.
+// then for each member queries Blockfrost for the UTxOs at
+// member.registeredReceiveAddress (their Ledger receive address) and prints
+// the ADA balance.
 //
 // There are no .addr files — all addresses now live in _1_members.json.
 //
@@ -63,8 +64,8 @@ async function main() {
   const members = loadMembers();
   for (const member of members) {
     try {
-      const utxos = await provider.fetchAddressUTxOs(member.address);
-      await printBalance(`${member.name} (Ledger)`, member.address, utxos);
+      const utxos = await provider.fetchAddressUTxOs(member.registeredReceiveAddress);
+      await printBalance(`${member.name} (Ledger)`, member.registeredReceiveAddress, utxos);
     } catch (err) {
       console.log(`Failed to check ${member.name}:`);
       console.log(`   ${err.message}\n`);
