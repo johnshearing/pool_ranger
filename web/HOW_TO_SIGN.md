@@ -12,7 +12,8 @@ Two pages live in this folder, for two different audiences:
   step. See the "Member page" section at the bottom of this file.
 
 The rest of this document describes the `sign_tx.html` (admin) flow.
-No build step is needed for `sign_tx.html` — it uses the browser's Eternl API directly.
+Both pages are produced by the same Vite build — run `npm run build` once and
+both `dist/sign_tx.html` and `dist/send_from_staking.html` are ready to serve.
 
 ---
 
@@ -32,14 +33,16 @@ Work through this list before opening the page. Most failures trace back to one 
 
 ---
 
-## Step 1 — Start a Local Web Server
+## Step 1 — Build and Start a Local Web Server
 
 You must serve the page over HTTP — browser wallets require a real server, not a plain file
 open. Open a WSL2 terminal and run:
 
 ```bash
 cd /home/js/aiken/ranger/web
-npx serve .
+npm install            # first time only
+npm run build
+npx serve dist
 ```
 
 It will print something like:
@@ -52,7 +55,7 @@ It will print something like:
 If `npx serve` is not available, use Python instead:
 
 ```bash
-cd /home/js/aiken/ranger/web
+cd /home/js/aiken/ranger/web/dist
 python3 -m http.server 3000
 ```
 
@@ -114,8 +117,8 @@ Most likely causes: Eternl is not installed, or Eternl's dApp Connector is disab
 
 **Eternl flashes open and closes with `ErrorSignTx.canOnlySignPartially`.**
 This is normal for Plutus script transactions and is handled automatically by the page.
-If you see this, it means an older version of `sign_tx.js` is being served — restart the
-server and do a hard refresh (Ctrl+Shift+R).
+If you see this, it means an older version of the page is being served — rebuild
+(`npm run build`), restart the server, and do a hard refresh (Ctrl+Shift+R).
 
 **Eternl shows `ledgerTxHashMismatch`.**
 The Ledger signed with the wrong key. Check:
@@ -139,15 +142,25 @@ inputs (staking address, recipient, amount) and one button.
 
 ### What it does
 
-- Fetches the member's UTxOs at the staking address using Koios (no API key needed).
-- Builds a transaction that sends the requested amount to the recipient and
-  returns ALL change to the SAME staking address — so the unspent ADA stays
-  delegated through the cooperative.
+- Reads UTxOs at the staking address directly from Eternl (CIP-30
+  `wallet.getUtxos()`). Eternl already tracks the staking address because
+  the member owns its payment key, even though the stake credential is the
+  Pool Ranger script. No external chain-data provider (Koios, Blockfrost,
+  CORS proxy) is involved.
+- Builds the transaction locally with MeshSDK's MeshTxBuilder using its
+  built-in protocol parameters — no network fetcher needed. The recipient
+  gets the requested amount; ALL change returns to the SAME staking address
+  so the unspent ADA stays delegated through the cooperative.
 - Signs via Eternl/Ledger (`partialSign=true`, same as `sign_tx.html`).
-- Submits via Koios. Displays the resulting tx hash with a Cardanoscan link.
+  MeshSDK merges the Ledger's witness into the transaction and returns a
+  complete signed tx.
+- Submits through Eternl (`wallet.submitTx`) — Eternl forwards to the
+  Cardano network via its own backend. Displays the resulting tx hash with
+  a Cardanoscan link.
 
 There is no copy-a-command step. Members do not need a terminal or any
-admin-run service.
+admin-run service. The entire flow runs inside the browser using only the
+Eternl extension and the member's Ledger.
 
 ### Building the page (admin only — members open the hosted version)
 

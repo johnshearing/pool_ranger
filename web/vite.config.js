@@ -10,6 +10,9 @@ export default defineConfig({
         send_from_staking: 'send_from_staking.html',
       },
     },
-    commonjsOptions: { transformMixedEsModules: true },
+    commonjsOptions: {
+      transformMixedEsModules: true,
+      strictRequires: true,
+    },
   },
 });

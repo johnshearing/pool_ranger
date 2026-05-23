@@ -8,22 +8,22 @@
 //     stake credential so the change stays delegated.
 //
 // Architecture choices:
-//   - Koios (no API key) for both UTxO fetch and tx submit. Permissionless:
-//     the page works without any Pool Ranger admin-run infrastructure.
-//   - MeshSDK MeshTxBuilder for tx assembly in the browser. No evaluator is
-//     passed because this tx does NOT execute any Plutus script — only the
-//     payment-key side of the staking address is checked. The script stake
-//     credential just rides along on the change output.
+//   - Eternl (CIP-30) supplies UTxOs and submits the tx. Eternl tracks the
+//     hybrid staking address (member's payment key + Pool Ranger script
+//     stake credential) because the member owns the payment key. This means
+//     no external chain-data provider is needed — no Koios, no Blockfrost,
+//     no CORS proxy, no admin server.
+//   - MeshTxBuilder uses its built-in DEFAULT_PROTOCOL_PARAMETERS for fee
+//     calculation. No evaluator is passed because this tx does NOT execute
+//     any Plutus script — only the payment-key side of the staking address
+//     is checked. The script stake credential just rides along on the
+//     change output.
 //   - BrowserWallet.signTx(hex, true) — partialSign=true matches sign_tx.html;
 //     Eternl/Ledger signs the lone payment-key witness and Mesh merges the
 //     witness back into the tx body, returning a complete signed tx CBOR.
-//
-// To switch to mainnet later: change NETWORK below and update the prefix
-// check in validateStakingAddress.
 
 import {
   BrowserWallet,
-  KoiosProvider,
   MeshTxBuilder,
   deserializeAddress,
 } from '@meshsdk/core';
@@ -104,18 +104,21 @@ sendBtn.addEventListener('click', async () => {
 
     sendBtn.disabled = true;
 
-    setStatus('Connecting to Koios to fetch UTxOs…');
-    const koios = new KoiosProvider(NETWORK);
+    setStatus('Connecting to Eternl…');
+    const wallet = await BrowserWallet.enable('eternl');
 
-    const utxos = await koios.fetchAddressUTxOs(stakingAddr);
-    if (utxos.length === 0) {
-      throw new Error('No UTxOs at the staking address. Nothing to spend.');
+    setStatus('Fetching UTxOs from Eternl…');
+    const allUtxos = await wallet.getUtxos();
+    const stakingUtxos = allUtxos.filter(u => u.output.address === stakingAddr);
+    if (stakingUtxos.length === 0) {
+      throw new Error(
+        'Eternl returned no UTxOs at the Pool Ranger staking address. ' +
+        'Either there is nothing to spend there, or this Eternl account does not own the payment key for that address.',
+      );
     }
 
-    setStatus(`Found ${utxos.length} UTxO(s) at the staking address. Building transaction…`);
+    setStatus(`Found ${stakingUtxos.length} UTxO(s) at the staking address. Building transaction…`);
     const txBuilder = new MeshTxBuilder({
-      fetcher: koios,
-      submitter: koios,
       network: NETWORK,
       verbose: false,
     });
@@ -124,7 +127,7 @@ sendBtn.addEventListener('click', async () => {
       await txBuilder
         .txOut(recipient, [{ unit: 'lovelace', quantity: lovelace.toString() }])
         .changeAddress(stakingAddr)
-        .selectUtxosFrom(utxos)
+        .selectUtxosFrom(stakingUtxos)
         .complete();
     } catch (err) {
       const msg = err.message ?? String(err);
@@ -139,14 +142,11 @@ sendBtn.addEventListener('click', async () => {
 
     const unsignedTxHex = txBuilder.txHex;
 
-    setStatus('Connecting to Eternl…');
-    const wallet = await BrowserWallet.enable('eternl');
-
-    setStatus('Approve the transaction on your Ledger device.');
+    setStatus('Approve the transaction on your Ledger device…');
     const signedTxHex = await wallet.signTx(unsignedTxHex, true);
 
-    setStatus('Submitting transaction to the Cardano network…');
-    const txHash = await koios.submitTx(signedTxHex);
+    setStatus('Submitting transaction via Eternl…');
+    const txHash = await wallet.submitTx(signedTxHex);
 
     setStatus('Transaction submitted!', 'success');
     showResult(txHash);

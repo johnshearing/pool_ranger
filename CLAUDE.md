@@ -1,5 +1,5 @@
 # CLAUDE.md — Pool Ranger (ranger)         
-**Always read `web/HOW_TO_SIGN.md` at the start of each session** to get background information about the CIP-30 / DApp Connector which must be constructed for spending funds located at Pool Ranger staking addresses. 
+**Always read the "Member Page" section of `web/HOW_TO_SIGN.md` at the start of each session**. 
 
 
 ---
