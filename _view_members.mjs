@@ -190,6 +190,15 @@ import { serializeRewardAddress } from '@meshsdk/core';
 const MEMBERS_FILE = './_1_members.json';
 const NETWORK_ID   = 0;   // 0 = Preview testnet
 
+// Base URL of the member-facing "send from staking address" page. The admin
+// emails each member their own line of the report (see the Spend tool line
+// printed per member below), which deep-links to this URL with the member's
+// staking address prefilled. The page reads ?addr=… on load, fills the box,
+// and locks it so the member never has to paste their address.
+// TODO: switch to the GitHub Pages URL once the page is published there,
+// e.g. https://johnshearing.github.io/pool_ranger/web/dist/send_from_staking.html
+const SEND_FROM_STAKING_BASE = 'http://localhost:3000/send_from_staking.html';
+
 const HELP = `Usage:
   node _view_members.mjs [--name <member>] [--help]
 
@@ -370,6 +379,8 @@ async function reportMember(member) {
   }
   console.log(`    D. Pool Ranger staking address    : ${member.poolRangerStakingAddress}`);
   console.log(`       balance                        : ${fmtAda(balC.lovelace)} across ${balC.utxoCount} UTxO(s)`);
+  console.log(`       Spend tool (send THIS link to ${member.name}):`);
+  console.log(`         ${SEND_FROM_STAKING_BASE}?addr=${member.poolRangerStakingAddress}`);
 
   const total = balA.lovelace + balB.lovelace + balC.lovelace;
   console.log(`    ─────────`);

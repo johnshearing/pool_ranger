@@ -9,10 +9,10 @@ Not pursued yet — saved here so we can resume later.
 
 ## Question
 
-> Will it be possible to use the same permissionless approach for registering
+> Will it be possible to use a permissionless approach for registering
 > new members?
 
-Same approach = static page hosted on GitHub Pages, Koios (no API key), in-browser
+Permissionless = static page hosted on GitHub Pages, Koios (no API key), in-browser
 build / sign / submit via Eternl + Ledger. No admin-run servers, no API keys in
 the browser, no admin-controlled proxies.
 

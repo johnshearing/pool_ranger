@@ -283,6 +283,198 @@ in both the docs and the page itself.
   out-of-band if the dist is ever tampered with, and how to rotate
   to a new URL.
 
+---
+
+## Safeguard added 2026-05-24 — wrong-account / wrong-address detection
+
+### Question
+
+If a member pastes the wrong value into the "Pool Ranger staking address"
+box on `send_from_staking.html`, can the change be sent to an address the
+member doesn't control? In particular: when a Ledger is paired with Eternl,
+the member can create more than one account, each with its own payment key
+and therefore its own Pool Ranger hybrid staking address. If they have the
+wrong account selected (or paste the wrong member's address), what happens?
+
+### Pre-existing safeguards (in `web/send_from_staking.js`)
+
+1. **Bech32 checksum** — `deserializeAddress(addr)` throws on any
+   one-letter typo because bech32 has a built-in error-detecting checksum.
+2. **UTxO match filter** — `allUtxos.filter(u => u.output.address === stakingAddr)`.
+   `wallet.getUtxos()` is scoped by CIP-30 to the currently selected
+   account, so if Eternl has no UTxOs at the typed address the filter is
+   empty and the tx aborts.
+3. **Ledger screen** — the device displays every output address before
+   signing, including the change output back to the staking address.
+
+### The residual case (case 3)
+
+Bech32 + UTxO filter together still leave one window open: a member with
+**multiple Pool Ranger registrations in the same Eternl wallet** (e.g.,
+two Ledger accounts that have each been registered) could paste the
+wrong one of their own hybrid addresses. UTxOs exist at that address
+under the wrong account, the filter is non-empty, the tx builds, and
+the change goes to the wrong staking address. Funds are technically
+recoverable (the member still controls the payment key on the other
+account) but the member would experience the loss as catastrophic
+until someone walked them back through it.
+
+### Solution implemented
+
+Added `assertWalletControlsPaymentKey(wallet, stakingAddr)` in
+`web/send_from_staking.js`, called immediately after
+`BrowserWallet.enable('eternl')` and before `wallet.getUtxos()`.
+
+The check:
+
+1. Extracts `pubKeyHash` from the typed staking address with
+   `deserializeAddress`. For a type-2 hybrid address this is the
+   member's payment-key hash.
+2. Calls `wallet.getUsedAddresses()` + `wallet.getUnusedAddresses()`
+   (CIP-30 scopes both to the active account) and extracts the
+   `pubKeyHash` from each — the set of payment-key hashes the currently
+   selected Eternl account controls.
+3. If the typed address's payment-key hash is not in that set, throws
+   before any tx is built:
+
+   > The payment key in this Pool Ranger staking address is not
+   > controlled by the currently selected Eternl account. Open Eternl
+   > and switch to the account you used when you registered with Pool
+   > Ranger, then try again.
+
+### What this catches
+
+- **Wrong Eternl account selected** for a member who has multiple
+  accounts and is registered under one of them — the most likely
+  multi-account scenario.
+- **Pasted a different member's hybrid address** — payment-key hash
+  belongs to someone else's wallet.
+- **Bech32-valid but wrong payment key** (an edge case typing/paste
+  error that survives the checksum) — payment-key hash won't match.
+
+### What it does not catch
+
+- **Multiple Pool Ranger registrations from different derivation indices
+  inside the same Eternl account.** All those addresses share the same
+  account, so any of their payment-key hashes will be in the wallet's
+  known-PKH set, and the check passes. This is rare in practice
+  (members typically register one address) and even when it happens the
+  funds remain recoverable. The Ledger screen is the remaining defense.
+
+### Files changed
+
+- `web/send_from_staking.js` — added `assertWalletControlsPaymentKey`
+  and called it in the click handler before UTxO fetch.
+- `web/dist/send_from_staking.html` + the hashed bundle in
+  `web/dist/assets/` — rebuilt via `npm run build` so the live page
+  picks up the new check.
+
+---
+
+## Safeguard added 2026-05-24 (follow-up) — URL prefill + locked staking field
+
+### Why this was necessary
+
+`assertWalletControlsPaymentKey` (above) closes the multi-account
+variant of case 3 but not the **multi-derivation-index variant**: if a
+member has registered more than one Pool Ranger hybrid address from the
+same Eternl account, all those payment-key hashes are in the wallet's
+known-PKH set, so any of them passes the check. The page has no way
+from inside itself to know *which* of the legitimate hybrid addresses
+the member meant to spend from this session — that information lives
+only in the member's head (or in the admin's report).
+
+The fix is to remove the paste step entirely: deliver the canonical
+staking address to the page through the URL, so the member never has
+to type or paste it. This also closes the broader category of
+clipboard-swap malware, typos that somehow survive bech32, and
+phishing-pasted wrong addresses — none of which the in-page check can
+catch on its own.
+
+### What was implemented
+
+**Page side — `web/send_from_staking.html` + `web/send_from_staking.js`:**
+
+- HTML: added `<div id="prefill-note" class="hint"></div>` immediately
+  below the staking-address textarea.
+- JS: on module load (before any click handler runs), read
+  `new URLSearchParams(window.location.search).get('addr')`. If a value
+  is present:
+  - set `stakingInput.value = addrFromUrl`
+  - set `stakingInput.readOnly = true`
+  - grey the background so the lock is visible
+  - populate `prefillNote` with "Address loaded from your admin's link
+    and locked." in green.
+- Rebuilt `web/dist/send_from_staking.html` + bundled JS via
+  `npm run build` so the served page picks up the change.
+
+If the page is opened with no `?addr=` (e.g. someone navigates to it
+directly), the field stays writable and the existing paste workflow
+continues to work as a fallback.
+
+**Admin side — `_view_members.mjs`:**
+
+- Added near the other config constants:
+  ```js
+  // TODO: switch to the GitHub Pages URL once the page is published there
+  const SEND_FROM_STAKING_BASE = 'http://localhost:3000/send_from_staking.html';
+  ```
+- Added two lines in `reportMember()` right under the staking-address
+  balance:
+  ```
+  Spend tool (send THIS link to <member.name>):
+    ${SEND_FROM_STAKING_BASE}?addr=${member.poolRangerStakingAddress}
+  ```
+- The admin emails (or otherwise sends out-of-band) this single
+  canonical URL to each member. Members are trained to click only that
+  link — never to paste anything by hand.
+
+### Why it ports cleanly to GitHub Pages
+
+`URLSearchParams` and `window.location.search` are plain browser APIs
+that don't care where the page came from. GitHub Pages is a static
+host and passes query strings through to the JS untouched. The hashed
+JS asset name changes on every `npm run build`, which guarantees fresh
+fetches across deploys regardless of GitHub's HTML caching. The only
+deployment-time change required is flipping `SEND_FROM_STAKING_BASE`
+in `_view_members.mjs` from the localhost URL to the GitHub Pages URL
+— a single-line edit.
+
+### Roster privacy (sanity-checked while making this change)
+
+The admin's `_view_members.mjs` output is the document that
+concentrates member info (the per-member URL embeds the staking
+address; the rest of the per-member block prints balances and
+registration metadata). Two guards already in place:
+
+- `ranger/.gitignore` excludes `_1_members.json`, `_1_members_BU.json`,
+  `_1_members_PRE_BATCH.json`, `_1_delegation_config.json`. The only
+  roster-shaped file committed is `_1_members_sample.json`
+  (template/example data).
+- Cardano staking addresses + member PKHs are public on-chain anyway
+  (anyone can look them up on Cardanoscan), so the *addresses* are not
+  secret. The sensitive concentrate is the **combined balance and
+  delegation roster** in the admin's local script output — which the
+  admin should always slice per-member before sending, not forward
+  wholesale.
+
+### Files changed
+
+- `web/send_from_staking.html` — added the `#prefill-note` div.
+- `web/send_from_staking.js` — added the URL-prefill block immediately
+  after the DOM-reference declarations.
+- `web/dist/send_from_staking.html` + new hashed bundle in
+  `web/dist/assets/` — rebuilt via `npm run build`.
+- `_view_members.mjs` — added `SEND_FROM_STAKING_BASE` constant and
+  the per-member Spend tool URL lines.
+- `REQUIREMENTS.md` — updated three places to match the new workflow:
+  the `_view_members.mjs` description (mentions the Spend tool URL),
+  the `web/send_from_staking.js` description (URL prefill + lock +
+  `assertWalletControlsPaymentKey`), and the member ongoing-participation
+  step (members open the admin's link, not the bare HTML).
+
+---
+
 ### Other questions worth asking
 
 - Is `johnshearing.github.io/pool_ranger/...` the right long-term URL,

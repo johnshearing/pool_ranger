@@ -39,6 +39,23 @@ const amountInput    = document.getElementById('amount');
 const sendBtn        = document.getElementById('btn-send');
 const statusBox      = document.getElementById('status');
 const resultBox      = document.getElementById('result');
+const prefillNote    = document.getElementById('prefill-note');
+
+// URL-prefill: if the admin's per-member link contains ?addr=addr_test1y…,
+// fill the staking-address textarea from it and lock the field so the member
+// cannot accidentally paste a different value over it. Eliminates typing,
+// clipboard-swap, and wrong-account-paste mistakes for members who arrive via
+// the canonical link in the admin's report.
+const addrFromUrl = new URLSearchParams(window.location.search).get('addr');
+if (addrFromUrl) {
+  stakingInput.value = addrFromUrl;
+  stakingInput.readOnly = true;
+  stakingInput.style.backgroundColor = '#f0f0f0';
+  if (prefillNote) {
+    prefillNote.textContent = 'Address loaded from your admin\'s link and locked.';
+    prefillNote.style.color = 'green';
+  }
+}
 
 function setStatus(msg, kind = 'info') {
   statusBox.textContent = msg;
@@ -80,6 +97,30 @@ function validateStakingAddress(addr) {
   }
 }
 
+// Reject a staking address whose payment-key hash is not controlled by the
+// currently selected Eternl account. Catches the "wrong account selected in
+// Eternl" / "pasted a different member's hybrid address" cases before any tx
+// is built, so change can never be returned to an address the member did not
+// intend. Compares the typed address's payment-key hash against every known
+// payment-key hash in the active account (used + unused chain addresses).
+async function assertWalletControlsPaymentKey(wallet, stakingAddr) {
+  const { pubKeyHash: typedPkh } = deserializeAddress(stakingAddr);
+  const [usedAddrs, unusedAddrs] = await Promise.all([
+    wallet.getUsedAddresses(),
+    wallet.getUnusedAddresses(),
+  ]);
+  const knownPkhs = new Set(
+    [...usedAddrs, ...unusedAddrs].map(a => deserializeAddress(a).pubKeyHash),
+  );
+  if (!knownPkhs.has(typedPkh)) {
+    throw new Error(
+      'The payment key in this Pool Ranger staking address is not controlled by the currently selected Eternl account.\n' +
+      'Open Eternl and switch to the account you used when you registered with Pool Ranger, then try again.\n' +
+      '(If you only use one account, double-check that you pasted the right address from your admin\'s report.)',
+    );
+  }
+}
+
 sendBtn.addEventListener('click', async () => {
   const stakingAddr = stakingInput.value.trim();
   const recipient   = recipientInput.value.trim();
@@ -106,6 +147,9 @@ sendBtn.addEventListener('click', async () => {
 
     setStatus('Connecting to Eternl…');
     const wallet = await BrowserWallet.enable('eternl');
+
+    setStatus('Verifying the staking address belongs to the selected Eternl account…');
+    await assertWalletControlsPaymentKey(wallet, stakingAddr);
 
     setStatus('Fetching UTxOs from Eternl…');
     const allUtxos = await wallet.getUtxos();
