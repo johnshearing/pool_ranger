@@ -473,6 +473,48 @@ registration metadata). Two guards already in place:
   `assertWalletControlsPaymentKey`), and the member ongoing-participation
   step (members open the admin's link, not the bare HTML).
 
+### Dev-server gotcha — `serve dist` strips `.html` AND query strings
+
+While testing the prefill end-to-end on localhost we hit a confusing
+symptom: pasting `http://localhost:3000/send_from_staking.html?addr=…`
+into the address bar produced a page where the staking-address field
+was still editable, the green lock note never appeared, and the
+address bar ended up at bare `http://localhost:3000/send_from_staking`
+(no `.html`, no query string).
+
+**Cause.** The local dev server is `npx serve dist` (running from
+`/home/js/aiken/ranger/web/`), and `serve`'s default `cleanUrls: true`
+behaviour 301-redirects `/send_from_staking.html` →
+`/send_from_staking` **and drops the query string** in the redirect.
+By the time the page loads, `window.location.search` is empty, the
+URL-prefill block sees no `?addr=`, and the field stays writable.
+
+**Fix on localhost.** Emit URLs in `_view_members.mjs` *without*
+`.html`, so they hit `serve`'s canonical form directly and skip the
+redirect. The constant in `_view_members.mjs` is now:
+
+```js
+const SEND_FROM_STAKING_BASE = 'http://localhost:3000/send_from_staking';
+```
+
+with a comment above it explaining the omission.
+
+**Implication for GitHub Pages.** GitHub Pages does **not** do
+clean-URL rewriting. The bare `/send_from_staking` would 404 there.
+So when we deploy:
+
+1. Flip `SEND_FROM_STAKING_BASE` to the full GitHub Pages URL
+   **with** `.html` (e.g.
+   `https://johnshearing.github.io/pool_ranger/web/dist/send_from_staking.html`).
+2. Verify by clicking a printed Spend tool link from the live admin
+   report; the page should load directly, no redirect involved, with
+   `?addr=…` intact and the field locked.
+3. The dev-server omission of `.html` is a localhost-only quirk —
+   nothing to carry over.
+
+There is a `TODO` comment above the constant in `_view_members.mjs`
+that calls this out, so the flip is hard to miss at deploy time.
+
 ---
 
 ### Other questions worth asking

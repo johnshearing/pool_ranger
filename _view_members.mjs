@@ -195,9 +195,18 @@ const NETWORK_ID   = 0;   // 0 = Preview testnet
 // printed per member below), which deep-links to this URL with the member's
 // staking address prefilled. The page reads ?addr=… on load, fills the box,
 // and locks it so the member never has to paste their address.
-// TODO: switch to the GitHub Pages URL once the page is published there,
-// e.g. https://johnshearing.github.io/pool_ranger/web/dist/send_from_staking.html
-const SEND_FROM_STAKING_BASE = 'http://localhost:3000/send_from_staking.html';
+//
+// NOTE on the missing `.html`: the local dev server (`npx serve dist`) is
+// configured with `cleanUrls: true` by default, which 301-redirects
+// `/send_from_staking.html` → `/send_from_staking` AND strips the query
+// string during the redirect. We hit `serve`'s canonical form directly to
+// keep `?addr=…` intact.
+//
+// TODO before deploying to GitHub Pages: switch to the full URL **with
+// `.html`** — GitHub Pages does not do clean-URL rewriting, so the bare
+// `/send_from_staking` would 404 there. Expected production form:
+//   https://johnshearing.github.io/pool_ranger/web/dist/send_from_staking.html
+const SEND_FROM_STAKING_BASE = 'http://localhost:3000/send_from_staking';
 
 const HELP = `Usage:
   node _view_members.mjs [--name <member>] [--help]
