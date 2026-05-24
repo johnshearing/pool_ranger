@@ -171,6 +171,25 @@ register, delegate, withdraw, or leave.
 - [x] `_1_delegation_config.json` — **the admin's batched delegation plan.** A flat JSON array of `{ name, memberPkh, poolId }` entries, consumed by `_batch_delegate.mjs`. Lookup is by `memberPkh`; the `name` field is human-readable only (audit aid so the admin can read the file without cross-referencing 56-character pkh strings). Members not listed here are not touched on a batch run. On testnet this file is committed alongside `_1_members.json`; on mainnet it will hold real cooperative assignments and will not be committed.
 - [x] `_1_delegation_config_sample.json` — **a tiny shape-only sample committed to the public GitHub repo.** Mirrors the role of `_1_members_sample.json`: shows readers what `_1_delegation_config.json` looks like (the flat `[{ name, memberPkh, poolId }, …]` array consumed by `_batch_delegate.mjs`) without exposing real cooperative delegation assignments. The two files are intentionally not expected to match; scripts must never compare them or treat divergence as an error.
 - [x] `_1_members_PRE_BATCH.json` — **auto-snapshot of `_1_members.json` written by `_batch_delegate.mjs`** immediately before it overwrites the live file. Provides a one-command rollback (`cp _1_members_PRE_BATCH.json _1_members.json`) if the admin decides not to submit the tx, or if anything else goes wrong post-build. Overwritten on every batch run that produces pending delegations; not written when the script exits early (drift, no-op, or over-cap), so a useful prior snapshot is not clobbered by a no-op run. Not committed.
+- [x] `epoch_agent/ranger_state.json` — **Pool Ranger's persistent epoch-by-epoch delegation memory.** Read by `_select_delegations.mjs` to know what is currently delegated and which submitted-but-not-settled changes are in flight, and written by `epoch_agent/run.mjs` after every epoch run. Eight top-level fields (full reference in `epoch_agent/HOW_TO_RUN.md`):
+  - `_schemaVersion`, `lastUpdatedEpoch` — agent-managed bookkeeping; do not edit.
+  - `totalMemberStakeAda` — admin-set total ADA available for delegation (whole ADA, not lovelace).
+  - `currentDelegations` — **the authoritative "where Pool Ranger's stake currently sits" map.** Keyed by `poolId`; each value `{ ticker, stakeAda, delegatedAtEpoch, activeFromEpoch }`. Auto-populated when an `inFlightChanges` entry settles. `_select_delegations.mjs` reads this to compute the diff between "where we are" and "where the latest report says we should be."
+  - `inFlightChanges` — array of `{ poolId, ticker, changeType ("ADD"|"WITHDRAW"), stakeAda, submittedAtEpoch, activeFromEpoch, rewardsFromEpoch, note }`. Anything still pending here must be **excluded from the available budget** by `_select_delegations.mjs` so the agent does not double-commit ADA that has already been promised.
+  - `completedChanges` — permanent audit trail of settled changes; `_select_delegations.mjs` may read for history but never writes here.
+  - `discoveryConfig` — pool-discovery filter thresholds (used by `discover_pools.mjs`, not by the delegation selector).
+  - `poolLuckHistory` — per-pool luck observations across epochs; one entry per pool with an `observations[]` array of `{ epoch, luckZ, luckPremium, nEpochs, luckZ_windows }`. `_select_delegations.mjs` may use the cross-run trend as a tie-breaker between pools whose projected ROA is nearly identical.
+  - `poolParamHistory` — per-pool last-known fee/margin/pledge plus full change log. Useful for surfacing recent SPO parameter changes when ranking pools.
+
+  On testnet this file is committed (current values are real). On mainnet it will not be committed.
+- [x] `epoch_agent/reports/epoch_<NNN>.txt` — **the ranked, human-readable epoch report.** One file per epoch; `_select_delegations.mjs` always consumes the file with the largest `NNN` (the "most-recent epoch" — for example, at the time of writing it is `epoch_631.txt`, but `NNN` advances every epoch). The report is produced by `epoch_agent/run.mjs` and is plain text (not JSON); it can either be parsed directly or, equivalently, re-derived by re-running `run.mjs --dry-run` for the same epoch. The sections `_select_delegations.mjs` cares about:
+  - **Header** — `r = ...`, `S_sat ≈ ... ADA`, `Pool Ranger stake: ... ADA`, `Global budget (total stake minus in-flight): ... ADA`. The global-budget number is the cap on what `_select_delegations.mjs` is allowed to assign across all members this epoch.
+  - **ELIGIBLE POOLS** — block per pool with `Full ID:`, `Classification:`, `Performance:`, `Active stake:`, `Projected ROA:`, `Historical ROA (20 ep):`, `Luck premium`, `Luck z-score`, `Pool age:`, `Current:`, `Proposed:`, and `Recommendation:` (`ADD X.XX M ADA` or `QUALIFIES — budget exhausted this epoch`). `ADD` lines are the canonical "delegate this much ADA to this pool" instruction set for the current epoch.
+  - **EXISTING DELEGATIONS** and **REBALANCING MOVES** — appear when Pool Ranger already has stake on-chain. List HOLD / ADD MORE / REDUCE / WITHDRAW with per-move opportunity cost and break-even.
+  - **NEXT STEPS (for administrator)** — flat, machine-friendly list of `<poolID> — add X.XX M ADA` lines. The simplest entry point for the selector: read these lines, fan them out across members, write `_1_delegation_config.json`.
+  - **SUMMARY** — counts and weighted ROA before / after; `_select_delegations.mjs` may include this in a confirmation banner before writing the config.
+
+  `_select_delegations.mjs`'s job is to map each `<poolID> — add X.XX M ADA` instruction across the set of registered members in `_1_members.json` (each member contributes whatever their `poolRangerStakingAddress` currently holds — that live balance is what `_view_members.mjs` already prints), so the resulting `_1_delegation_config.json` honours the per-pool target ADA totals as closely as integer member balances allow. Reports are committed on testnet for reproducibility and not committed on mainnet.
 - [x] `.env` — `BLOCKFROST_API=previewXXXXX`. Not committed.
 
 There are no `.addr` files in `ranger/`. Earlier in development each Ledger wallet had its
@@ -317,8 +336,14 @@ tx cap.
 13. Use the `Epoch Reporting System` *(covered in the next section)* to track pool saturation and choose pools wisely.
 
 ### Moving Delegation Each Epoch
-14. Use `_select_delegations.mjs` *(not yet built)* which looks at epoch_agent/ranger_state.json, the most recent epoch report found in epoch_agent/reports, _1_members and the output of ranger/_view_members.mjs.json and then creates _1_delegation_config.json.
-15. Use _batch_delegate.mjs to move all the delegation and record history of those moves back to ranger_state.json and _1_members.json.
+14. Run `_select_delegations.mjs` *(not yet built)*. It reads:
+    - `epoch_agent/ranger_state.json` — current delegations + in-flight changes (so we don't double-commit budget),
+    - the most-recent `epoch_agent/reports/epoch_<NNN>.txt` — the per-epoch ranked pool list and per-pool ADA targets,
+    - `_1_members.json` — the member directory,
+    - the live balances surfaced by `_view_members.mjs` (member ADA actually parked at each `poolRangerStakingAddress`),
+
+    and writes `_1_delegation_config.json`. The field shapes of the two epoch-agent files are documented in the **Data Files** section above.
+15. Run `_batch_delegate.mjs` to move all the delegation in one transaction and record history back to `_1_members.json`. `epoch_agent/ranger_state.json` is updated separately on the next run of `epoch_agent/run.mjs`, which settles `inFlightChanges` into `currentDelegations`.
 
 ---
 
