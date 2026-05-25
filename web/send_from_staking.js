@@ -171,6 +171,17 @@ function validateStakingAddress(addr) {
       'Use the address from the "Pool Ranger staking address" line in the report your admin sent you.',
     );
   }
+  // Belt-and-suspenders: the 'y' marker already implies a script stake
+  // credential, but parsing the address and explicitly checking the field
+  // catches any future bech32 / prefix quirk that would let something past
+  // the startsWith() test. Mirrors the same guard in _spend_from_staking.mjs.
+  const { stakeScriptCredentialHash } = deserializeAddress(addr);
+  if (!stakeScriptCredentialHash) {
+    throw new Error(
+      'That address does not carry a script stake credential, so it is not a Pool Ranger staking address.\n' +
+      'Use the address from the "Pool Ranger staking address" line in the report your admin sent you.',
+    );
+  }
 }
 
 // Reject a staking address whose payment-key hash is not controlled by the
@@ -203,9 +214,21 @@ async function buildSpendTx(wallet, stakingAddr) {
 
   validateBech32Address(recipient, 'Recipient address');
 
+  // Refuse a no-op spend whose recipient is the source staking address —
+  // would just pay a fee to send ADA to itself.
+  if (recipient === stakingAddr) {
+    throw new Error('Recipient is the same as your Pool Ranger staking address — that would just pay a fee to send ADA to itself.');
+  }
+
   const ada = Number(amountStr);
   if (!Number.isFinite(ada) || ada <= 0) {
     throw new Error('Amount must be a positive number of tADA.');
+  }
+  // Cardano's min-UTxO floor for an ADA-only output is ~1 tADA. Refuse here
+  // with a clear message rather than letting the operator decode a generic
+  // build-time "value too small" error.
+  if (ada < 1) {
+    throw new Error('Amount must be at least 1 tADA (Cardano min-UTxO rule for ADA-only outputs).');
   }
   const lovelace = BigInt(Math.round(ada * 1_000_000));
 
@@ -219,7 +242,20 @@ async function buildSpendTx(wallet, stakingAddr) {
     );
   }
 
-  setStatus(`Found ${stakingUtxos.length} UTxO(s) at the staking address. Building transaction…`);
+  // Balance summary so the member can sanity-check the numbers before the
+  // Ledger prompt. Mirrors the summary printed by _spend_from_staking.mjs.
+  const totalLovelace = stakingUtxos.reduce((sum, u) => {
+    const ll = u.output.amount.find(a => a.unit === 'lovelace');
+    return sum + BigInt(ll?.quantity ?? '0');
+  }, 0n);
+  const totalAda     = (Number(totalLovelace) / 1_000_000).toFixed(6);
+  const approxChange = (Number(totalLovelace - lovelace) / 1_000_000).toFixed(6);
+  setStatus(
+    `Source balance: ${totalAda} tADA across ${stakingUtxos.length} UTxO(s).\n` +
+    `Sending: ${ada} tADA → ${recipient}\n` +
+    `Approx change returned: ~${approxChange} tADA (less fee) back to your staking address.\n` +
+    `Building transaction…`,
+  );
   const txBuilder = new MeshTxBuilder({ network: NETWORK, verbose: false });
 
   try {

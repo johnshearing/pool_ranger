@@ -896,6 +896,123 @@ unused escape hatch is itself attack surface.
 
 ---
 
+## Safeguard added 2026-05-25 (round 2) — CLI-parity guards ported into the page
+
+### The hole this closes
+
+The CLI counterpart `_spend_from_staking.mjs` grew a layered set of guards
+(bech32 parse, Type-2 prefix, script-stake-credential truthy, payment-key
+cross-check, script-hash derivation, on-chain registration anchor, no-op
+self-send refusal, sub-1-tADA refusal, balance summary) so an admin running
+the script can never accidentally spend from the wrong address even if
+`_1_members.json` is tampered with. Several of those guards apply equally
+well to the browser page — and the page had a few of them missing. The gaps:
+
+- `validateStakingAddress` did the bech32 parse and the
+  `addr_test1y`/`addr1y` prefix check, but did NOT explicitly assert that
+  the parsed `stakeScriptCredentialHash` is truthy. The prefix already
+  implies it, but an explicit check is belt-and-suspenders against a future
+  bech32 / prefix quirk.
+- Spend mode let the member set `Recipient = staking address` — a no-op
+  self-send that just burns a fee.
+- Spend mode accepted any positive amount, including sub-1-tADA values
+  that fail at tx build with an opaque "value too small" error.
+- Spend mode showed only "Found N UTxO(s). Building transaction…" before
+  the Ledger prompt — no balance summary the member could cross-check
+  against the device screen.
+
+### What was implemented
+
+In `web/send_from_staking.js`:
+
+1. **`validateStakingAddress`** now calls `deserializeAddress(addr)` after
+   the prefix check and throws if `stakeScriptCredentialHash` is falsy.
+2. **`buildSpendTx`** refuses `recipient === stakingAddr` with a clear
+   message: *"Recipient is the same as your Pool Ranger staking address —
+   that would just pay a fee to send ADA to itself."*
+3. **`buildSpendTx`** refuses `ada < 1` with: *"Amount must be at least
+   1 tADA (Cardano min-UTxO rule for ADA-only outputs)."*
+4. **`buildSpendTx`** sums the source-address UTxOs and shows a four-line
+   status before tx build: *"Source balance: X tADA across N UTxO(s). /
+   Sending: Y tADA → recipient. / Approx change returned: ~Z tADA (less
+   fee) back to your staking address. / Building transaction…"*
+
+Rebuilt `web/dist/` via `npm run build`; new hashed bundle is
+`web/dist/assets/send_from_staking-lZlm8D1k.js`, replacing the prior
+`send_from_staking-BSWrwoEV.js`.
+
+### What it catches
+
+- An address with a perfectly-formatted `addr_test1y` / `addr1y` prefix
+  that for some reason doesn't carry a script stake credential
+  (defense-in-depth against future protocol/library quirks).
+- A typo / phishing-paste that uses the member's own staking address as
+  the recipient — caught instead of silently paying a fee for nothing.
+- A "send 0.5 tADA" attempt — caught with a clear message instead of a
+  generic build-time error.
+- A wrong amount typed (e.g., extra zero, wrong decimal) — the balance
+  summary lets the member catch it before they touch the Ledger.
+
+### What it does not catch
+
+- An attacker-controlled `?addr=` that points at a *real* Pool Ranger
+  hybrid that the active Eternl account also happens to control
+  (sibling-Pool-Ranger registration in the same wallet). That's covered
+  by the 2026-05-25 sibling-detection safeguard at sweep time and by the
+  registration-time guard in `_register_stake.mjs`.
+- A coordinated multi-field tamper of `_1_members.json` that ends up
+  emitting a `?addr=` for the wrong member but with all fields
+  self-consistent. That's the CLI-side gap, not the page's — the page
+  never reads `_1_members.json`. As long as `_view_members.mjs` (admin)
+  prints the correct URL, the page receives the right address.
+
+### Why these guards aren't a full duplicate of the CLI set
+
+Two CLI guards do NOT transfer to the page:
+
+- **`assertScriptHashDerivation`** — the page has no admin pkh and no
+  member directory, so it can't re-derive script bytes from
+  `(adminPkh, memberPkh)` and compare against stored hashes.
+- **`assertRegistrationOnChain`** — the page is permissionless. No
+  Blockfrost, no chain provider in the browser. Adding one would
+  reintroduce the API-key-in-browser failure mode the architecture is
+  built to avoid.
+
+The page's `assertWalletControlsPaymentKey` is **functionally stronger**
+than the CLI's file-side checks because the wallet's live key-set is
+ground truth (cryptographic, not JSON consensus). So the web and CLI ends
+now both run the strongest defense available given their respective
+constraints.
+
+### Files changed
+
+- `web/send_from_staking.js` — strengthened `validateStakingAddress`;
+  added three guards plus a balance summary in `buildSpendTx`.
+- `web/dist/send_from_staking.html` + new hashed bundle in
+  `web/dist/assets/` (`send_from_staking-lZlm8D1k.js`) — rebuilt via
+  `npm run build`.
+- `REQUIREMENTS.md` — extended the `web/send_from_staking.js` bullet to
+  describe the new guards.
+
+### Suggested manual test plan
+
+1. Visit the canonical per-member URL — load behavior should be unchanged
+   (prefilled + locked staking field, green note).
+2. **Self-send refusal:** in Spend mode, paste the same staking address
+   into the Recipient field; click Send → error before Eternl opens.
+3. **Sub-1-tADA refusal:** enter `0.5` in the Amount field; click Send →
+   error before Eternl opens.
+4. **Balance summary visible:** with a normal amount (e.g. 5), watch the
+   status box during the brief moment between "Fetching UTxOs from
+   Eternl…" and the Ledger prompt — you should see the four-line summary
+   (Source balance / Sending / Approx change returned / Building).
+5. Sweep mode still works (no spend-mode guards apply to it; the only
+   sweep-affecting change is the `stakeScriptCredentialHash` truthy
+   check in `validateStakingAddress`, which has the same effect as
+   before for any `addr_test1y` address).
+
+---
+
 ### Other questions worth asking
 
 - Is `johnshearing.github.io/pool_ranger/...` the right long-term URL,
