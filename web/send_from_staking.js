@@ -1,13 +1,19 @@
-// Pool Ranger — Send from Staking Address (permissionless member page).
+// Pool Ranger — Staking Address Tool (permissionless member page).
 //
-// Builds, signs, and submits a transaction that:
-//   - spends UTxOs at the member's Pool Ranger staking address (addr_test1y...
-//     on Preview, addr1y... on mainnet),
-//   - sends a chosen amount to a chosen recipient,
-//   - returns all change to the SAME staking address — preserving the coop
-//     stake credential so the change stays delegated.
+// Two modes (radio toggle at top of the page):
 //
-// Architecture choices:
+//   SPEND — spend UTxOs at the member's Pool Ranger staking address
+//     (addr_test1y... on Preview, addr1y... on mainnet), send a chosen amount
+//     to a chosen recipient, and return all change to the SAME staking
+//     address — preserving the coop stake credential so the change stays
+//     delegated.
+//
+//   SWEEP — gather every UTxO Eternl owns OUTSIDE the staking address and
+//     consolidate them into one output at the staking address. Existing
+//     staking-address UTxOs are not touched. Increases the member's
+//     delegated stake in one tx. No recipient, no amount — one button.
+//
+// Architecture choices (apply to both modes):
 //   - Eternl (CIP-30) supplies UTxOs and submits the tx. Eternl tracks the
 //     hybrid staking address (member's payment key + Pool Ranger script
 //     stake credential) because the member owns the payment key. This means
@@ -21,6 +27,21 @@
 //   - BrowserWallet.signTx(hex, true) — partialSign=true matches sign_tx.html;
 //     Eternl/Ledger signs the lone payment-key witness and Mesh merges the
 //     witness back into the tx body, returning a complete signed tx CBOR.
+//
+// Sweep-mode specifics:
+//   - Inputs are added with explicit .txIn() for every non-staking UTxO so
+//     coin selection cannot leave any behind. This is what makes a sweep
+//     actually drain the wallet (not just "pick enough to cover X").
+//   - The single output is sized at (total non-staking lovelace - 2 tADA
+//     fee/min-UTxO buffer) and goes to the staking address. The 2 tADA
+//     buffer covers worst-case fee; the residual (~1.5-1.83 tADA after
+//     the real fee) lands at the staking address as change because
+//     .changeAddress is also the staking address. Net result: every
+//     non-staking lovelace minus fee ends up at the staking address.
+//   - Refuses to proceed if any source UTxO carries native tokens. Token
+//     sweep would need per-asset bundling in the output and min-UTxO
+//     recalculation — left out of v1 deliberately. Members with tokens
+//     should consolidate them in Eternl first, then re-run the sweep.
 
 import {
   BrowserWallet,
@@ -40,6 +61,40 @@ const sendBtn        = document.getElementById('btn-send');
 const statusBox      = document.getElementById('status');
 const resultBox      = document.getElementById('result');
 const prefillNote    = document.getElementById('prefill-note');
+const modeRadios     = document.querySelectorAll('input[name="mode"]');
+const recipientGroup = document.getElementById('recipient-group');
+const amountGroup    = document.getElementById('amount-group');
+const modeDescription = document.getElementById('mode-description');
+
+const SPEND_DESCRIPTION = 'Spend ADA from your Pool Ranger staking address. The change goes back to the same address so the rest of your ADA stays delegated through the cooperative.';
+const SWEEP_DESCRIPTION = 'Sweep all ADA from your other Eternl addresses into your Pool Ranger staking address. Only this account\'s UTxOs at addresses OUTSIDE the staking address are moved — existing staking balance is not disturbed.';
+
+// 2 tADA buffer covers worst-case fee for a many-input tx plus min-UTxO
+// floor. Residual (buffer minus real fee) lands at the staking address as
+// change. Tune only if fee or min-UTxO rules change materially.
+const SWEEP_FEE_BUFFER_LOVELACE = 2_000_000n;
+
+function getMode() {
+  return document.querySelector('input[name="mode"]:checked')?.value ?? 'spend';
+}
+
+function updateModeUI() {
+  const mode = getMode();
+  if (mode === 'sweep') {
+    recipientGroup.style.display = 'none';
+    amountGroup.style.display = 'none';
+    modeDescription.textContent = SWEEP_DESCRIPTION;
+    sendBtn.textContent = 'Sign and sweep with Eternl (Ledger)';
+  } else {
+    recipientGroup.style.display = '';
+    amountGroup.style.display = '';
+    modeDescription.textContent = SPEND_DESCRIPTION;
+    sendBtn.textContent = 'Sign and submit with Eternl (Ledger)';
+  }
+}
+
+modeRadios.forEach(r => r.addEventListener('change', updateModeUI));
+updateModeUI();
 
 // URL-prefill: if the admin's per-member link contains ?addr=addr_test1y…,
 // fill the staking-address textarea from it and lock the field so the member
@@ -121,23 +176,130 @@ async function assertWalletControlsPaymentKey(wallet, stakingAddr) {
   }
 }
 
+async function buildSpendTx(wallet, stakingAddr) {
+  const recipient = recipientInput.value.trim();
+  const amountStr = amountInput.value.trim();
+
+  validateBech32Address(recipient, 'Recipient address');
+
+  const ada = Number(amountStr);
+  if (!Number.isFinite(ada) || ada <= 0) {
+    throw new Error('Amount must be a positive number of tADA.');
+  }
+  const lovelace = BigInt(Math.round(ada * 1_000_000));
+
+  setStatus('Fetching UTxOs from Eternl…');
+  const allUtxos = await wallet.getUtxos();
+  const stakingUtxos = allUtxos.filter(u => u.output.address === stakingAddr);
+  if (stakingUtxos.length === 0) {
+    throw new Error(
+      'Eternl returned no UTxOs at the Pool Ranger staking address. ' +
+      'Either there is nothing to spend there, or this Eternl account does not own the payment key for that address.',
+    );
+  }
+
+  setStatus(`Found ${stakingUtxos.length} UTxO(s) at the staking address. Building transaction…`);
+  const txBuilder = new MeshTxBuilder({ network: NETWORK, verbose: false });
+
+  try {
+    await txBuilder
+      .txOut(recipient, [{ unit: 'lovelace', quantity: lovelace.toString() }])
+      .changeAddress(stakingAddr)
+      .selectUtxosFrom(stakingUtxos)
+      .complete();
+  } catch (err) {
+    const msg = err.message ?? String(err);
+    if (/min.*utxo|too small|insufficient/i.test(msg)) {
+      throw new Error(
+        'Amount too large — the change at the staking address would fall below the min-UTxO threshold.\n' +
+        'Reduce the amount so at least ~1 tADA remains at the staking address.',
+      );
+    }
+    throw err;
+  }
+
+  return txBuilder.txHex;
+}
+
+async function buildSweepTx(wallet, stakingAddr) {
+  setStatus('Fetching UTxOs from Eternl…');
+  const allUtxos = await wallet.getUtxos();
+  const sweepUtxos = allUtxos.filter(u => u.output.address !== stakingAddr);
+  if (sweepUtxos.length === 0) {
+    throw new Error(
+      'Nothing to sweep — Eternl reports no UTxOs at addresses outside your Pool Ranger staking address. ' +
+      'Any ADA you have is already at the staking address.',
+    );
+  }
+
+  // v1: refuse to sweep wallets that hold native tokens / NFTs at the source
+  // addresses. Bundling tokens into the staking-address output requires
+  // per-asset min-UTxO math we have not implemented yet, and a partial sweep
+  // that silently leaves token-bearing UTxOs behind would mislead the member
+  // about whether the sweep was "complete". Better to refuse loudly.
+  const tokenBearing = sweepUtxos.filter(u =>
+    u.output.amount.some(a => a.unit !== 'lovelace'),
+  );
+  if (tokenBearing.length > 0) {
+    throw new Error(
+      `Sweep cannot proceed: ${tokenBearing.length} of your wallet UTxOs contain native tokens or NFTs.\n` +
+      'Send the tokens to a separate Cardano address using Eternl first, then retry the sweep with ADA-only UTxOs.',
+    );
+  }
+
+  const totalLovelace = sweepUtxos.reduce((sum, u) => {
+    const ll = u.output.amount.find(a => a.unit === 'lovelace');
+    return sum + BigInt(ll?.quantity ?? '0');
+  }, 0n);
+
+  if (totalLovelace <= SWEEP_FEE_BUFFER_LOVELACE) {
+    const totalAda = (Number(totalLovelace) / 1_000_000).toFixed(6);
+    const bufferAda = (Number(SWEEP_FEE_BUFFER_LOVELACE) / 1_000_000).toFixed(2);
+    throw new Error(
+      `Not enough ADA to sweep. Found ${totalAda} tADA across ${sweepUtxos.length} UTxO(s) outside the staking address, ` +
+      `but at least ${bufferAda} tADA is needed to cover the transaction fee.`,
+    );
+  }
+
+  const outputLovelace = totalLovelace - SWEEP_FEE_BUFFER_LOVELACE;
+  const totalAda = (Number(totalLovelace) / 1_000_000).toFixed(6);
+
+  setStatus(
+    `Sweeping ${totalAda} tADA from ${sweepUtxos.length} UTxO(s) into your staking address.\n` +
+    `Verify the destination address on the Ledger screen — it must match the address shown above. Building transaction…`,
+  );
+
+  const txBuilder = new MeshTxBuilder({ network: NETWORK, verbose: false });
+
+  // Explicit .txIn() for every UTxO so coin selection cannot omit any.
+  // .selectUtxosFrom() would only pick enough to cover the output; this
+  // forces the full drain that "sweep" implies.
+  //
+  // The 5th arg (scriptSize=0) marks each input as a plain pay-to-pubkey
+  // UTxO with no attached reference script. Without it, Mesh treats the
+  // input as "incomplete" and tries to look up the source tx through a
+  // fetcher — which we deliberately don't provide.
+  for (const u of sweepUtxos) {
+    txBuilder.txIn(u.input.txHash, u.input.outputIndex, u.output.amount, u.output.address, 0);
+  }
+
+  await txBuilder
+    .txOut(stakingAddr, [{ unit: 'lovelace', quantity: outputLovelace.toString() }])
+    .changeAddress(stakingAddr)
+    .complete();
+
+  return txBuilder.txHex;
+}
+
 sendBtn.addEventListener('click', async () => {
   const stakingAddr = stakingInput.value.trim();
-  const recipient   = recipientInput.value.trim();
-  const amountStr   = amountInput.value.trim();
+  const mode = getMode();
 
   clearResult();
   setStatus('');
 
   try {
     validateStakingAddress(stakingAddr);
-    validateBech32Address(recipient, 'Recipient address');
-
-    const ada = Number(amountStr);
-    if (!Number.isFinite(ada) || ada <= 0) {
-      throw new Error('Amount must be a positive number of tADA.');
-    }
-    const lovelace = BigInt(Math.round(ada * 1_000_000));
 
     if (!window.cardano?.eternl) {
       throw new Error('Eternl extension not found. Install Eternl and refresh.');
@@ -151,40 +313,9 @@ sendBtn.addEventListener('click', async () => {
     setStatus('Verifying the staking address belongs to the selected Eternl account…');
     await assertWalletControlsPaymentKey(wallet, stakingAddr);
 
-    setStatus('Fetching UTxOs from Eternl…');
-    const allUtxos = await wallet.getUtxos();
-    const stakingUtxos = allUtxos.filter(u => u.output.address === stakingAddr);
-    if (stakingUtxos.length === 0) {
-      throw new Error(
-        'Eternl returned no UTxOs at the Pool Ranger staking address. ' +
-        'Either there is nothing to spend there, or this Eternl account does not own the payment key for that address.',
-      );
-    }
-
-    setStatus(`Found ${stakingUtxos.length} UTxO(s) at the staking address. Building transaction…`);
-    const txBuilder = new MeshTxBuilder({
-      network: NETWORK,
-      verbose: false,
-    });
-
-    try {
-      await txBuilder
-        .txOut(recipient, [{ unit: 'lovelace', quantity: lovelace.toString() }])
-        .changeAddress(stakingAddr)
-        .selectUtxosFrom(stakingUtxos)
-        .complete();
-    } catch (err) {
-      const msg = err.message ?? String(err);
-      if (/min.*utxo|too small|insufficient/i.test(msg)) {
-        throw new Error(
-          'Amount too large — the change at the staking address would fall below the min-UTxO threshold.\n' +
-          'Reduce the amount so at least ~1 tADA remains at the staking address.',
-        );
-      }
-      throw err;
-    }
-
-    const unsignedTxHex = txBuilder.txHex;
+    const unsignedTxHex = mode === 'sweep'
+      ? await buildSweepTx(wallet, stakingAddr)
+      : await buildSpendTx(wallet, stakingAddr);
 
     setStatus('Approve the transaction on your Ledger device…');
     const signedTxHex = await wallet.signTx(unsignedTxHex, true);

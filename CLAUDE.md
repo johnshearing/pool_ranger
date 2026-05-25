@@ -1,6 +1,5 @@
-# CLAUDE.md — Pool Ranger (ranger)          
-**Always read `/home/js/aiken/ranger/REQUIREMENTS.md` at the start of each session**. 
-**Always read `/home/js/aiken/ranger/claude_todo/host_send_from_staking_on_github_pages.md` at the start of each session**. 
+# CLAUDE.md — Pool Ranger (ranger)           
+**Always read `/home/js/aiken/ranger/claude_todo/host_send_from_staking_on_github_pages.md` at the start of each session**.
 
 
 ---

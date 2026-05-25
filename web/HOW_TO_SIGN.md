@@ -6,10 +6,15 @@ Two pages live in this folder, for two different audiences:
   `_*.mjs` script, signs it with Eternl/Ledger, and prints a copy-pasteable
   `node _submit_tx.mjs …` command. Submission is a separate step.
 - **`send_from_staking.html`** — member tool (built from source via `npm run build`).
-  A permissionless page: a member pastes their own Pool Ranger staking address
-  (no admin server, no API key needed), types a recipient and amount, and the
-  page builds, signs (via Eternl/Ledger), and submits the transaction in one
-  step. See the "Member page" section at the bottom of this file.
+  A permissionless page titled "Pool Ranger — Staking Address Tool" with a
+  radio toggle at the top selecting between two modes — **Spend FROM staking
+  address** (default — spend a chosen amount to a recipient, change returns
+  to the staking address) and **Sweep INTO staking address** (consolidate
+  every UTxO Eternl owns at addresses OUTSIDE the staking address into one
+  output at the staking address, increasing the member's delegated stake).
+  No admin server, no API key, no terminal step — the page builds, signs
+  (via Eternl/Ledger), and submits in one click. See the "Member page"
+  section at the bottom of this file.
 
 The rest of this document describes the `sign_tx.html` (admin) flow.
 Both pages are produced by the same Vite build — run `npm run build` once and
@@ -135,28 +140,57 @@ inside `ranger/`, not from `ranger/web/` or any other folder.
 
 ## Member Page — `send_from_staking.html`
 
-A separate page for cooperative members who want to spend ADA from their Pool
-Ranger staking address without un-staking the change. It does NOT replace
-`sign_tx.html`; it is a self-contained sign-and-submit tool with three pasted
-inputs (staking address, recipient, amount) and one button.
+A separate page for cooperative members. It does NOT replace `sign_tx.html`;
+it is a self-contained sign-and-submit tool. A radio toggle at the top of
+the page selects between two modes:
+
+- **Spend FROM staking address** (default) — spend a chosen amount of ADA
+  from the Pool Ranger staking address to any recipient. The change returns
+  to the same staking address so unspent ADA stays delegated. Two inputs
+  (recipient, amount).
+- **Sweep INTO staking address** — gather every UTxO the active Eternl
+  account holds at addresses OUTSIDE the staking address and consolidate
+  them into one output at the staking address. No recipient, no amount —
+  one button. Used to increase the member's delegated stake in a single tx.
+
+The staking address itself is normally not typed — the admin's per-member
+link prefills it from the `?addr=…` query string and locks the field.
 
 ### What it does
 
-- Reads UTxOs at the staking address directly from Eternl (CIP-30
-  `wallet.getUtxos()`). Eternl already tracks the staking address because
-  the member owns its payment key, even though the stake credential is the
-  Pool Ranger script. No external chain-data provider (Koios, Blockfrost,
-  CORS proxy) is involved.
+Both modes share the same wiring:
+
+- Verifies that the staking address's payment key is actually controlled by
+  the currently selected Eternl account (`wallet.getUsedAddresses()` +
+  `wallet.getUnusedAddresses()`). Refuses the request if not — catches
+  wrong-account-selected and pasted-someone-else's-address mistakes before
+  any tx is built.
+- Reads UTxOs directly from Eternl (CIP-30 `wallet.getUtxos()`). Eternl
+  already tracks the staking address because the member owns its payment
+  key, even though the stake credential is the Pool Ranger script. No
+  external chain-data provider (Koios, Blockfrost, CORS proxy) is involved.
 - Builds the transaction locally with MeshSDK's MeshTxBuilder using its
-  built-in protocol parameters — no network fetcher needed. The recipient
-  gets the requested amount; ALL change returns to the SAME staking address
-  so the unspent ADA stays delegated through the cooperative.
+  built-in protocol parameters — no network fetcher needed.
 - Signs via Eternl/Ledger (`partialSign=true`, same as `sign_tx.html`).
   MeshSDK merges the Ledger's witness into the transaction and returns a
   complete signed tx.
 - Submits through Eternl (`wallet.submitTx`) — Eternl forwards to the
   Cardano network via its own backend. Displays the resulting tx hash with
   a Cardanoscan link.
+
+**Spend mode specifics:** filters wallet UTxOs to those at the staking
+address only, builds a tx with the requested amount to the recipient and
+`changeAddress` set to the staking address so unspent ADA stays delegated.
+
+**Sweep mode specifics:** filters wallet UTxOs to those NOT at the staking
+address, refuses up-front if any of them hold native tokens or NFTs (token
+sweep is deliberately not implemented in v1), then sums the lovelace,
+explicitly adds every UTxO with `.txIn()` (so coin selection cannot leave
+any behind), and emits a single output to the staking address sized at
+`(total − 2 tADA fee/min-UTxO buffer)`. The residual after the real fee
+lands at the staking address via `changeAddress`. A pre-Ledger status line
+tells the member exactly how much tADA from how many UTxOs is about to
+move — that is the known-good number to compare against the Ledger screen.
 
 There is no copy-a-command step. Members do not need a terminal or any
 admin-run service. The entire flow runs inside the browser using only the
@@ -189,4 +223,19 @@ Same as the admin checklist above: Eternl extension installed, correct Ledger
 account selected in Eternl, Ledger plugged in with the Cardano app open. The
 member's "Pool Ranger staking address" is the value on the
 `D. Pool Ranger staking address` line of the report the admin generates with
-`_view_members.mjs`.
+`_view_members.mjs`. Members normally do not type the address — they click
+the per-member Spend tool link the admin sends, which prefills and locks
+the staking-address field; only the mode toggle (Spend vs. Sweep) and the
+recipient + amount (Spend mode only) need attention.
+
+### Verifying on the Ledger screen
+
+Both modes show a status line just before Eternl opens the Ledger prompt:
+
+- **Spend mode:** the recipient address and amount you typed.
+- **Sweep mode:** "Sweeping X.XXXXXX tADA from N UTxO(s) into your staking
+  address." That is the known-good number to compare against the Ledger.
+
+The Ledger displays every output address and amount before signing. **Always
+verify both on the device** — addresses must match the page, and amounts
+must match the status line. Do not approve if anything differs.

@@ -517,6 +517,160 @@ that calls this out, so the flip is hard to miss at deploy time.
 
 ---
 
+## Feature added 2026-05-24 — Sweep mode (consolidate non-staking UTxOs into the staking address)
+
+### Why
+
+The page's original job was one-directional: spend ADA *out* of the Pool
+Ranger staking address while keeping the change delegated. The inverse
+operation — moving ADA the member already has at *other* Eternl addresses
+*into* the staking address so it joins the delegation — was technically
+possible from Eternl directly, but required the member to send N
+transactions (one per source UTxO they wanted to move) and to know the
+staking address by hand. Adding a sweep button to the same page makes it
+one click.
+
+This is the *safe* direction relative to the existing Spend mode: funds
+never leave the member's own wallet boundary — they consolidate from the
+member's other addresses into the member's staking address. The Ledger
+still verifies the destination, but the worst-case mistake is "I deposited
+more into my coop stake than I meant to," not "I sent ADA to an attacker."
+
+Naming: initially called "Deposit" in the spec, but the user pointed out
+that "deposit" implies funds arriving from *outside* the wallet, which is
+misleading — every lovelace involved is already inside the same Eternl
+account, just sitting at different addresses. Renamed to "Sweep" to match
+the actual semantics (consolidation within one wallet boundary). Saved
+that as a usability lesson for future feature naming on this page.
+
+### What was implemented
+
+**HTML (`web/send_from_staking.html`):**
+
+- Page title changed from "Pool Ranger — Send from Staking Address" to
+  "Pool Ranger — Staking Address Tool" (covers both modes).
+- Added a `#mode-toggle` block immediately under the H2 with two radio
+  inputs (`spend` default, `sweep`) and a light-grey background to make
+  it visually distinct.
+- Wrapped the recipient field in `<div id="recipient-group">` and the
+  amount field in `<div id="amount-group">` so both can be hidden in
+  Sweep mode via `display: none`.
+- Added `<p id="mode-description">` for the per-mode description sentence
+  (swapped by JS on toggle).
+- Dropped `placeholder="5"` from the amount input — the bare numeric
+  placeholder rendered as if "5" was already entered, which confused the
+  user during testing when validation said "Amount must be a positive
+  number" on what looked like a filled field. The example is now in the
+  hint text below the label instead: *"For example, type 5 to send 5 tADA.
+  Decimals allowed (e.g. 5.25)."*
+
+**JS (`web/send_from_staking.js`):**
+
+- Added a `getMode()` reader, an `updateModeUI()` toggle handler, and
+  `change` listeners on the radios. On toggle: show/hide the recipient
+  and amount groups, swap the description text, swap the button label
+  (`Sign and submit with Eternl (Ledger)` ⇄ `Sign and sweep with Eternl
+  (Ledger)`).
+- Refactored the click handler into a thin orchestrator. Shared work
+  (`validateStakingAddress`, `assertWalletControlsPaymentKey`, the Eternl
+  connection, the URL-prefill lock, the sign + submit) runs once for both
+  modes. The mode-specific tx construction lives in `buildSpendTx` /
+  `buildSweepTx` helpers that each return the unsigned tx hex.
+- `buildSpendTx` preserves the original behavior exactly.
+
+### Sweep-mode tx construction details
+
+1. `wallet.getUtxos()` returns every UTxO in the active Eternl account.
+2. Filter to those NOT at the staking address — call this `sweepUtxos`.
+3. If any `sweepUtxos[i]` carries a non-lovelace asset, refuse with a
+   friendly error and tell the member to consolidate tokens in Eternl
+   first. (v1 limitation — bundling tokens into the staking-address
+   output needs per-asset min-UTxO recalculation we have not written.)
+4. Sum lovelace across all `sweepUtxos`. If total ≤ 2 tADA buffer,
+   refuse — not enough to cover fee.
+5. Add every UTxO to the tx with explicit `txBuilder.txIn(...)`.
+   **Critical:** this is what differs from `.selectUtxosFrom()`, which
+   would only pick enough UTxOs to cover the output. Explicit `.txIn()`
+   forces every source UTxO to be consumed, which is the whole point of
+   "sweep."
+6. Single output to the staking address sized at
+   `(total − SWEEP_FEE_BUFFER_LOVELACE)` where the buffer is 2 tADA.
+7. `changeAddress` set to the staking address as well, so the residual
+   (buffer minus real fee, typically ~1.5–1.83 tADA) lands at the staking
+   address too. Net result: every non-staking lovelace minus the actual
+   fee ends up at the staking address; nothing leaks back to the
+   wallet's normal change address.
+8. Status line set just before signing reads:
+   *"Sweeping X.XXXXXX tADA from N UTxO(s) into your staking address.
+   Verify the destination address on the Ledger screen — it must match
+   the address shown above. Building transaction…"*
+   That gives the member a known-good number to compare against the
+   Ledger screen.
+
+The 2 tADA buffer is intentionally generous. A many-input tx can run a
+few hundred thousand lovelace in fees; 2 tADA covers worst case plus the
+min-UTxO floor on the residual. Tune `SWEEP_FEE_BUFFER_LOVELACE` only if
+protocol params or min-UTxO rules change materially.
+
+### What it catches
+
+- The pre-existing `assertWalletControlsPaymentKey()` check applies to
+  Sweep mode too — wrong Eternl account selected, or somehow a different
+  member's staking address loaded from the URL, both abort before any
+  UTxO is read.
+- The token-bearing-UTxO check fails *loudly* rather than silently
+  dropping or wrongly bundling tokens — important so a "successful sweep"
+  message never misleads a member whose NFTs were quietly left behind.
+
+### What it does NOT catch
+
+- Membership in the active Eternl account is the only filter for "is
+  this UTxO mine?" — if a member has multiple accounts in the same
+  Eternl instance, only the *active* one is swept. That is the intended
+  scoping (CIP-30 standard), but worth knowing.
+- A member who clicks Sweep without realizing what it does will move
+  *all* their non-staking ADA into the staking address. The destination
+  is safe (it is their own staking address) and recoverable via Spend
+  mode, but undoing a sweep takes a second tx. The mode-description
+  sentence and the pre-Ledger status line both spell out what is about
+  to happen.
+- Token-bearing wallets cannot use Sweep at all in v1. Documented in the
+  error message; revisit if/when token bundling is implemented.
+
+### Files changed
+
+- `web/send_from_staking.html` — added mode toggle, wrapped fields in
+  groups, dropped numeric placeholder, updated title.
+- `web/send_from_staking.js` — added mode toggle handler, refactored
+  click handler into orchestrator + `buildSpendTx` / `buildSweepTx`,
+  added `SWEEP_FEE_BUFFER_LOVELACE` constant, expanded header comment.
+- `web/dist/send_from_staking.html` + new hashed bundle in
+  `web/dist/assets/` (`send_from_staking-C1eb9Yeu.js`) — rebuilt via
+  `npm run build`. Old hashed bundle removed by the build.
+- `REQUIREMENTS.md` — updated the script-checklist entry and the Member
+  Workflow "Ongoing participation" section to describe both modes.
+- `web/HOW_TO_SIGN.md` — restructured the Member Page section to cover
+  both modes, added a verification-on-Ledger subsection.
+
+### Suggested manual test plan
+
+1. From `web/`, run `npx serve dist`.
+2. Open the admin's per-member URL — verify the staking field is
+   prefilled and locked, mode is Spend.
+3. Toggle to Sweep — recipient and amount fields hide, description
+   changes, button reads "Sign and sweep with Eternl (Ledger)."
+4. Spend-mode regression: toggle back, send a small amount as before.
+5. Sweep happy path: with at least one non-staking-address UTxO, click
+   Sweep → Sign and sweep → verify status line reports total tADA +
+   UTxO count → verify Ledger screen shows the staking address as
+   destination → approve.
+6. Sweep with nothing to sweep: friendly error before any Eternl popup.
+7. Wrong-account regression: with a different Eternl account selected,
+   either mode should still hit the "payment key not controlled" error
+   before tx build.
+
+---
+
 ### Other questions worth asking
 
 - Is `johnshearing.github.io/pool_ranger/...` the right long-term URL,
