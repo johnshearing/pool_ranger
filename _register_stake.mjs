@@ -15,9 +15,12 @@
 //      the command line — there are no separate .addr files.
 //   2. Loads _1_members.json (creates it as [] if missing).
 //   3. Errors if the name or memberPkh is already present (no duplicates).
-//   4. Derives memberPkh, PoolRangerRewardAddress, Pool Ranger staking address, and script hash.
-//   5. Appends a new record to _1_members.json.
-//   6. Builds the on-chain stake-registration tx and prints the unsigned hex.
+//   4. Errors if --addr shares its stake credential with an existing member's
+//      registeredReceiveAddress (sibling-from-same-Eternl-account check —
+//      prevents the Sweep tool from later confusing the two staking addresses).
+//   5. Derives memberPkh, PoolRangerRewardAddress, Pool Ranger staking address, and script hash.
+//   6. Appends a new record to _1_members.json.
+//   7. Builds the on-chain stake-registration tx and prints the unsigned hex.
 //
 // Member record shape:
 //   {
@@ -90,12 +93,16 @@ Options:
 What this does:
   1. Loads ./_1_members.json (creates [] if the file is missing).
   2. Errors if a member with this --name or derived memberPkh is already in the file.
-  3. Derives the parameterized coop stake script for this member.
-  4. Builds a stake-registration transaction (2 ADA deposit, refunded on deregister).
-  5. Computes the registration txHash via resolveTxHash on the unsigned tx.
-  6. Appends the new member record to _1_members.json with the registration
+  3. Errors if --addr shares its wallet stake credential with an existing member's
+     registeredReceiveAddress. Two receive addresses from the same Eternl account
+     share a stake credential, so this catches "different derivation index, same
+     wallet" registrations that would later confuse the Sweep tool.
+  4. Derives the parameterized coop stake script for this member.
+  5. Builds a stake-registration transaction (2 ADA deposit, refunded on deregister).
+  6. Computes the registration txHash via resolveTxHash on the unsigned tx.
+  7. Appends the new member record to _1_members.json with the registration
      { txHash, requestedAt } stamped in, and an empty delegations: [] array.
-  7. Prints the unsigned tx hex for signing with the member's Ledger via
+  8. Prints the unsigned tx hex for signing with the member's Ledger via
      web/sign_tx.html.
 
 Next steps after running:
@@ -154,6 +161,34 @@ async function main() {
   if (dupPkh) {
     console.error(`\nError: memberPkh ${memberPkh} is already registered as "${dupPkh.name}" in ${MEMBERS_FILE}.`);
     process.exit(1);
+  }
+
+  // ── Sibling-from-same-Eternl-account check ─────────────────────────────
+  // Eternl uses one stake key per account and one payment key per receive
+  // address. So two different receive addresses from the same Eternl account
+  // share a stake credential. If we let two such registrations both go through,
+  // the Sweep tool in web/send_from_staking.html would later move funds out of
+  // one Pool Ranger staking address into the other (both addresses live in the
+  // same wallet, so wallet.getUtxos() returns UTxOs from both). Refuse here so
+  // the foot-gun never reaches on-chain.
+  const { stakeCredentialHash: newStakeKeyHash } = deserializeAddress(memberAddress);
+  if (newStakeKeyHash) {
+    const sibling = members.find(m => {
+      if (!m.registeredReceiveAddress) return false;
+      const { stakeCredentialHash } = deserializeAddress(m.registeredReceiveAddress);
+      return stakeCredentialHash === newStakeKeyHash;
+    });
+    if (sibling) {
+      console.error(`\nError: --addr shares its wallet stake credential with existing member "${sibling.name}".`);
+      console.error(`Both addresses appear to come from the same Eternl account, which would create a`);
+      console.error(`sibling Pool Ranger registration. The Sweep tool in web/send_from_staking.html`);
+      console.error(`cannot tell sibling registrations apart and would move funds from one Pool Ranger`);
+      console.error(`staking address into the other.`);
+      console.error(`\nIf the member wants a second Pool Ranger registration, ask them to use a different`);
+      console.error(`Eternl account (Eternl: Settings → Accounts → Add account) and send a receive`);
+      console.error(`address from that new account.`);
+      process.exit(1);
+    }
   }
 
   // ── Resolve admin info ─────────────────────────────────────────────────

@@ -183,14 +183,25 @@ address only, builds a tx with the requested amount to the recipient and
 `changeAddress` set to the staking address so unspent ADA stays delegated.
 
 **Sweep mode specifics:** filters wallet UTxOs to those NOT at the staking
-address, refuses up-front if any of them hold native tokens or NFTs (token
-sweep is deliberately not implemented in v1), then sums the lovelace,
-explicitly adds every UTxO with `.txIn()` (so coin selection cannot leave
-any behind), and emits a single output to the staking address sized at
+address, then runs two pre-tx refusals before building anything:
+
+- Refuses if any of those UTxOs sits at another address with a **script
+  stake credential** — that's a sibling Pool Ranger staking address in
+  the same Eternl account, and sweeping out of it would silently move
+  funds out of a second Pool Ranger staking address that isn't the
+  destination. The error message lists the other staking address(es) so
+  the member can show the admin which addresses Eternl is reporting.
+- Refuses if any of those UTxOs holds native tokens or NFTs (token sweep
+  is deliberately not implemented in v1).
+
+After both checks pass, sweep sums the lovelace, explicitly adds every
+UTxO with `.txIn()` (so coin selection cannot leave any behind), and
+emits a single output to the staking address sized at
 `(total − 2 tADA fee/min-UTxO buffer)`. The residual after the real fee
-lands at the staking address via `changeAddress`. A pre-Ledger status line
-tells the member exactly how much tADA from how many UTxOs is about to
-move — that is the known-good number to compare against the Ledger screen.
+lands at the staking address via `changeAddress`. A pre-Ledger status
+line tells the member exactly how much tADA from how many UTxOs is about
+to move — that is the known-good number to compare against the Ledger
+screen.
 
 There is no copy-a-command step. Members do not need a terminal or any
 admin-run service. The entire flow runs inside the browser using only the

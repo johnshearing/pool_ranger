@@ -671,6 +671,137 @@ protocol params or min-UTxO rules change materially.
 
 ---
 
+## Safeguard added 2026-05-25 — sibling Pool Ranger registration detection
+
+### The hole this closes
+
+`assertWalletControlsPaymentKey` (added 2026-05-24) plus URL-prefill +
+locked staking field together close the "wrong account / wrong address"
+case, but they leave one variant open: a member who registers **more
+than one Pool Ranger hybrid address from the same Eternl account** ends
+up with two staking addresses whose payment keys are both controlled
+by that account.
+
+Why that matters at Sweep time: `wallet.getUtxos()` returns every UTxO
+in the active Eternl account regardless of which address it sits at.
+The sweep filter `allUtxos.filter(u => u.output.address !== stakingAddr)`
+only excludes UTxOs at the *target* staking address — UTxOs at the
+**other** Pool Ranger staking address survive the filter, get added as
+inputs via explicit `.txIn()`, and consolidate into the target. Net
+effect: the member runs Sweep on address A, the page silently moves
+funds out of address B into A, and the member wonders where the funds
+delegated under B went. The Ledger displays the destination correctly
+(A) but does not display source addresses in a way that makes
+"this UTxO was at B" salient.
+
+Funds are not lost — they're at A, still under the member's payment
+key, still delegated (via A's coop script instead of B's). But to the
+member it looks indistinguishable from a bug, and the "fix" requires
+explanation rather than recovery.
+
+### What links sibling Pool Ranger addresses (the detectable invariant)
+
+Not `memberPkh` — sibling receive addresses come from different
+derivation indices → different payment keys → different PKHs. The
+existing `dupPkh` check in `_register_stake.mjs` does not fire.
+
+**Stake credential.** A base address is `payment_credential +
+stake_credential`. Eternl (like most HD wallets) uses one **stake key
+per account** but a new **payment key per receive address**. So two
+receive addresses from the same Eternl account share their stake
+credential. `deserializeAddress(addr).stakeCredentialHash` returns the
+key-hash form of that stake credential, and
+`deserializeAddress(addr).stakeScriptCredentialHash` returns the
+script-hash form — both fields already used elsewhere in the codebase
+(see `_view_members.mjs:304-307`).
+
+### Defense in depth — two checks, complementary
+
+**A. Registration-time guard (`_register_stake.mjs`).** Pre-commit, no
+2 tADA wasted. Runs immediately after the existing `dupPkh` check and
+before the admin lookup. Extracts `stakeCredentialHash` from `--addr`,
+then derives the same field from every existing
+`registeredReceiveAddress` and refuses on a match. Skips silently if
+`--addr` is an enterprise address (no stake half — nothing to compare).
+
+Edge cases handled:
+- Empty roster (bootstrap path): `members.find` returns `undefined`,
+  check passes, `admin_0` registers as before.
+- Existing rosters: derivation is on the fly from
+  `registeredReceiveAddress`, so no schema change to `_1_members.json`
+  and no migration needed.
+- Admin dogfooding from their own wallet: check fires against
+  `admin_0` and surfaces the situation immediately — intended.
+- Re-registration after deregister: trips the check. The existing
+  workflow already handles this — header comment instructs the admin
+  to remove the old entry from `_1_members.json` first when re-deriving.
+- No `--force` flag yet. If a legitimate "I really want two sibling
+  registrations" case ever appears, add it then; meanwhile the simpler
+  refusal protects against the foot-gun without a tempting escape hatch.
+
+**B. Sweep-time guard (`web/send_from_staking.js`).** Post-commit safety
+net for siblings that pre-date the registration check, structurally
+detectable without the admin's roster (which the browser doesn't have
+and shouldn't have, for privacy). In `buildSweepTx`, immediately after
+the empty-sweep check and before the token-bearing check: filter
+`sweepUtxos` for any whose `output.address` has a
+`stakeScriptCredentialHash`. Any such UTxO sits at a Pool Ranger-style
+hybrid address other than the target — refuse with a message that lists
+the distinct sibling addresses so the member can show the admin exactly
+which staking addresses Eternl is reporting under the same account.
+
+Why a structural check rather than a roster check: the browser cannot
+fetch the admin's roster without re-introducing the centralized
+dependency the page was designed to avoid. The `stakeScriptCredentialHash`
+test is conservative (it would also refuse non-Pool Ranger script-stake
+addresses, which are extremely rare in member wallets and would still
+deserve a refusal) and needs nothing beyond MeshSDK.
+
+### Why the permissionless-registration path doesn't need this
+
+`claude_todo/permissionless_registration.md` is parked. The admin
+currently runs `_register_stake.mjs` themselves (admin-gated
+registration), so the check lives there and fires *before* the member
+spends 2 tADA. If the parked permissionless plan is ever revisited,
+the registration-side check would move to an `_ingest_member.mjs`
+script (also admin-side, with roster access), and the failure mode
+shifts to "member already paid the on-chain deposit and now has to
+deregister to recover it." Both checks (registration-side and
+sweep-side) survive that move unchanged.
+
+### Files changed
+
+- `_register_stake.mjs` — added the sibling-stake-cred refusal in
+  `main()` immediately after the existing `dupPkh` block, plus matching
+  bullets in the header comment block and in `HELP`.
+- `web/send_from_staking.js` — added the script-stake-cred refusal in
+  `buildSweepTx` right after the empty-sweep check, plus a matching
+  bullet in the top-of-file Sweep-mode comment block.
+- `web/dist/send_from_staking.html` + new hashed bundle in
+  `web/dist/assets/` (`send_from_staking-DtQoDA_j.js`, replacing the
+  prior `send_from_staking-C1eb9Yeu.js`) — rebuilt via `npm run build`.
+- `REQUIREMENTS.md` — updated the `_register_stake.mjs` script-checklist
+  entry and the Sweep-mode bullet under `web/send_from_staking.js` to
+  describe the new defenses.
+
+### Suggested manual test plan
+
+1. Registration-side regression. With at least one existing member in
+   `_1_members.json`, run `_register_stake.mjs --name member_X --addr
+   <a sibling receive address from the existing member's Eternl
+   account>` — expect refusal naming the existing member, no tx built.
+2. Registration-side happy path. Same command with a receive address
+   from a different Eternl account → tx builds normally.
+3. Sweep-side regression. Construct a wallet that holds UTxOs at two
+   distinct Pool Ranger staking addresses (deliberately register
+   siblings on a throwaway test member if needed), load the Sweep tool
+   with one of them as `?addr=`, click Sweep — expect refusal listing
+   the other staking address; no Eternl popup; no tx.
+4. Sweep-side happy path. Single Pool Ranger staking address, regular
+   Eternl receive UTxOs outside it, Sweep should still work as before.
+
+---
+
 ### Other questions worth asking
 
 - Is `johnshearing.github.io/pool_ranger/...` the right long-term URL,

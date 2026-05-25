@@ -38,6 +38,10 @@
 //     the real fee) lands at the staking address as change because
 //     .changeAddress is also the staking address. Net result: every
 //     non-staking lovelace minus fee ends up at the staking address.
+//   - Refuses to proceed if any source UTxO sits at another address with a
+//     script stake credential — that's a sibling Pool Ranger registration
+//     in the same Eternl account, and sweeping out of it would silently
+//     drain a second staking address.
 //   - Refuses to proceed if any source UTxO carries native tokens. Token
 //     sweep would need per-asset bundling in the output and min-UTxO
 //     recalculation — left out of v1 deliberately. Members with tokens
@@ -229,6 +233,33 @@ async function buildSweepTx(wallet, stakingAddr) {
     throw new Error(
       'Nothing to sweep — Eternl reports no UTxOs at addresses outside your Pool Ranger staking address. ' +
       'Any ADA you have is already at the staking address.',
+    );
+  }
+
+  // Refuse if any source UTxO sits at an address with a script stake credential.
+  // Such an address is a Pool Ranger-style hybrid address other than the one
+  // we're sweeping into — i.e. a sibling Pool Ranger registration in the same
+  // Eternl account. Sweeping out of it would silently move funds from one of
+  // the member's Pool Ranger staking addresses into another. The registration
+  // script in _register_stake.mjs blocks new sibling registrations, but this
+  // check defends against any that pre-date the registration-side guard.
+  const siblingPoolRangerUtxos = sweepUtxos.filter(u => {
+    try {
+      return Boolean(deserializeAddress(u.output.address).stakeScriptCredentialHash);
+    } catch {
+      return false;
+    }
+  });
+  if (siblingPoolRangerUtxos.length > 0) {
+    const otherAddrs = [...new Set(siblingPoolRangerUtxos.map(u => u.output.address))];
+    throw new Error(
+      `Sweep refused: ${siblingPoolRangerUtxos.length} of your UTxO(s) sit at ${otherAddrs.length} other ` +
+      `Pool Ranger-style staking address(es) (addresses with a script stake credential, distinct from the ` +
+      `sweep destination). Sweeping them would move funds out of a Pool Ranger staking address that is not ` +
+      `the destination — almost certainly not what you want.\n\n` +
+      `Other staking address(es) detected:\n  ${otherAddrs.join('\n  ')}\n\n` +
+      `Contact your admin if you believe you are registered under more than one Pool Ranger staking address ` +
+      `and want to consolidate them deliberately.`,
     );
   }
 
