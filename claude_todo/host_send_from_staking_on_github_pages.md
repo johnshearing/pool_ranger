@@ -802,6 +802,100 @@ sweep-side) survive that move unchanged.
 
 ---
 
+## Safeguard added 2026-05-25 (follow-up) — lock the staking field when no `?addr=`
+
+### The hole this closes
+
+The 2026-05-24 URL-prefill safeguard locked the staking-address field only
+*when* `?addr=` was present. Visiting the page at the bare URL
+(`http://localhost:3000/send_from_staking`, or the eventual
+`https://johnshearing.github.io/pool_ranger/web/dist/send_from_staking.html`)
+left the textarea writable as a paste fallback. That fallback reopens
+exactly the holes URL-prefill was designed to close: clipboard-swap
+malware, typos that survive bech32, phishing-pasted wrong addresses, and
+the wrong-account-from-the-same-Eternl-wallet variant that
+`assertWalletControlsPaymentKey` cannot fully cover.
+
+Members should never need to type or paste a staking address — the admin's
+`_view_members.mjs` report prints a canonical per-member URL with
+`?addr=` baked in. A bare visit to the page is not a legitimate workflow.
+
+### What was implemented
+
+In `web/send_from_staking.js`, extended the URL-prefill block with an
+`else` branch:
+
+- `stakingInput.value = ''` (defensive — should already be empty).
+- `stakingInput.readOnly = true` and greyed background (same lock styling
+  as the prefilled case, so the locked state looks consistent regardless
+  of how the page was opened).
+- `stakingInput.placeholder = ''` so the textarea reads as inert, not as
+  "go ahead and paste here."
+- `sendBtn.disabled = true` so the action is unavailable, not just
+  unfilled.
+- `#prefill-note` populated in crimson with: *"No address in the URL.
+  Open this page using the link your admin sent you — manual entry is
+  disabled for safety."*
+
+Rebuilt `web/dist/` via `npm run build`; new hashed bundle is
+`web/dist/assets/send_from_staking-BSWrwoEV.js`, replacing the prior
+`send_from_staking-DtQoDA_j.js`.
+
+### What it catches
+
+- A member who bookmarks the bare page URL and visits it without going
+  through the admin's link — the page refuses to act until they open
+  the proper per-member URL.
+- An attacker phishing the bare URL alongside instructions to paste an
+  attacker-supplied address — the paste path no longer exists.
+- A would-be footgun where a member types or pastes a *valid-looking
+  but wrong* staking address (sibling registration, another member's
+  address, etc.) that the in-page checks would have to catch downstream.
+
+### What it does not catch
+
+- A phishing URL that bundles a malicious `?addr=` — `assertWalletControlsPaymentKey`
+  still has to catch that case (and does, except for the sibling-derivation
+  variant that the 2026-05-25 sibling-Pool-Ranger detection covers at sweep
+  time). This safeguard narrows the manual-entry surface, not the URL-injection
+  surface.
+
+### Trade-off accepted
+
+The page is no longer usable for *anyone* who arrives at the bare URL —
+including the admin testing the page out of band. If a manual escape
+hatch ever becomes desirable (for example, `?manual=1` to re-enable the
+textarea for admin-side testing), it is a one-line addition in the same
+block. Not added yet because no current workflow requires it and an
+unused escape hatch is itself attack surface.
+
+### Files changed
+
+- `web/send_from_staking.js` — added the `else` branch on the
+  `addrFromUrl` check; expanded the surrounding comment to document the
+  bare-URL behavior.
+- `web/dist/send_from_staking.html` + new hashed bundle in
+  `web/dist/assets/` (`send_from_staking-BSWrwoEV.js`) — rebuilt via
+  `npm run build`.
+
+### Suggested manual test plan
+
+1. Visit `http://localhost:3000/send_from_staking` with no query string —
+   field should appear locked + empty, Send button disabled, crimson
+   notice visible.
+2. Visit `http://localhost:3000/send_from_staking?addr=<valid staking
+   addr>` — field prefilled and locked (grey), green "loaded from your
+   admin's link and locked" notice, Send button enabled. Existing flow
+   should be unchanged.
+3. Visit `http://localhost:3000/send_from_staking?addr=garbage` — field
+   prefilled with `garbage`, locked, Send button enabled, but clicking
+   Send triggers `validateStakingAddress` and surfaces the
+   "must start with addr_test1y / addr1y" error before any Eternl
+   popup. (Confirms the URL-injection path still funnels through the
+   downstream checks.)
+
+---
+
 ### Other questions worth asking
 
 - Is `johnshearing.github.io/pool_ranger/...` the right long-term URL,

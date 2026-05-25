@@ -105,6 +105,12 @@ updateModeUI();
 // cannot accidentally paste a different value over it. Eliminates typing,
 // clipboard-swap, and wrong-account-paste mistakes for members who arrive via
 // the canonical link in the admin's report.
+//
+// If the page is opened with no ?addr= at all, the field is still locked but
+// left empty and the Send button disabled. Manual entry as a fallback would
+// reopen the clipboard-swap / typo / phishing-paste holes that prefill exists
+// to close. Members must arrive via the canonical per-member link printed by
+// _view_members.mjs; a bare visit to the page is intentionally inert.
 const addrFromUrl = new URLSearchParams(window.location.search).get('addr');
 if (addrFromUrl) {
   stakingInput.value = addrFromUrl;
@@ -113,6 +119,17 @@ if (addrFromUrl) {
   if (prefillNote) {
     prefillNote.textContent = 'Address loaded from your admin\'s link and locked.';
     prefillNote.style.color = 'green';
+  }
+} else {
+  stakingInput.value = '';
+  stakingInput.readOnly = true;
+  stakingInput.placeholder = '';
+  stakingInput.style.backgroundColor = '#f0f0f0';
+  sendBtn.disabled = true;
+  if (prefillNote) {
+    prefillNote.textContent =
+      'No address in the URL. Open this page using the link your admin sent you — manual entry is disabled for safety.';
+    prefillNote.style.color = 'crimson';
   }
 }
 

@@ -1,7 +1,6 @@
-# CLAUDE.md — Pool Ranger (ranger)           
+# CLAUDE.md — Pool Ranger (ranger)  
+**Always read `/home/js/aiken/ranger/web/HOW_TO_SIGN.md` at the start of each session**.         
 **Always read `/home/js/aiken/ranger/claude_todo/host_send_from_staking_on_github_pages.md` at the start of each session**.
-**Always read `/home/js/aiken/ranger/web/HOW_TO_SIGN.md` at the start of each session**.
-**Always read `/home/js/aiken/ranger/_register_stake.mjs` at the start of each session**.
 
 
 
