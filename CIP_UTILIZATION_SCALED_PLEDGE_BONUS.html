@@ -400,8 +400,8 @@ input[type=range] {
 </div>
 <p class="sub">
   Interactive simulation of the parameter change proposed in
-  <a href="https://github.com/johnshearing/pool_ranger/blob/main/claude_queries/utilization_scaled_pledge_bonus.md"
-     style="color:var(--accent)">utilization_scaled_pledge_bonus.md</a>:
+  <a href="https://github.com/johnshearing/CIPs/tree/utilization-scaled-pledge-bonus/CIP-XXXX"
+     style="color:var(--accent)">CIP-???? | Utilization-Scaled Pledge Bonus #1193</a>:
   multiply the pledge bonus <code>A</code> by pool utilization <code>u = S/S<sub>sat</sub></code>.
   Every <strong>current-formula</strong> curve is in red/green/blue (same colors as
   <a href="https://johnshearing.github.io/pool_ranger/SPO_REWARD_ANALYSIS_CHART.html"
@@ -698,8 +698,8 @@ input[type=range] {
       Below saturation, the proposed formula removes the dilution regime —
       d(ROA)/dS = +F/S² &gt; 0 always — so adding delegation to <em>any</em> pool monotonically
       raises per-delegator ROA. See
-      <a href="https://github.com/johnshearing/pool_ranger/blob/main/claude_queries/utilization_scaled_pledge_bonus.md"
-         style="color:var(--accent)">utilization_scaled_pledge_bonus.md §§3–4</a>.
+      <a href="https://github.com/johnshearing/CIPs/tree/utilization-scaled-pledge-bonus/CIP-XXXX"
+         style="color:var(--accent)">CIP-???? | Utilization-Scaled Pledge Bonus #1193</a>.
     </span>
     <br><br>
 
@@ -1651,15 +1651,21 @@ const TOUR_SCRIPTS = {
       title: 'A typical high-pledge pool',
       body: `<p>I'm setting up a realistic pool: <strong>Pledge = 5 M ADA</strong>,
         <strong>Margin = 1 %</strong>, <strong>Fixed Fee = 170 ADA/epoch</strong>,
-        <strong>r = 0.000548</strong>. These parameters produce a large, very visible red
+        <strong>r = 0.000400</strong>. These parameters produce a large, very visible red
         zone — the pledge bonus <code>A</code> is well above the fixed fee <code>F</code>,
         and the low margin leaves room for the dilution to dominate.</p>`,
-      targets: ['sl-p', 'sl-m', 'sl-f', 'sl-r'],
+      targets: [
+        'sl-p',
+        'sl-m',
+        'sl-f',
+        'sl-r',
+        { kind: 'chart-point', chart: 'main', dataset: 0, dataIndex: 14 },
+      ],
       actions: [
         { kind: 'slider', id: 'sl-p', value: 5,        ms: 700 },
         { kind: 'slider', id: 'sl-m', value: 1,        ms: 500 },
         { kind: 'slider', id: 'sl-f', value: 170,      ms: 500 },
-        { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 500 },
+        { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 500 },
         { kind: 'slider', id: 'sl-d', value: 10,       ms: 400 },
       ],
       holdMs: 6500,
@@ -1938,8 +1944,8 @@ TOUR_SCRIPTS.benefits = [
     body: `<p>The CIP redistributes some emission and reshapes incentives. This 9-step
       tutorial walks through who gains, who loses, and by how much — stakeholder by
       stakeholder.</p>
-      <p>The source material is §5 ("Who benefits, and how") of
-      <code>utilization_scaled_pledge_bonus.md</code>. Press
+      <p>The source material is <a href="https://github.com/johnshearing/CIPs/tree/utilization-scaled-pledge-bonus/CIP-XXXX#a4-extended-stakeholder-analysis"
+      style="color:var(--accent)">("A.4 Extended stakeholder analysis") of CIP-???? | Utilization-Scaled Pledge Bonus #1193</a>. Press
       <strong>▶ Play</strong> to let it run on its own.</p>`,
     targets: [],
     actions: [
