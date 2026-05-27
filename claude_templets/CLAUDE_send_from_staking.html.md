@@ -1,5 +1,6 @@
 # CLAUDE.md — Pool Ranger (ranger)  
-Always read /home/js/aiken/CIPs/CIP-0187/README.md at the start of each session.
+**At the start of each session, always read `/home/js/aiken/ranger/web/HOW_TO_SIGN.md` starting from the section "Member Page — send_from_staking.html"**.
+**Always read `/home/js/aiken/ranger/claude_todo/host_send_from_staking_on_github_pages.md` at the start of each session**.
 
 ---
 

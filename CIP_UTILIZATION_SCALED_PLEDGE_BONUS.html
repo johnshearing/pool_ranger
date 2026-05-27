@@ -279,7 +279,8 @@ input[type=range] {
 #tour-start-btn           { background: var(--accent);  color: #0d1117; }
 #tour-start-btn-why,
 #tour-start-btn-benefits,
-#tour-start-btn-mpo       { background: #233244;        color: #c9d1d9; border: 1px solid var(--accent); }
+#tour-start-btn-mpo,
+#tour-start-btn-cerkoryn  { background: #233244;        color: #c9d1d9; border: 1px solid var(--accent); }
 #tour-launcher-panel button:hover  { opacity: 0.88; transform: translateY(-1px); }
 #tour-launcher-panel button:active { opacity: 0.7; transform: translateY(0); }
 #tour-launcher-hint { font-size: 0.82rem; color: var(--muted); }
@@ -420,6 +421,7 @@ input[type=range] {
     <button id="tour-start-btn-mpo"      class="secondary">▶  The Multi-Pool Operator Problem — and how the CIP helps decentralization</button>
     <button id="tour-start-btn-benefits" class="secondary">▶  Who benefits, and by how much</button>
     <button id="tour-start-btn-why"      class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
+    <button id="tour-start-btn-cerkoryn" class="secondary">▶  A reviewer's questions about Pool 3 — answered card by card</button>
   </div>
   <span id="tour-launcher-hint">
     — Guided walkthroughs. Cards appear bottom-right; arrows point at the relevant
@@ -2279,6 +2281,238 @@ TOUR_SCRIPTS.mpo = [
   },
 ];
 
+// "cerkoryn" — fifth tutorial. Walks through the two specific questions a CIP
+// reviewer (Cerkoryn) posted on the PR thread and answers each one directly.
+// Loads his Pool 3 (P = 50%, S = 50% of S_sat) into the simulator so the
+// halved pledge bonus is visible on the metric cards, then pivots to where
+// the CIP's actual case lives (delegator dilution, cooperative bargaining,
+// MPO deterrence).
+TOUR_SCRIPTS.cerkoryn = [
+  {
+    title: 'A reviewer\'s two questions',
+    body: `<p>On the CIP-0187 pull request (#1193), longtime RSS reviewer
+      <strong>Cerkoryn</strong> was invited by the CIP editors to compare this
+      proposal against other RSS work. He posted a 5-pool chart and two
+      questions.</p>
+      <p>This tutorial walks through both questions in order and answers each
+      one directly. Press <strong>▶ Play</strong> for the no-clicks version,
+      or click Next to advance manually.</p>`,
+    targets: [],
+    actions: [
+      { kind: 'check',  id: 'cb-show-current',  value: true },
+      { kind: 'check',  id: 'cb-show-proposed', value: true },
+      { kind: 'slider', id: 'sl-b',             value: 1, ms: 300 },
+    ],
+    holdMs: 8500,
+  },
+  {
+    title: 'Cerkoryn\'s 5-pool table',
+    body: `<p>He expressed <code>P</code> and <code>S</code> as percentages of
+      saturation (<code>S<sub>sat</sub> = 75 M ADA</code>):</p>
+      <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
+        <tr style="color:var(--muted)">
+          <td style="padding:0.1rem 0.6rem 0.1rem 0">Pool</td>
+          <td style="padding:0.1rem 0.6rem 0.1rem 0">Scenario</td>
+          <td style="padding:0.1rem 0.6rem 0.1rem 0">Current bonus</td>
+          <td>Proposed bonus</td>
+        </tr>
+        <tr><td>Pool&nbsp;1</td><td>P=100%, S=100%</td><td>100%</td><td>100%</td></tr>
+        <tr><td>Pool&nbsp;2</td><td>P=&nbsp;50%, S=100%</td><td>&nbsp;50%</td><td>&nbsp;50%</td></tr>
+        <tr style="color:#4ecdc4"><td>Pool&nbsp;3</td><td>P=&nbsp;50%, S=&nbsp;50%</td><td>&nbsp;50%</td><td>&nbsp;25%</td></tr>
+        <tr><td>Pool&nbsp;4</td><td>P=&nbsp;&nbsp;0%, S=100%</td><td>&nbsp;&nbsp;0%</td><td>&nbsp;&nbsp;0%</td></tr>
+        <tr><td>Pool&nbsp;5</td><td>P=&nbsp;&nbsp;0%, S=&nbsp;50%</td><td>&nbsp;&nbsp;0%</td><td>&nbsp;&nbsp;0%</td></tr>
+      </table>
+      <p>His math is correct. The proposed bonus is <code>A · u</code> with
+      <code>u = S / S<sub>sat</sub></code>, so Pool&nbsp;3 (<code>u = 0.5</code>)
+      earns half of today's bonus. Pool&nbsp;3 is his focal example — same
+      pledge as Pool&nbsp;2, half the delegation, half the proposed bonus.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 13000,
+  },
+  {
+    title: 'Loading Pool 3 into the simulator',
+    body: `<p>To see Pool&nbsp;3 live: pledge slider to <strong>37.5 M ADA</strong>
+      (50% of S<sub>sat</sub>); external delegation slider to <strong>0</strong>
+      (so total stake S = pledge = 37.5 M, also 50% of S<sub>sat</sub>).</p>
+      <p>Both formula overlays are on, and the blending coefficient
+      <code>b = 1</code> (full proposal). Margin, fee, and rate are set to
+      reasonable defaults for the demonstration.</p>`,
+    targets: ['sl-p', 'sl-d', 'sl-b'],
+    actions: [
+      { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
+      { kind: 'slider', id: 'sl-f', value: 340,      ms: 400 },
+      { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 400 },
+      { kind: 'slider', id: 'sl-p', value: 37.5,     ms: 900 },
+      { kind: 'slider', id: 'sl-d', value: 0,        ms: 700 },
+      { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
+    ],
+    holdMs: 8500,
+  },
+  {
+    title: 'Confirming: yes, the bonus IS cut in half',
+    body: `<p>Look at the two pledge-bonus metric cards.
+      <em>Pledge Bonus (A_eff)</em> is the current-formula value;
+      <em>Pledge Bonus (A_new)</em> is the proposed-formula value at this
+      cursor position.</p>
+      <p>The proposed value is roughly <strong>half</strong> of the current
+      value — exactly Cerkoryn's Pool&nbsp;3 row. His chart and the simulator
+      agree.</p>`,
+    targets: ['m-A', 'm-A-prop'],
+    actions: [],
+    holdMs: 9000,
+  },
+  {
+    title: 'First question — answered: YES, intentional',
+    body: `<p>Cerkoryn asked:</p>
+      <p style="border-left:2px solid var(--accent);padding-left:0.7rem;color:var(--muted);font-style:italic;margin:0.4rem 0">
+        "It appears to make pledge less important and simply having enough
+        delegation to saturate your pool the dominating factor. Or am I
+        misunderstanding?"</p>
+      <p>He understands correctly, and that effect is intentional. The CIP
+      states it directly:</p>
+      <p style="border-left:2px solid #4ecdc4;padding-left:0.7rem;color:var(--muted);font-style:italic;margin:0.4rem 0">
+        "Pledge becomes a partnership claim, redeemed by attracting delegation
+        rather than declared in isolation."</p>
+      <p>An empty pledged pool earns nothing from pledge. A half-utilized one
+      earns half. The whole point is to make pledge contingent on demonstrated
+      demand.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 12000,
+  },
+  {
+    title: 'Second question — what about the operator?',
+    body: `<p>His substantive critique runs along the operator axis:</p>
+      <p style="border-left:2px solid var(--accent);padding-left:0.7rem;color:var(--muted);font-style:italic;margin:0.4rem 0">
+        "If the operator has 1 M ADA pledged and there is no other stake in
+        the pool, then the operator earns 100% of rewards. But if he had 1 M
+        ADA pledged and the pool had an additional 9 M in delegation, he is
+        only making 10% of the pool's rewards. But he's still getting the
+        same return on his 1 M ADA pledge in either case, so his rewards
+        didn't go down."</p>
+      <p>The implicit challenge: <em>if the operator isn't hurt by
+      delegators arriving today, what dilution problem is actually being
+      fixed?</em></p>`,
+    targets: [],
+    actions: [],
+    holdMs: 12500,
+  },
+  {
+    title: 'He\'s correct — about the operator',
+    body: `<p>On the operator side his analysis lands. Per-ADA-pledge return
+      is roughly preserved across pool sizes today, because:</p>
+      <ul style="margin:0.3rem 0 0.3rem 1.1rem;padding:0">
+        <li>Pledge rewards flow back to the same operator — effectively
+          "fee-free."</li>
+        <li>Margin and fixed fee on delegators give the operator a slice of
+          every additional ADA arriving.</li>
+      </ul>
+      <p>The CIP doesn't actually claim operator dilution as the problem it
+      solves. Cerkoryn's per-ADA-operator-return observation is a fair
+      operator-side point.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 10000,
+  },
+  {
+    title: 'But the CIP fixes a DELEGATOR problem',
+    body: `<p>The dilution the CIP names lives on the <em>delegator</em> side.
+      Appendix A.3's worked example: a 50 M-pledge pool with
+      <code>F = 340</code>, <code>r = 0.000400</code>:</p>
+      <ul style="margin:0.3rem 0 0.3rem 1.1rem;padding:0;font-family:monospace;font-size:0.78rem">
+        <li>S = 50 M (pledge only):&nbsp;(A − F)/S ≈ 8.55 × 10<sup>−5</sup></li>
+        <li>S = 75 M (saturated):&nbsp;&nbsp;&nbsp;(A − F)/S ≈ 5.70 × 10<sup>−5</sup></li>
+      </ul>
+      <p>≈&nbsp;<strong>0.21% absolute ROA loss</strong>, absorbed by
+      delegators for the act of arriving at the pool. The blue dashed
+      current-ROA curve slopes <em>downward</em> across this range — every
+      new delegator drags every existing delegator's ROA down. That is what
+      the CIP is fixing, not operator income.</p>`,
+    targets: [{ kind: 'chart-point', chart: 'main', dataset: 2, dataIndex: 20 }],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 50,       ms: 900 },
+      { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
+      { kind: 'slider', id: 'sl-f', value: 340,      ms: 400 },
+      { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 400 },
+      { kind: 'slider', id: 'sl-d', value: 10,       ms: 700 },
+    ],
+    holdMs: 13000,
+  },
+  {
+    title: 'Operator income CAN fall too — but only in some regimes',
+    body: `<p>Cerkoryn's "operator return is preserved" claim is roughly right
+      for typical parameters, but it isn't universal. In low-margin,
+      low-fee, high-pledge pools the SPO income curve <em>does</em> fall
+      when delegators arrive — the <strong style="color:#f85149">red zone</strong>
+      on the chart.</p>
+      <p>With these parameters (P = 5 M, m = 1%, F = 170, r = 0.000400) the
+      red zone covers roughly the leftmost quarter of the chart. This is a
+      parameter regime, not the average pool — and Cerkoryn could fairly
+      reply that those aren't typical settings. The
+      <em>delegator</em> dilution above is the load-bearing argument, not
+      this.</p>`,
+    targets: [{ kind: 'chart-point', chart: 'main', dataset: 0, dataIndex: 14 }],
+    actions: [
+      { kind: 'slider', id: 'sl-p', value: 5,        ms: 700 },
+      { kind: 'slider', id: 'sl-m', value: 1,        ms: 300 },
+      { kind: 'slider', id: 'sl-f', value: 170,      ms: 300 },
+      { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 300 },
+      { kind: 'slider', id: 'sl-d', value: 10,       ms: 500 },
+    ],
+    holdMs: 11000,
+  },
+  {
+    title: 'The structural wins — beyond dilution',
+    body: `<p>Even granting Cerkoryn's operator point in full, two structural
+      wins remain that don't depend on operator dilution at all:</p>
+      <ul style="margin:0.3rem 0 0.4rem 1.1rem;padding:0">
+        <li><strong>Cooperative bargaining surface.</strong> A coordinator
+          (Pool Ranger, or any large delegator) lifts
+          <code>A<sub>new</sub>/S</code> for every existing delegator by
+          arriving, and drops it visibly by leaving. The threat of
+          withdrawal becomes a publicly computable mathematical event,
+          giving SPOs a continuous incentive to <em>retain</em> large
+          delegators.</li>
+        <li><strong>MPO deterrence at the formula level.</strong> A 10-way
+          self-funded split costs roughly <strong>277 K ADA/year</strong> in
+          forgone bonus under the proposal; today it costs zero.
+          <code>a<sub>0</sub></code> is untouched, so Sybil resistance via
+          delegator preference is preserved exactly. The new cost stacks on
+          top.</li>
+      </ul>
+      <p>These wins make the case even if Cerkoryn's operator critique lands
+      in full.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 13000,
+  },
+  {
+    title: 'Bottom line — how to reply',
+    body: `<p>The clean reply to Cerkoryn, in order:</p>
+      <ol style="margin:0.3rem 0 0.4rem 1.1rem;padding:0">
+        <li>Confirm his chart and his Pool&nbsp;3 reading. The math is
+          right.</li>
+        <li>Confirm "pledge less important in isolation, saturation more
+          important" is intentional — pledge becomes a partnership
+          claim.</li>
+        <li>Acknowledge the operator-side observation is correct. The CIP
+          doesn't claim operator dilution.</li>
+        <li>Pivot: the dilution the CIP fixes lives on the
+          <em>delegator</em> side — cite the §A.3 worked example
+          (8.55×10<sup>−5</sup> → 5.70×10<sup>−5</sup>).</li>
+        <li>Highlight the structural wins — cooperative bargaining and MPO
+          deterrence — that hold regardless of whether the operator is
+          diluted.</li>
+      </ol>
+      <p style="color:var(--muted);margin-top:0.5rem">End of tour — press
+      <strong style="color:var(--accent)">Exit</strong> (or Esc) to return.</p>`,
+    targets: [],
+    actions: [],
+    holdMs: 14000,
+  },
+];
+
 // Mutable pointer to the active script. startTour() reassigns this.
 let TOUR_STEPS = TOUR_SCRIPTS.explain;
 
@@ -2652,6 +2886,7 @@ document.getElementById('tour-start-btn').addEventListener('click',          () 
 document.getElementById('tour-start-btn-why').addEventListener('click',      () => startTour('why'));
 document.getElementById('tour-start-btn-benefits').addEventListener('click', () => startTour('benefits'));
 document.getElementById('tour-start-btn-mpo').addEventListener('click',      () => startTour('mpo'));
+document.getElementById('tour-start-btn-cerkoryn').addEventListener('click', () => startTour('cerkoryn'));
 
 update(); // initial render
 
