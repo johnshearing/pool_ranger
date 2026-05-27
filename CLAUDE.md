@@ -1,6 +1,7 @@
 # CLAUDE.md — Pool Ranger (ranger)  
 Always read /home/js/aiken/CIPs/CIP-0187/README.md at the start of each session.
-
+Always read /home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html at the start of each session.
+Always read /home/js/aiken/ranger/claude_queries/reply_to_cerkoryn_pool3.md at the start of each session.
 ---
 
 ## Project Summary

@@ -57,7 +57,7 @@ These two wins hold whether or not operators are diluted today.
 
 ## A visual walkthrough, if you'd like to step through it
 
-I've added a guided tutorial to the interactive simulator that walks through your two questions card-by-card, loads Pool 3 into the chart so the halved bonus is visible on the metric cards, and steps through the responses above:
+I've added a guided presentation to the interactive simulator that walks through your two questions card-by-card, loads Pool 3 into the chart so the halved bonus is visible on the metric cards, and steps through the responses above:
 
 [https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)
 

@@ -2294,9 +2294,9 @@ TOUR_SCRIPTS.cerkoryn = [
       <strong>Cerkoryn</strong> was invited by the CIP editors to compare this
       proposal against other RSS work. He posted a 5-pool chart and two
       questions.</p>
-      <p>This tutorial walks through both questions in order and answers each
-      one directly. Press <strong>▶ Play</strong> for the no-clicks version,
-      or click Next to advance manually.</p>`,
+      <p>This presentation walks through both questions in order and answers
+      each one directly. Press <strong>▶ Play</strong> for the no-clicks
+      version, or click Next to advance manually.</p>`,
     targets: [],
     actions: [
       { kind: 'check',  id: 'cb-show-current',  value: true },
@@ -2488,25 +2488,35 @@ TOUR_SCRIPTS.cerkoryn = [
     holdMs: 13000,
   },
   {
-    title: 'Bottom line — how to reply',
-    body: `<p>The clean reply to Cerkoryn, in order:</p>
+    title: 'In summary',
+    body: `<p>The response to Cerkoryn's two questions, in five points:</p>
       <ol style="margin:0.3rem 0 0.4rem 1.1rem;padding:0">
-        <li>Confirm his chart and his Pool&nbsp;3 reading. The math is
-          right.</li>
-        <li>Confirm "pledge less important in isolation, saturation more
-          important" is intentional — pledge becomes a partnership
-          claim.</li>
-        <li>Acknowledge the operator-side observation is correct. The CIP
-          doesn't claim operator dilution.</li>
-        <li>Pivot: the dilution the CIP fixes lives on the
-          <em>delegator</em> side — cite the §A.3 worked example
-          (8.55×10<sup>−5</sup> → 5.70×10<sup>−5</sup>).</li>
-        <li>Highlight the structural wins — cooperative bargaining and MPO
-          deterrence — that hold regardless of whether the operator is
-          diluted.</li>
+        <li>His chart and Pool&nbsp;3 reading are correct — the proposed
+          pledge bonus on Pool&nbsp;3 is exactly half of today's.</li>
+        <li>That effect is intentional. Pledge becomes a partnership
+          claim, redeemed by attracting delegation rather than declared
+          in isolation. The saturation case is preserved exactly — a
+          saturated pool earns today's bonus.</li>
+        <li>The operator-side observation is correct on its own terms.
+          Per-ADA-pledge return is roughly preserved across pool sizes
+          today, and the CIP does not claim operator dilution as the
+          problem it solves.</li>
+        <li>The dilution the CIP fixes lives on the <em>delegator</em>
+          side. Appendix A.3's 50 M-pledge worked example shows
+          <code>(A − F)/S</code> falling from 8.55×10<sup>−5</sup> to
+          5.70×10<sup>−5</sup> as delegation arrives — a ≈ 0.21%
+          absolute ROA loss absorbed by delegators today. The proposal
+          flips that slope positive everywhere.</li>
+        <li>Two structural wins hold regardless of whether operators are
+          diluted: a cooperative bargaining surface (large delegators
+          lift <code>A<sub>new</sub>/S</code> for everyone in their
+          pool) and MPO deterrence at the formula level — with
+          <code>a<sub>0</sub></code> untouched, so today's Sybil
+          resistance is preserved exactly.</li>
       </ol>
-      <p style="color:var(--muted);margin-top:0.5rem">End of tour — press
-      <strong style="color:var(--accent)">Exit</strong> (or Esc) to return.</p>`,
+      <p style="color:var(--muted);margin-top:0.5rem">End of presentation
+      — press <strong style="color:var(--accent)">Exit</strong> (or Esc)
+      to return.</p>`,
     targets: [],
     actions: [],
     holdMs: 14000,
