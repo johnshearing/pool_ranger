@@ -1,5 +1,8 @@
 # CLAUDE.md — Pool Ranger (ranger)  
-Always read /home/js/aiken/ranger/epoch_agent/HOW_TO_RUN.md at the start of each session.
+Always read /home/js/aiken/CIPs/CIP-0187/README.md at the start of each session.
+Always read /home/js/aiken/ranger/claude_queries/combine_cip_ideas.md at the start of each session.
+Always read /home/js/aiken/ranger/claude_queries/Multi_CIP_Plan.md at the start of each session.
+
 
 ---
 
