@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-CIP Simulator — Closing the Multipool Parameter Space</title>
+<!--
+  Multi-CIP Simulator (Field / MRI mode).
+
+  A companion to the single-pool CIP-187 simulator
+  (CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html). Where that tool examines ONE pool at
+  a time, this one renders the WHOLE parameter cube as a 3-D scalar field so the
+  *shape* of the region where multipool operation pays can be seen — and watched as
+  each CIP slider reshapes it.
+
+  Axes:   X = Pledge P      Y = Margin m      Z = Delegation D (= total stake − pledge)
+  Color:  a selectable output metric (default: the gain an operator makes by splitting
+          into N pools instead of running one — the region we are trying to close).
+
+  Levers (each maps to a CIP family from Multi_CIP_Plan.md §5.6):
+    • minPoolCost (fee F)      — CIPs 23 / 74 / 75   (fee reform)
+    • L (leverage cap)         — CIP-50              (σ' = min(σ, L·p))
+    • b (utilization blend)    — CIP-187             (A_blend = A·(1 − b + b·u))
+
+  No real pool data is used: the grid is synthetic. Plotly.js (CDN) renders three
+  volume techniques — isosurface, semi-transparent volume fog, and a swept MRI slice.
+
+  Reward math is lifted verbatim from CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html and
+  extended with the CIP-50 leverage cap.
+-->
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  :root {
+    --bg:        #0e1117;
+    --panel:     #161b22;
+    --panel2:    #1c2330;
+    --border:    #2b333f;
+    --text:      #d6dde6;
+    --muted:     #8b97a7;
+    --accent:    #ff9f43;   /* CIP-187 / pledge orange  */
+    --teal:      #4ecdc4;   /* proposed / good          */
+    --red:       #ff6b6b;   /* MPO-wins / bad           */
+    --blue:      #5b8def;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+  }
+  header {
+    padding: 0.8rem 1.1rem 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0 0 0.2rem; font-size: 1.15rem; }
+  header p  { margin: 0; color: var(--muted); font-size: 0.82rem; max-width: 70ch; }
+  header a  { color: var(--accent); }
+
+  #layout { display: flex; height: calc(100vh - 64px); min-height: 540px; }
+
+  #controls {
+    width: 340px; flex: 0 0 340px;
+    overflow-y: auto;
+    padding: 0.8rem 0.9rem 2rem;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+  }
+  #plotwrap { flex: 1 1 auto; position: relative; min-width: 0; }
+  #plot { width: 100%; height: 100%; }
+
+  .group {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.6rem 0.7rem;
+    margin-bottom: 0.7rem;
+  }
+  .group h3 {
+    margin: 0 0 0.5rem; font-size: 0.8rem; letter-spacing: 0.02em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .ctl { margin-bottom: 0.55rem; }
+  .ctl:last-child { margin-bottom: 0; }
+  .ctl label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.82rem; margin-bottom: 0.2rem;
+  }
+  .ctl label .val { color: var(--accent); font-variant-numeric: tabular-nums; font-weight: 600; }
+  input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+  select, button {
+    width: 100%; padding: 0.35rem 0.4rem;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    font-size: 0.82rem; cursor: pointer;
+  }
+  .cipline {
+    display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.3rem;
+  }
+  .cipline input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--teal); cursor: pointer; }
+  .cipline label { font-size: 0.83rem; font-weight: 600; cursor: pointer; flex: 1; }
+  .cip-on  { color: var(--teal); }
+  .cip-off { color: var(--muted); }
+  .disabled { opacity: 0.4; pointer-events: none; }
+
+  .modebtns { display: flex; gap: 0.3rem; }
+  .modebtns button { flex: 1; padding: 0.4rem 0.2rem; font-size: 0.78rem; }
+  .modebtns button.active { background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 700; }
+
+  .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; }
+  .presets button { font-size: 0.74rem; padding: 0.4rem 0.2rem; }
+
+  #readout {
+    font-size: 0.78rem; color: var(--muted); line-height: 1.5;
+    background: var(--panel2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.55rem 0.7rem;
+  }
+  #readout b { color: var(--text); }
+  #readout .hot { color: var(--red); }
+  #readout .cool { color: var(--teal); }
+  .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.4; }
+  code { color: var(--accent); font-size: 0.92em; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Multi-CIP Simulator — the parameter cube where multipools live</h1>
+  <p>
+    The whole <b>(pledge × margin × delegation)</b> cube, colored by an output metric.
+    Move the three CIP levers and watch the region where splitting into many pools pays
+    (the <span style="color:var(--red)">red</span> habitable zone) shrink. Synthetic grid —
+    no pool data. Companion to the
+    <a href="CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html">single-pool CIP-187 simulator</a>.
+  </p>
+</header>
+
+<div id="layout">
+  <div id="controls">
+
+    <div class="group">
+      <h3>Render mode</h3>
+      <div class="modebtns" id="modebtns">
+        <button data-mode="volume" class="active">Volume fog</button>
+        <button data-mode="isosurface">Isosurface</button>
+        <button data-mode="slice">MRI slice</button>
+      </div>
+      <div class="hint" id="mode-hint">
+        Semi-transparent fog: opacity follows the metric, so dense color marks where the
+        metric is large. Best first look at the field's shape.
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Color metric</h3>
+      <div class="ctl">
+        <select id="metric">
+          <option value="advantage" selected>Splitting advantage — N-pool take − 1-pool take (ADA/epoch)</option>
+          <option value="advratio">Splitting advantage — ratio (N-pool ÷ 1-pool)</option>
+          <option value="mpo">MPO combined take — all N pools (ADA/epoch)</option>
+          <option value="single">Single-pool operator take (ADA/epoch)</option>
+          <option value="roa">Delegator ROA (%/yr)</option>
+          <option value="fee">Operator fixed-fee income (ADA/epoch)</option>
+          <option value="margin">Operator margin income (ADA/epoch)</option>
+          <option value="pledgeinc">Operator pledge income (ADA/epoch)</option>
+        </select>
+      </div>
+      <div class="hint" id="metric-hint"></div>
+    </div>
+
+    <div class="group">
+      <h3>CIP levers</h3>
+
+      <div class="cipline">
+        <input type="checkbox" id="cip-fee" checked>
+        <label for="cip-fee" class="cip-on" id="lbl-fee">Fee reform — CIPs 23/74/75</label>
+      </div>
+      <div class="ctl">
+        <label>minPoolCost <code>F</code> (ADA/epoch) <span class="val" id="v-F">340</span></label>
+        <input type="range" id="sl-F" min="0" max="340" step="5" value="340">
+      </div>
+
+      <div class="cipline">
+        <input type="checkbox" id="cip-50">
+        <label for="cip-50" class="cip-off" id="lbl-50">Leverage cap — CIP-50</label>
+      </div>
+      <div class="ctl" id="wrap-L">
+        <label>L &nbsp;<span style="color:var(--muted);font-weight:400">σ′ = min(σ, L·p)</span> <span class="val" id="v-L">100</span></label>
+        <input type="range" id="sl-L" min="10" max="1000" step="10" value="100">
+      </div>
+
+      <div class="cipline">
+        <input type="checkbox" id="cip-187" checked>
+        <label for="cip-187" class="cip-on" id="lbl-187">Utilization-scaled pledge bonus — CIP-187</label>
+      </div>
+      <div class="ctl" id="wrap-b">
+        <label>b &nbsp;<span style="color:var(--muted);font-weight:400">A·(1−b+b·u)</span> <span class="val" id="v-b">1.00</span></label>
+        <input type="range" id="sl-b" min="0" max="1" step="0.01" value="1">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Operator strategy &amp; protocol</h3>
+      <div class="ctl">
+        <label>Multipool count <code>N</code> <span class="val" id="v-N">5</span></label>
+        <input type="range" id="sl-N" min="1" max="10" step="1" value="5">
+      </div>
+      <div class="ctl">
+        <label>Base reward rate <code>r</code> <span class="val" id="v-r">0.000400</span></label>
+        <input type="range" id="sl-r" min="0.0003" max="0.0008" step="0.000005" value="0.000400">
+      </div>
+      <div class="ctl">
+        <label>Pledge influence <code>a₀</code> <span class="val" id="v-a0">0.30</span></label>
+        <input type="range" id="sl-a0" min="0" max="2" step="0.05" value="0.30">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Field view</h3>
+      <div class="ctl" id="wrap-iso">
+        <label>Isosurface level <span class="val" id="v-iso">—</span></label>
+        <input type="range" id="sl-iso" min="0" max="100" step="1" value="50">
+        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+          <button id="btn-snap" style="font-size:0.74rem">Snap to pivot (0 / 1)</button>
+          <button id="btn-shells" style="font-size:0.74rem">Nested shells</button>
+        </div>
+      </div>
+      <div class="ctl" id="wrap-slice" style="display:none">
+        <label>Slice axis</label>
+        <select id="slice-axis">
+          <option value="z" selected>Delegation (horizontal plane)</option>
+          <option value="x">Pledge</option>
+          <option value="y">Margin</option>
+        </select>
+        <label style="margin-top:0.4rem">Slice position <span class="val" id="v-slicepos">50%</span></label>
+        <input type="range" id="sl-slicepos" min="0" max="100" step="2" value="50">
+        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+          <button id="btn-sweep" style="font-size:0.74rem">▶ Sweep</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>Grid resolution <span class="val" id="v-res">24</span></label>
+        <input type="range" id="sl-res" min="12" max="40" step="2" value="24">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Axis ranges</h3>
+      <div class="ctl">
+        <label>Pledge max (M ADA) <span class="val" id="v-pmax">10</span></label>
+        <input type="range" id="sl-pmax" min="1" max="50" step="1" value="10">
+      </div>
+      <div class="ctl">
+        <label>Margin max (%) <span class="val" id="v-mmax">5</span></label>
+        <input type="range" id="sl-mmax" min="1" max="20" step="1" value="5">
+      </div>
+      <div class="ctl">
+        <label>Delegation max (M ADA) <span class="val" id="v-dmax">75</span></label>
+        <input type="range" id="sl-dmax" min="10" max="150" step="5" value="75">
+      </div>
+    </div>
+
+    <div class="group">
+      <h3>Scenario presets</h3>
+      <div class="presets">
+        <button data-preset="baseline">Baseline (no CIP)</button>
+        <button data-preset="fee">Fee reform only</button>
+        <button data-preset="c50">CIP-50 only</button>
+        <button data-preset="c187">CIP-187 only</button>
+        <button data-preset="all" style="grid-column:1/3;background:var(--teal);color:#06201d;font-weight:700;border-color:var(--teal)">All three families</button>
+      </div>
+    </div>
+
+    <div id="readout">Recomputing…</div>
+  </div>
+
+  <div id="plotwrap"><div id="plot"></div></div>
+</div>
+
+<script>
+"use strict";
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Constants
+// ─────────────────────────────────────────────────────────────────────────────
+const S_SAT         = 75e6;      // saturation point (ADA)
+const EPOCHS_PER_YR = 73;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Reward math  (lifted from CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html, then
+//  extended with the CIP-50 leverage cap)
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Blended utilization factor for CIP-187: at b=0 → 1 (current formula),
+// at b=1 → u = min(S,S_sat)/S_sat. (1 − b + b·u).
+function utilFactor(S, b) {
+  const u = Math.min(S, S_SAT) / S_SAT;
+  return (1 - b) + b * u;
+}
+
+// Gross pool rewards for ONE pool of total stake S and pledge P.
+//   • CIP-50 caps the rewardable stake at L·P (σ' = min(σ, L·p)).
+//   • CIP-187 multiplies only the a₀·P pledge term by the utilization factor.
+function gross(S, P, cfg) {
+  const sSat = Math.min(S, S_SAT);
+  const sReward = cfg.cip50 ? Math.min(sSat, cfg.L * P) : sSat;
+  const pledgeTerm = cfg.a0 * P * (cfg.cip187 ? utilFactor(S, cfg.b) : 1);
+  return cfg.r * (sReward + pledgeTerm) / (1 + cfg.a0);
+}
+
+// Operator take for one pool: fixed fee + margin on net + pledge's share of net.
+function spoIncome(S, P, m, cfg) {
+  if (S <= 0) return 0;
+  const F = cfg.cipFee ? cfg.F : 340;   // fee charged = minPoolCost lever
+  const g = gross(S, P, cfg);
+  if (g <= F) return g;                  // can't extract more fee than the pool earns
+  const net = g - F;
+  return F + m * net + (P / S) * (1 - m) * net;
+}
+
+function delegROA(S, P, m, cfg) {
+  if (S <= 0) return 0;
+  const F = cfg.cipFee ? cfg.F : 340;
+  const g = gross(S, P, cfg);
+  if (g <= F) return 0;
+  return (1 - m) * (g - F) / S * EPOCHS_PER_YR * 100;
+}
+
+// Operator income broken into channels (single pool).
+function feeIncome(S, P, m, cfg) {
+  const F = cfg.cipFee ? cfg.F : 340;
+  return Math.min(F, gross(S, P, cfg));
+}
+function marginIncome(S, P, m, cfg) {
+  const F = cfg.cipFee ? cfg.F : 340;
+  const g = gross(S, P, cfg);
+  if (g <= F) return 0;
+  return m * (g - F);
+}
+function pledgeIncome(S, P, m, cfg) {
+  const F = cfg.cipFee ? cfg.F : 340;
+  const g = gross(S, P, cfg);
+  if (g <= F) return 0;
+  return (P / S) * (1 - m) * (g - F);
+}
+
+// Combined take if the operator splits aggregate (P,D) into N identical pools,
+// each holding P/N pledge and D/N delegation. Fee is charged once PER POOL.
+function mpoCombined(P, D, m, cfg) {
+  const N = cfg.N;
+  const Pi = P / N, Di = D / N, Si = Pi + Di;
+  return N * spoIncome(Si, Pi, m, cfg);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Metric dispatch.  (P, D in ADA; m in fraction.)
+// ─────────────────────────────────────────────────────────────────────────────
+const METRICS = {
+  advantage: {
+    label: 'Splitting advantage (ADA/epoch)',
+    diverging: true, pivot: 0, colorscale: 'RdBu', reverse: true,
+    fn: (P, D, m, cfg) => mpoCombined(P, D, m, cfg) - spoIncome(P + D, P, m, cfg),
+    hint: 'How many extra ADA per epoch the operator earns by splitting into N pools '
+        + 'instead of running one. RED (positive) = multipools win — the region to close. '
+        + 'BLUE (negative) = a single pool is better.'
+  },
+  advratio: {
+    label: 'Splitting advantage (ratio)',
+    diverging: true, pivot: 1, colorscale: 'RdBu', reverse: true, clamp: [0, 3],
+    fn: (P, D, m, cfg) => {
+      const single = spoIncome(P + D, P, m, cfg);
+      const comb   = mpoCombined(P, D, m, cfg);
+      if (single < 1) return comb < 1 ? 1 : 3;
+      return Math.min(comb / single, 3);
+    },
+    hint: 'N-pool take ÷ 1-pool take. >1 (red) = splitting pays; 1 = neutral; <1 (blue) = single pool wins.'
+  },
+  mpo: {
+    label: 'MPO combined take (ADA/epoch)',
+    colorscale: 'Hot',
+    fn: (P, D, m, cfg) => mpoCombined(P, D, m, cfg),
+    hint: 'Total operator income across all N pools. The high-value region is what each CIP family aims to shrink.'
+  },
+  single: {
+    label: 'Single-pool take (ADA/epoch)',
+    colorscale: 'Viridis',
+    fn: (P, D, m, cfg) => spoIncome(P + D, P, m, cfg),
+    hint: 'Operator income running ONE honest pool at the aggregate (P, D). We want this to dominate the multipool take.'
+  },
+  roa: {
+    label: 'Delegator ROA (%/yr)',
+    colorscale: 'Viridis',
+    fn: (P, D, m, cfg) => delegROA(P + D, P, m, cfg),
+    hint: 'Annualized return for delegators in a single pool. Bright = where delegator participation is most rewarded.'
+  },
+  fee: {
+    label: 'Operator fixed-fee income (ADA/epoch)',
+    colorscale: 'Hot',
+    fn: (P, D, m, cfg) => feeIncome(P + D, P, m, cfg),
+    hint: 'The minPoolCost fee actually extracted (capped by what the pool earns). The fee-farm revenue stream.'
+  },
+  margin: {
+    label: 'Operator margin income (ADA/epoch)',
+    colorscale: 'Hot',
+    fn: (P, D, m, cfg) => marginIncome(P + D, P, m, cfg),
+    hint: 'Income from the percentage margin on net rewards.'
+  },
+  pledgeinc: {
+    label: 'Operator pledge income (ADA/epoch)',
+    colorscale: 'Hot',
+    fn: (P, D, m, cfg) => pledgeIncome(P + D, P, m, cfg),
+    hint: "The operator's own pledge share of net rewards — what CIP-187 scales by utilization."
+  }
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Read controls into a config object
+// ─────────────────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+let renderMode = 'volume';
+let showShells = false;
+
+function readCfg() {
+  return {
+    cipFee : $('cip-fee').checked,
+    cip50  : $('cip-50').checked,
+    cip187 : $('cip-187').checked,
+    F      : parseFloat($('sl-F').value),
+    L      : parseFloat($('sl-L').value),
+    b      : parseFloat($('sl-b').value),
+    N      : parseInt($('sl-N').value, 10),
+    r      : parseFloat($('sl-r').value),
+    a0     : parseFloat($('sl-a0').value),
+    res    : parseInt($('sl-res').value, 10),
+    pmax   : parseFloat($('sl-pmax').value) * 1e6,
+    mmax   : parseFloat($('sl-mmax').value) / 100,
+    dmax   : parseFloat($('sl-dmax').value) * 1e6,
+    metric : $('metric').value,
+    iso    : parseFloat($('sl-iso').value) / 100,
+    sliceAxis: $('slice-axis').value,
+    slicePos : parseFloat($('sl-slicepos').value) / 100
+  };
+}
+
+// linspace helper
+function lin(a, b, n) {
+  const out = new Array(n);
+  for (let i = 0; i < n; i++) out[i] = a + (b - a) * i / (n - 1);
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Build the 3-D grid (for volume & isosurface)
+// ─────────────────────────────────────────────────────────────────────────────
+function buildGrid(cfg) {
+  const m = METRICS[cfg.metric];
+  const n = cfg.res;
+  const Pvals = lin(0, cfg.pmax, n);   // ADA
+  const Mvals = lin(0, cfg.mmax, n);   // fraction
+  const Dvals = lin(0, cfg.dmax, n);   // ADA
+
+  const x = [], y = [], z = [], value = [];
+  let vmin = Infinity, vmax = -Infinity;
+
+  for (let k = 0; k < n; k++) {        // delegation (Z)
+    for (let j = 0; j < n; j++) {      // margin (Y)
+      for (let i = 0; i < n; i++) {    // pledge (X)
+        const P = Pvals[i], mm = Mvals[j], D = Dvals[k];
+        let v = m.fn(P, D, mm, cfg);
+        if (!isFinite(v)) v = 0;
+        x.push(P / 1e6);
+        y.push(mm * 100);
+        z.push(D / 1e6);
+        value.push(v);
+        if (v < vmin) vmin = v;
+        if (v > vmax) vmax = v;
+      }
+    }
+  }
+  return { x, y, z, value, vmin, vmax, Pvals, Mvals, Dvals };
+}
+
+// Build a single oriented MRI plane perpendicular to one axis.
+function buildSlice(cfg) {
+  const m = METRICS[cfg.metric];
+  const n = Math.max(cfg.res, 30);
+  const Pvals = lin(0, cfg.pmax, n);
+  const Mvals = lin(0, cfg.mmax, n);
+  const Dvals = lin(0, cfg.dmax, n);
+
+  const xs = [], ys = [], zs = [], cs = [];   // 2-D arrays for surface
+  let vmin = Infinity, vmax = -Infinity;
+
+  // The two free axes (a, b) vary; the sliced axis is held at pos.
+  if (cfg.sliceAxis === 'z') {                 // horizontal plane, vary P & m
+    const D = cfg.dmax * cfg.slicePos;
+    for (let j = 0; j < n; j++) {              // rows = margin
+      const rx = [], ry = [], rz = [], rc = [];
+      for (let i = 0; i < n; i++) {            // cols = pledge
+        const v = clean(m.fn(Pvals[i], D, Mvals[j], cfg));
+        rx.push(Pvals[i] / 1e6); ry.push(Mvals[j] * 100); rz.push(D / 1e6); rc.push(v);
+        vmin = Math.min(vmin, v); vmax = Math.max(vmax, v);
+      }
+      xs.push(rx); ys.push(ry); zs.push(rz); cs.push(rc);
+    }
+  } else if (cfg.sliceAxis === 'x') {          // plane at fixed pledge, vary m & D
+    const P = cfg.pmax * cfg.slicePos;
+    for (let k = 0; k < n; k++) {              // rows = delegation
+      const rx = [], ry = [], rz = [], rc = [];
+      for (let j = 0; j < n; j++) {            // cols = margin
+        const v = clean(m.fn(P, Dvals[k], Mvals[j], cfg));
+        rx.push(P / 1e6); ry.push(Mvals[j] * 100); rz.push(Dvals[k] / 1e6); rc.push(v);
+        vmin = Math.min(vmin, v); vmax = Math.max(vmax, v);
+      }
+      xs.push(rx); ys.push(ry); zs.push(rz); cs.push(rc);
+    }
+  } else {                                     // plane at fixed margin, vary P & D
+    const mm = cfg.mmax * cfg.slicePos;
+    for (let k = 0; k < n; k++) {              // rows = delegation
+      const rx = [], ry = [], rz = [], rc = [];
+      for (let i = 0; i < n; i++) {            // cols = pledge
+        const v = clean(m.fn(Pvals[i], Dvals[k], mm, cfg));
+        rx.push(Pvals[i] / 1e6); ry.push(mm * 100); rz.push(Dvals[k] / 1e6); rc.push(v);
+        vmin = Math.min(vmin, v); vmax = Math.max(vmax, v);
+      }
+      xs.push(rx); ys.push(ry); zs.push(rz); cs.push(rc);
+    }
+  }
+  return { xs, ys, zs, cs, vmin, vmax };
+}
+function clean(v) { return isFinite(v) ? v : 0; }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Color-range helper: for diverging metrics, center on the pivot.
+// ─────────────────────────────────────────────────────────────────────────────
+function colorRange(metric, vmin, vmax) {
+  const m = METRICS[metric];
+  if (m.diverging) {
+    const span = Math.max(Math.abs(vmax - m.pivot), Math.abs(vmin - m.pivot), 1e-9);
+    return { cmin: m.pivot - span, cmax: m.pivot + span, cmid: m.pivot };
+  }
+  return { cmin: vmin, cmax: vmax };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Main render
+// ─────────────────────────────────────────────────────────────────────────────
+const layout3d = {
+  paper_bgcolor: '#0e1117',
+  font: { color: '#d6dde6', size: 11 },
+  margin: { l: 0, r: 0, t: 0, b: 0 },
+  scene: {
+    xaxis: { title: 'Pledge P (M ADA)',      backgroundcolor:'#0e1117', gridcolor:'#2b333f', zerolinecolor:'#3a4350', color:'#9aa6b5' },
+    yaxis: { title: 'Margin m (%)',          backgroundcolor:'#0e1117', gridcolor:'#2b333f', zerolinecolor:'#3a4350', color:'#9aa6b5' },
+    zaxis: { title: 'Delegation D (M ADA)',  backgroundcolor:'#0e1117', gridcolor:'#2b333f', zerolinecolor:'#3a4350', color:'#9aa6b5' },
+    camera: { eye: { x: 1.7, y: 1.5, z: 1.1 } },
+    aspectmode: 'cube'
+  }
+};
+const plotConfig = { displayModeBar: true, responsive: true,
+  modeBarButtonsToRemove: ['toImage'], displaylogo: false };
+
+let lastGridRange = [0, 1];   // [vmin, vmax] of the most recent field, for the iso slider
+
+function render() {
+  const cfg = readCfg();
+  const m = METRICS[cfg.metric];
+  const cs = m.reverse ? reverseScale(m.colorscale) : m.colorscale;
+
+  let traces = [];
+  let info = '';
+
+  if (renderMode === 'slice') {
+    const g = buildSlice(cfg);
+    lastGridRange = [g.vmin, g.vmax];
+    const cr = colorRange(cfg.metric, g.vmin, g.vmax);
+    traces = [{
+      type: 'surface',
+      x: g.xs, y: g.ys, z: g.zs, surfacecolor: g.cs,
+      colorscale: cs, cmin: cr.cmin, cmax: cr.cmax,
+      colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
+      contours: { z: { show: false } },
+      lighting: { ambient: 0.95, diffuse: 0.2, specular: 0.05 },
+      hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<extra></extra>'
+    }];
+    const axisName = cfg.sliceAxis === 'z' ? 'Delegation' : cfg.sliceAxis === 'x' ? 'Pledge' : 'Margin';
+    const axisMax  = cfg.sliceAxis === 'z' ? cfg.dmax/1e6+' M' : cfg.sliceAxis === 'x' ? cfg.pmax/1e6+' M' : (cfg.mmax*100).toFixed(1)+'%';
+    const posVal   = cfg.sliceAxis === 'z' ? (cfg.dmax*cfg.slicePos/1e6).toFixed(1)+' M ADA'
+                   : cfg.sliceAxis === 'x' ? (cfg.pmax*cfg.slicePos/1e6).toFixed(2)+' M ADA'
+                   : (cfg.mmax*cfg.slicePos*100).toFixed(2)+'%';
+    info = `MRI slice ⟂ <b>${axisName}</b> at <b>${posVal}</b> (range 0–${axisMax}).`;
+
+  } else {
+    const g = buildGrid(cfg);
+    lastGridRange = [g.vmin, g.vmax];
+    const cr = colorRange(cfg.metric, g.vmin, g.vmax);
+
+    if (renderMode === 'volume') {
+      traces = [{
+        type: 'volume',
+        x: g.x, y: g.y, z: g.z, value: g.value,
+        isomin: g.vmin, isomax: g.vmax,
+        cmin: cr.cmin, cmax: cr.cmax, cmid: cr.cmid,
+        colorscale: cs,
+        opacity: 0.12, surface: { count: 18 },
+        colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
+        hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<br>'+m.label+': %{value:.3s}<extra></extra>'
+      }];
+      info = 'Volume fog — opacity follows the metric. Denser color = larger value.';
+
+    } else {  // isosurface
+      const lvl = g.vmin + cfg.iso * (g.vmax - g.vmin);
+      const band = (g.vmax - g.vmin) * 0.001 || 1e-6;
+      const isomin = showShells ? g.vmin : lvl;
+      const isomax = showShells ? g.vmax : lvl + band;
+      traces = [{
+        type: 'isosurface',
+        x: g.x, y: g.y, z: g.z, value: g.value,
+        isomin, isomax,
+        surface: { count: showShells ? 4 : 1, fill: 1.0 },
+        caps: { x:{show:false}, y:{show:false}, z:{show:false} },
+        cmin: cr.cmin, cmax: cr.cmax, cmid: cr.cmid,
+        colorscale: cs, opacity: showShells ? 0.35 : 0.9,
+        colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
+        hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<br>'+m.label+': %{value:.3s}<extra></extra>'
+      }];
+      $('v-iso').textContent = fmt(lvl);
+      info = showShells
+        ? 'Nested shells — several constant-value surfaces from min to max.'
+        : `Isosurface at <b>${fmt(lvl)}</b> — the boundary of the region above this value.`;
+    }
+  }
+
+  Plotly.react('plot', traces, layout3d, plotConfig);
+  updateReadout(cfg, m, info);
+}
+
+// Build a reversed copy of a named Plotly colorscale (so red = "bad/MPO-wins").
+function reverseScale(name) {
+  // RdBu reversed → red high, blue low.
+  if (name === 'RdBu') {
+    return [
+      [0.0, 'rgb(5,48,97)'], [0.1,'rgb(33,102,172)'], [0.2,'rgb(67,147,195)'],
+      [0.3,'rgb(146,197,222)'], [0.4,'rgb(209,229,240)'], [0.5,'rgb(247,247,247)'],
+      [0.6,'rgb(253,219,199)'], [0.7,'rgb(244,165,130)'], [0.8,'rgb(214,96,77)'],
+      [0.9,'rgb(178,24,43)'], [1.0,'rgb(103,0,31)']
+    ];
+  }
+  return name;
+}
+
+function fmt(v) {
+  const a = Math.abs(v);
+  if (a >= 1e6) return (v/1e6).toFixed(2)+'M';
+  if (a >= 1e3) return (v/1e3).toFixed(1)+'k';
+  if (a >= 1)   return v.toFixed(1);
+  return v.toFixed(3);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Readout panel
+// ─────────────────────────────────────────────────────────────────────────────
+function updateReadout(cfg, m, info) {
+  const active = [];
+  if (cfg.cipFee && cfg.F < 340) active.push(`fee→${cfg.F}`);
+  if (cfg.cip50)  active.push(`CIP-50 L=${cfg.L}`);
+  if (cfg.cip187) active.push(`CIP-187 b=${cfg.b.toFixed(2)}`);
+  const cipTxt = active.length ? active.join(' · ') : 'none (baseline)';
+
+  // sample the splitting advantage at the three archetype corners
+  const corners = {
+    'Fee-farm (low P, low D)':      [0.2e6, 2e6],
+    'Leveraged (low P, high D)':    [0.2e6, cfg.dmax*0.9],
+    'Empty pledge (high P, low D)': [cfg.pmax*0.9, 1e6]
+  };
+  let rows = '';
+  for (const [name, pd] of Object.entries(corners)) {
+    const single = spoIncome(pd[0]+pd[1], pd[0], 0.0, cfg);
+    const comb   = mpoCombined(pd[0], pd[1], 0.0, cfg);
+    const adv    = comb - single;
+    const cls    = adv > 0.5 ? 'hot' : adv < -0.5 ? 'cool' : '';
+    const verdict= adv > 0.5 ? 'multipool wins' : adv < -0.5 ? 'single wins' : '≈ neutral';
+    rows += `<div><b>${name}</b>: <span class="${cls}">${fmt(adv)} ADA/ep — ${verdict}</span></div>`;
+  }
+
+  const Pi = cfg.pmax*0.5, Di = cfg.dmax*0.5;
+  $('readout').innerHTML =
+    `<div style="margin-bottom:0.4rem">${info}</div>`
+    + `<div style="margin-bottom:0.4rem">Active CIPs: <b>${cipTxt}</b> · N=<b>${cfg.N}</b></div>`
+    + `<div style="font-size:0.74rem;color:var(--muted);margin-bottom:0.3rem">Splitting advantage (m=0%) at the three MPO archetypes:</div>`
+    + rows
+    + `<div class="hint">${m.hint}</div>`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Wiring
+// ─────────────────────────────────────────────────────────────────────────────
+function syncLabels() {
+  $('v-F').textContent  = $('sl-F').value;
+  $('v-L').textContent  = $('sl-L').value;
+  $('v-b').textContent  = parseFloat($('sl-b').value).toFixed(2);
+  $('v-N').textContent  = $('sl-N').value;
+  $('v-r').textContent  = parseFloat($('sl-r').value).toFixed(6);
+  $('v-a0').textContent = parseFloat($('sl-a0').value).toFixed(2);
+  $('v-res').textContent= $('sl-res').value;
+  $('v-pmax').textContent = $('sl-pmax').value;
+  $('v-mmax').textContent = $('sl-mmax').value;
+  $('v-dmax').textContent = $('sl-dmax').value;
+  $('v-slicepos').textContent = $('sl-slicepos').value + '%';
+
+  // CIP label coloring + enable/disable dependent sliders
+  toggleCip('cip-fee', 'lbl-fee', 'sl-F');
+  toggleCip('cip-50',  'lbl-50',  'sl-L', 'wrap-L');
+  toggleCip('cip-187', 'lbl-187', 'sl-b', 'wrap-b');
+  $('metric-hint').innerHTML = METRICS[$('metric').value].hint;
+}
+function toggleCip(cb, lbl, slId, wrapId) {
+  const on = $(cb).checked;
+  $(lbl).className = on ? 'cip-on' : 'cip-off';
+  if (wrapId) $(wrapId).classList.toggle('disabled', !on);
+}
+
+// Debounced heavy recompute (on release / change).
+let pending = null;
+function scheduleRender() {
+  syncLabels();
+  clearTimeout(pending);
+  pending = setTimeout(render, 30);
+}
+
+// Light controls update labels live during drag; heavy recompute on 'change'.
+document.querySelectorAll('input[type=range]').forEach(el => {
+  el.addEventListener('input', syncLabels);
+  el.addEventListener('change', scheduleRender);
+});
+document.querySelectorAll('input[type=checkbox], select').forEach(el => {
+  el.addEventListener('change', scheduleRender);
+});
+
+// Render-mode buttons
+$('modebtns').addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  renderMode = btn.dataset.mode;
+  document.querySelectorAll('#modebtns button').forEach(b => b.classList.toggle('active', b === btn));
+  $('wrap-iso').style.display   = renderMode === 'isosurface' ? '' : 'none';
+  $('wrap-slice').style.display = renderMode === 'slice' ? '' : 'none';
+  const hints = {
+    volume: "Semi-transparent fog: opacity follows the metric, so dense color marks where the metric is large. Best first look at the field's shape.",
+    isosurface: 'A surface of constant metric value. Slide the level to find the boundary; for the advantage metrics, snap to the 0 / 1 pivot to see exactly where multipools stop winning.',
+    slice: 'A flat plane swept through the cube — the literal MRI view. Pick an axis and sweep its position.'
+  };
+  $('mode-hint').innerHTML = hints[renderMode];
+  render();
+});
+
+// Iso "snap to pivot" → set slider so the level sits on the metric's pivot (0 or 1).
+$('btn-snap').addEventListener('click', () => {
+  const cfg = readCfg();
+  const m = METRICS[cfg.metric];
+  const pivot = m.diverging ? m.pivot : (lastGridRange[0]+lastGridRange[1])/2;
+  const [vmin, vmax] = lastGridRange;
+  const pct = vmax > vmin ? Math.max(0, Math.min(100, 100*(pivot - vmin)/(vmax - vmin))) : 50;
+  $('sl-iso').value = pct; showShells = false;
+  scheduleRender();
+});
+$('btn-shells').addEventListener('click', () => { showShells = !showShells; render(); });
+
+// MRI sweep animation
+let sweepTimer = null;
+$('btn-sweep').addEventListener('click', () => {
+  if (sweepTimer) { clearInterval(sweepTimer); sweepTimer = null; $('btn-sweep').textContent = '▶ Sweep'; return; }
+  $('btn-sweep').textContent = '⏸ Stop';
+  let p = 0;
+  sweepTimer = setInterval(() => {
+    p = (p + 4) % 102;
+    $('sl-slicepos').value = p;
+    syncLabels(); render();
+  }, 120);
+});
+
+// Multipool N animation handled by the N slider; offer a quick auto-play too via 'A'
+document.addEventListener('keydown', e => {
+  if (e.key === 'a' || e.key === 'A') {
+    let n = 1;
+    const t = setInterval(() => {
+      $('sl-N').value = n; syncLabels(); render();
+      if (++n > 10) clearInterval(t);
+    }, 600);
+  }
+});
+
+// ── Scenario presets ─────────────────────────────────────────────────────────
+const PRESETS = {
+  baseline: { fee:false, F:340, c50:false, c187:false, b:1 },
+  fee:      { fee:true,  F:0,   c50:false, c187:false, b:1 },
+  c50:      { fee:false, F:340, c50:true,  L:100, c187:false, b:1 },
+  c187:     { fee:false, F:340, c50:false, c187:true,  b:1 },
+  all:      { fee:true,  F:0,   c50:true,  L:100, c187:true, b:1 }
+};
+document.querySelector('.presets').addEventListener('click', e => {
+  const btn = e.target.closest('button'); if (!btn) return;
+  const p = PRESETS[btn.dataset.preset];
+  $('cip-fee').checked = p.fee; $('sl-F').value = p.F;
+  $('cip-50').checked  = p.c50; if (p.L) $('sl-L').value = p.L;
+  $('cip-187').checked = p.c187; $('sl-b').value = p.b;
+  scheduleRender();
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+syncLabels();
+render();
+</script>
+</body>
+</html>
