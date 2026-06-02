@@ -145,7 +145,7 @@ sketch.
 | 6 | **Data format** | **Prose report format** identical to `epoch_633.txt`, parsed by the parser lifted from `epoch_report_viewer.html`. |
 | 7 | **Charting library** | **Plotly.js via CDN**, mirroring how the CIP-187 simulator loads Chart.js. |
 
-### 5.1 The Five (+1) Encoding Channels
+### 5.1 The Five (+4) Encoding Channels
 
 | Channel | Encodes | Notes |
 | --- | --- | --- |
@@ -155,6 +155,9 @@ sketch.
 | **Color** | Selectable output metric | with a colorbar/legend so a value can be *read*, not just compared |
 | **Time** | Multipool count `N` = 1…10 (animated) | §5.5 |
 | **Dot size** | *available* as an optional 6th scalar channel | reserved; use sparingly |
+| **Opacity** | *available* as an optional 7th scalar channel | reserved; use sparingly |
+| **Symbols** | *available* as an optional 8th scalar channel | reserved; use sparingly |
+| **Symbol orientation** | *available* as an optional 9th scalar channel | reserved; use sparingly |
 
 The three MPO archetypes from §2 then land in distinct regions of the cube:
 
@@ -285,7 +288,7 @@ lifted wholesale rather than rewritten.
 
 ### Suggested Filename
 
-`Multi_CIP_Combined_Simulator.html` — alongside the existing CIP-187 simulator at
+`Multi_CIP_Simulator.html` — alongside the existing CIP-187 simulator at
 `/home/js/aiken/ranger/`. Keep both simulators side by side; do not modify the
 existing one. Publish to GitHub Pages alongside the existing one.
 
@@ -362,7 +365,7 @@ not at every session start.
 | --- | --- |
 | Plan document (this file) | Created 2026-05-31. |
 | Draft write-up `Multi-CIPs_Needed_To_Close_The_Parameter_Spaces_Where_MultiPools_Operate.md` | Not started. |
-| Build combined simulator `Multi_CIP_Combined_Simulator.html` | Design fully specified 2026-06-01 (§5). Build not started. |
+| Build combined simulator `Multi_CIP_Simulator.html` | Design fully specified 2026-06-01 (§5). Build not started. |
 | Publish new simulator to GitHub Pages | Not done. |
 
 ---
