@@ -151,8 +151,10 @@
     box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,159,67,0.18);
     font-size: 0.86rem; line-height: 1.5; color: var(--text);
   }
-  .tour-step-counter { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.35rem; }
-  #tour-title { font-size: 1.0rem; color: var(--accent); margin-bottom: 0.5rem; font-weight: 700; }
+  .tour-step-counter { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.35rem; cursor: move; user-select: none; }
+  #tour-title { font-size: 1.0rem; color: var(--accent); margin-bottom: 0.5rem; font-weight: 700; cursor: move; user-select: none; }
+  #tour-title::before { content: "⠿ "; color: var(--muted); font-weight: 400; }
+  #tour-card.dragging { box-shadow: 0 14px 40px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,159,67,0.4); }
   #tour-body strong { color: var(--accent); }
   #tour-body em { color: var(--teal); font-style: normal; font-weight: 600; }
   #tour-body .bad  { color: var(--red);  font-weight: 700; }
@@ -210,6 +212,35 @@
       <div class="hint" id="mode-hint">
         Semi-transparent fog: opacity follows the metric, so dense color marks where the
         metric is large. Best first look at the field's shape.
+      </div>
+    </div>
+
+    <div class="group" id="grp-field">
+      <h3>Field view</h3>
+      <div class="ctl" id="wrap-iso">
+        <label>Isosurface level <span class="val" id="v-iso">—</span></label>
+        <input type="range" id="sl-iso" min="0" max="100" step="1" value="50">
+        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+          <button id="btn-snap" style="font-size:0.74rem">Snap to pivot (0 / 1)</button>
+          <button id="btn-shells" style="font-size:0.74rem">Nested shells</button>
+        </div>
+      </div>
+      <div class="ctl" id="wrap-slice" style="display:none">
+        <label>Slice axis</label>
+        <select id="slice-axis">
+          <option value="z" selected>Delegation (horizontal plane)</option>
+          <option value="x">Pledge</option>
+          <option value="y">Margin</option>
+        </select>
+        <label style="margin-top:0.4rem">Slice position <span class="val" id="v-slicepos">50%</span></label>
+        <input type="range" id="sl-slicepos" min="0" max="100" step="2" value="50">
+        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+          <button id="btn-sweep" style="font-size:0.74rem">▶ Sweep</button>
+        </div>
+      </div>
+      <div class="ctl">
+        <label>Grid resolution <span class="val" id="v-res">32</span></label>
+        <input type="range" id="sl-res" min="12" max="48" step="2" value="32">
       </div>
     </div>
 
@@ -282,35 +313,6 @@
       <div class="ctl">
         <label>Pledge influence <code>a₀</code> <span class="val" id="v-a0">0.30</span></label>
         <input type="range" id="sl-a0" min="0" max="2" step="0.05" value="0.30">
-      </div>
-    </div>
-
-    <div class="group" id="grp-field">
-      <h3>Field view</h3>
-      <div class="ctl" id="wrap-iso">
-        <label>Isosurface level <span class="val" id="v-iso">—</span></label>
-        <input type="range" id="sl-iso" min="0" max="100" step="1" value="50">
-        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
-          <button id="btn-snap" style="font-size:0.74rem">Snap to pivot (0 / 1)</button>
-          <button id="btn-shells" style="font-size:0.74rem">Nested shells</button>
-        </div>
-      </div>
-      <div class="ctl" id="wrap-slice" style="display:none">
-        <label>Slice axis</label>
-        <select id="slice-axis">
-          <option value="z" selected>Delegation (horizontal plane)</option>
-          <option value="x">Pledge</option>
-          <option value="y">Margin</option>
-        </select>
-        <label style="margin-top:0.4rem">Slice position <span class="val" id="v-slicepos">50%</span></label>
-        <input type="range" id="sl-slicepos" min="0" max="100" step="2" value="50">
-        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
-          <button id="btn-sweep" style="font-size:0.74rem">▶ Sweep</button>
-        </div>
-      </div>
-      <div class="ctl">
-        <label>Grid resolution <span class="val" id="v-res">32</span></label>
-        <input type="range" id="sl-res" min="12" max="48" step="2" value="32">
       </div>
     </div>
 
@@ -904,14 +906,16 @@ const TOUR_SCRIPTS = {
     {
       title: 'The cube: three things describe every pool',
       body: `<p>Rather than look at pools one at a time, this tool draws <em>all</em> possible pools at
-        once, as a 3-D cube. Where a point sits is set by three numbers:</p>
-        <p>• <strong>Pledge</strong> (left–right, the X axis): how much of the operator's <em>own</em>
-        money is locked in the pool — their skin in the game.<br>
-        • <strong>Margin</strong> (up–down, the Y axis): the cut the operator keeps before sharing rewards.<br>
-        • <strong>Delegation</strong> (depth, the Z axis): how much money <em>other people</em> have
-        entrusted to the pool.</p>
-        <p>Every region of the cube is a different kind of pool. The colour at each point answers a
-        question — which we set next.</p>`,
+        once, as a 3-D cube. Where a point sits is set by three numbers, one for each axis:</p>
+        <p>• <strong>Pledge axis</strong>: how much of the operator's <em>own</em> money is locked in
+        the pool — their skin in the game.<br>
+        • <strong>Margin axis</strong>: the cut the operator keeps before sharing rewards.<br>
+        • <strong>Delegation axis</strong>: how much money <em>other people</em> have entrusted to the
+        pool.</p>
+        <p>Each axis is labelled where it meets the cube. You can grab the cube and spin it, so an axis
+        won't always point the same way on your screen — read the label, not the direction (up/down,
+        in/out, side to side). Every region of the cube is a different kind of pool, and the colour at
+        each point answers a question we set next.</p>`,
       targets: ['plot'],
       actions: [],
       cardPosition: 'bottom-left',
@@ -932,17 +936,54 @@ const TOUR_SCRIPTS = {
       holdMs: 10000,
     },
     {
-      title: 'Choosing what the colour means',
-      body: `<p>This menu picks the question the colours answer. Besides <strong>splitting advantage</strong>,
-        you can colour by a single operator's income, by <strong>delegator ROA</strong> (the yearly
-        return ordinary members earn), by the operator's fee income, and more.</p>
-        <p>Two of these are the heroes of the story: when we squeeze the cheaters we want
-        <em>single-pool income</em> and <em>delegator ROA</em> to stay healthy. We'll return to them
-        at the end.</p>`,
+      title: 'The colour menu — splitting advantage',
+      body: `<p>This menu picks the <strong>question the colours answer</strong>. There are eight
+        choices. The first two are the ones the tour leans on most, because they measure the gaming
+        directly:</p>
+        <p>• <strong>Splitting advantage — difference</strong> (the default): the extra ADA <em>per
+        epoch</em> an operator pockets by splitting into N pools instead of running one.
+        <span class="bad">Red</span> = splitting wins (the habitat we want to close);
+        <span class="good">blue</span> = one honest pool wins.<br>
+        • <strong>Splitting advantage — ratio</strong>: the same comparison as a multiple (N-pool take
+        ÷ 1-pool take). Above 1 (red) splitting pays; exactly 1 is a tie; below 1 (blue) the single
+        pool wins. The ratio is capped at 3 so a few runaway numbers don't wash out the colours.</p>`,
       targets: ['grp-metric'],
       actions: [],
       cardPosition: 'bottom-right',
-      holdMs: 10000,
+      holdMs: 11000,
+    },
+    {
+      title: "The colour menu — the operator's income",
+      body: `<p>The next five choices open up <em>where</em> an operator's money actually comes from —
+        handy for seeing exactly which revenue stream a given reform is squeezing:</p>
+        <p>• <strong>MPO combined take</strong>: the operator's total income added up across all N
+        split pools. This is the high-value blob each CIP family is trying to shrink.<br>
+        • <strong>Single-pool operator take</strong>: income from running just <em>one</em> honest pool
+        at the same total pledge and delegation. We want this to beat the combined take.<br>
+        • <strong>Operator fixed-fee income</strong>: the flat <code>minPoolCost</code> fee actually
+        collected (it can't exceed what the pool earns) — the fee-farm stream that CIPs 23/74/75 target.<br>
+        • <strong>Operator margin income</strong>: what the operator keeps from its percentage margin on
+        the net rewards.<br>
+        • <strong>Operator pledge income</strong>: the operator's own pledge share of the net rewards —
+        exactly the stream CIP-187 scales down when a pool sits empty.</p>`,
+      targets: ['grp-metric', 'plot'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 13000,
+    },
+    {
+      title: "The colour menu — the delegator's return",
+      body: `<p>The last choice looks at the people the network is really for:</p>
+        <p>• <strong>Delegator ROA</strong>: the annual percentage return an ordinary member earns by
+        delegating to a single pool. Bright means members are well rewarded there.</p>
+        <p>Across all eight, two are the <em>heroes</em> of the mission: when we squeeze the cheaters we
+        want <strong>single-pool take</strong> and <strong>delegator ROA</strong> to stay strong. If
+        closing the red zones also keeps honest operators and their members prosperous, the reforms are
+        doing exactly what Cardano wants — and we return to these two at the very end.</p>`,
+      targets: ['grp-metric'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 11000,
     },
     {
       title: 'Three ways to look inside the cube',
@@ -960,19 +1001,48 @@ const TOUR_SCRIPTS = {
     },
     {
       title: 'Isosurface — find the boundary wall',
-      body: `<p>Here is the <strong>isosurface</strong> view. It draws the skin around the region where
-        the metric is high. For the splitting advantage, snapping the level to <strong>zero</strong>
-        shows the exact wall between <span class="bad">multipools-win</span> and
-        <span class="good">single-pool-wins</span>. Shrinking what's inside that wall is the whole
-        mission.</p>`,
-      targets: ['grp-mode', 'plot'],
+      body: `<p>This is the <strong>isosurface</strong> view. Instead of a fog it draws a single hard
+        <em>shell</em> — the surface where the metric equals one chosen value, like a contour line on a
+        map turned into a 3-D skin. Everything <em>inside</em> the shell is above that value; everything
+        outside is below it.</p>
+        <p>The <strong>Isosurface level</strong> slider (in the Field view group, just below) chooses
+        which value the shell wraps. For the splitting-advantage metric the value that matters is
+        <strong>zero</strong> — the dividing line between <span class="bad">multipools win</span> and
+        <span class="good">single pool wins</span>. The <strong>Snap to pivot (0 / 1)</strong> button
+        jumps the level straight onto that line for you (0 for the difference metric, 1 for the ratio),
+        so the shell becomes the exact wall of the gaming habitat. Shrinking the volume inside that wall
+        is the whole mission.</p>`,
+      targets: ['grp-field', 'plot'],
       actions: [
         { kind: 'mode', mode: 'isosurface' },
         { pause: 700 },
         { kind: 'click', id: 'btn-snap' },
       ],
       cardPosition: 'bottom-left',
-      holdMs: 10000,
+      holdMs: 12000,
+    },
+    {
+      title: 'Isosurface — nested shells & reading each metric',
+      body: `<p><strong>Nested shells</strong> draws several shells at once — like the layers of an
+        onion — from the lowest value out to the highest. One shell shows a single boundary; nested
+        shells show how steeply the metric climbs, so you see not just <em>where</em> a region begins
+        but where its concentrated "hot core" sits.</p>
+        <p>This view is how you locate each group's territory, one metric at a time:</p>
+        <p>• Colour by <strong>splitting advantage</strong> and snap to zero → the shell walls off where
+        <span class="bad">multipools profit</span> (the region to close).<br>
+        • Switch to <strong>single-pool take</strong> → the shell wraps where an <span class="good">honest
+        single operator profits</span>.<br>
+        • Switch to <strong>delegator ROA</strong> → the shell wraps where <span class="good">delegators
+        earn the best return</span>.</p>
+        <p>Turning a CIP preset on and watching the multipool shell <em>shrink</em> while the single-pool
+        and delegator shells <em>hold their ground</em> is the visual proof at the heart of this project.</p>`,
+      targets: ['grp-field', 'plot'],
+      actions: [
+        { pause: 600 },
+        { kind: 'click', id: 'btn-shells' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 13000,
     },
     {
       title: 'MRI slice — sweep a cross-section',
@@ -1216,6 +1286,52 @@ let TOUR_STEPS = TOUR_SCRIPTS.tour;
 
 const tour = { i: 0, playing: false, open: false, rafId: null, autoTimerId: null, renderGuard: 0 };
 
+// Set true the moment the viewer drags the card; from then on the scripted
+// per-step placement (applyCardPosition) leaves the card alone. Reset on each
+// fresh startTour() so a relaunched tutorial starts from the default corner.
+let tourCardMoved = false;
+
+// Make the card draggable by its title / step-counter "handle". The body text and
+// the control buttons stay fully usable — only grabs that start on the handle move it.
+function initCardDrag(card) {
+  let dragging = false, sx = 0, sy = 0, startLeft = 0, startTop = 0;
+  card.addEventListener('pointerdown', e => {
+    if (!e.target.closest('.tour-step-counter') && e.target.id !== 'tour-title') return;
+    dragging = true;
+    const r = card.getBoundingClientRect();
+    startLeft = r.left; startTop = r.top;
+    sx = e.clientX; sy = e.clientY;
+    card.style.left = startLeft + 'px';
+    card.style.top  = startTop + 'px';
+    card.style.right = 'auto';
+    card.style.bottom = 'auto';
+    card.classList.add('dragging');
+    tourCardMoved = true;
+    try { card.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  card.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const r = card.getBoundingClientRect();
+    let nx = startLeft + (e.clientX - sx);
+    let ny = startTop  + (e.clientY - sy);
+    nx = Math.max(0, Math.min(window.innerWidth  - r.width,  nx));
+    ny = Math.max(0, Math.min(window.innerHeight - r.height, ny));
+    card.style.left = nx + 'px';
+    card.style.top  = ny + 'px';
+    scheduleArrowRedraw();
+  });
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    card.classList.remove('dragging');
+    try { card.releasePointerCapture(e.pointerId); } catch (_) {}
+    scheduleArrowRedraw();
+  }
+  card.addEventListener('pointerup', endDrag);
+  card.addEventListener('pointercancel', endDrag);
+}
+
 function tourClamp(min, max, v) { return Math.max(min, Math.min(max, v)); }
 function tourSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -1352,6 +1468,9 @@ function nextFrame() { return new Promise(r => requestAnimationFrame(r)); }
 function applyCardPosition(pos) {
   const card = document.getElementById('tour-card');
   if (!card) return;
+  // Once the viewer has dragged the card, keep it where they put it — don't let
+  // the scripted per-step placement yank it back.
+  if (tourCardMoved) return;
   card.style.top = ''; card.style.bottom = ''; card.style.left = ''; card.style.right = '';
   switch (pos) {
     case 'top-right':   card.style.top = '1.2rem';    card.style.right = '1.2rem'; break;
@@ -1452,10 +1571,12 @@ function buildTourDom() {
   document.getElementById('tour-next').addEventListener('click',     () => { pauseAutoplay(); nextStep(); });
   document.getElementById('tour-autoplay').addEventListener('click', toggleAutoplay);
   document.getElementById('tour-exit').addEventListener('click',     exitTour);
+  initCardDrag(card);
 }
 
 function startTour(scriptName = 'tour') {
   TOUR_STEPS = TOUR_SCRIPTS[scriptName] ?? TOUR_SCRIPTS.tour;
+  tourCardMoved = false;   // each fresh launch starts from the default corner
   if (tour.open) {
     tour.renderGuard++;
     tour.i = 0;
