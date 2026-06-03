@@ -1,7 +1,7 @@
 # CLAUDE.md — Pool Ranger (ranger)  
-Always read /home/js/aiken/ranger/claude_queries/Multi_CIP_Plan.md at the start of each session.
-Always read /home/js/aiken/ranger/Multi_CIP_Simulator.html at the start of each session.
-Always read /home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html at the start of each session.
+Always read /home/js/aiken/ranger/claude_queries/Multi_CIP_Plan.md at the start of each session.  
+Always read /home/js/aiken/ranger/Multi_CIP_Simulator.html at the start of each session.  
+Always read /home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html at the start of each session.  
 
 ---
 

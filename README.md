@@ -208,7 +208,8 @@ To see rewards that have built up but not yet been sent to you:
 - [Pool Switch Calculator](https://johnshearing.github.io/pool_ranger/POOL_SWITCH_CALCULATOR.html)
 - [View and Analyze All Pools](https://johnshearing.github.io/pool_ranger/epoch_agent/epoch_report_viewer.html)
 - [Latest Epoch Reporting Data](https://github.com/johnshearing/pool_ranger/tree/main/epoch_agent/reports): See which pools changed their fee, margin, or pledge since the last epoch.
-- [Interactive Chart for CIP: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)
+- [Interactive Chart for CIP-187: Utilization Scaled Pledge Bonus: The Multi-Pool Buster](https://johnshearing.github.io/pool_ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html)  
+- [Multi CIP Simulator: The Multi-Pool Busters](https://johnshearing.github.io/pool_ranger/Multi_CIP_Simulator.html)
 
 
 ## Donate To Pool Ranger

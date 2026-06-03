@@ -128,6 +128,52 @@
   #readout .cool { color: var(--teal); }
   .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.4; }
   code { color: var(--accent); font-size: 0.92em; }
+
+  /* ── Guided tutorial: launcher, dim, card, arrows ─────────────────────────── */
+  #tour-launcher button { margin-bottom: 0.4rem; text-align: left; font-weight: 700; line-height: 1.3; }
+  #tour-launcher .hint { margin-top: 0.45rem; }
+  .tour-launch-1 { background: var(--accent) !important; color: #1a1205 !important; border-color: var(--accent) !important; }
+  .tour-launch-2 { background: #233244 !important; color: var(--text) !important; border: 1px solid var(--accent) !important; }
+  #tour-launcher button:hover { opacity: 0.88; }
+
+  #tour-dim {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+    z-index: 9000; pointer-events: none; opacity: 0; transition: opacity 0.2s;
+  }
+  #tour-dim.shown { opacity: 1; }
+  #tour-arrow-layer { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 9100; pointer-events: none; }
+
+  #tour-card {
+    position: fixed; bottom: 1.2rem; right: 1.2rem;
+    width: clamp(320px, 28vw, 440px);
+    background: var(--panel2); border: 1px solid var(--accent);
+    border-radius: 10px; padding: 1rem 1.2rem 0.9rem; z-index: 9200;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,159,67,0.18);
+    font-size: 0.86rem; line-height: 1.5; color: var(--text);
+  }
+  .tour-step-counter { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.35rem; }
+  #tour-title { font-size: 1.0rem; color: var(--accent); margin-bottom: 0.5rem; font-weight: 700; }
+  #tour-body strong { color: var(--accent); }
+  #tour-body em { color: var(--teal); font-style: normal; font-weight: 600; }
+  #tour-body .bad  { color: var(--red);  font-weight: 700; }
+  #tour-body .good { color: var(--teal); font-weight: 700; }
+  #tour-body code { color: var(--accent); }
+  #tour-body p { margin: 0 0 0.55rem; }
+  #tour-body p:last-child { margin-bottom: 0; }
+  .tour-controls { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.85rem; padding-top: 0.7rem; border-top: 1px solid var(--border); }
+  .tour-controls button { width: auto; background: transparent; border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-size: 0.76rem; font-weight: 600; padding: 0.4rem 0.7rem; }
+  .tour-controls button:hover { border-color: var(--accent); }
+  .tour-controls button:disabled { opacity: 0.35; cursor: default; }
+  #tour-autoplay { background: var(--accent); color: #1a1205; border-color: var(--accent); }
+  #tour-autoplay.playing { background: var(--teal); border-color: var(--teal); color: #06201d; }
+  #tour-exit { margin-left: auto; }
+  @keyframes tour-pulse {
+    0%   { box-shadow: 0 0 0 0    rgba(78,205,196,0.65); }
+    70%  { box-shadow: 0 0 0 12px rgba(78,205,196,0);    }
+    100% { box-shadow: 0 0 0 0    rgba(78,205,196,0);    }
+  }
+  .tour-pulse { outline: 2px solid var(--teal) !important; outline-offset: 3px; border-radius: 6px; animation: tour-pulse 1.4s ease-out infinite; position: relative; z-index: 9050; }
+  @media (max-width: 760px) { #tour-card { left: 0.6rem; right: 0.6rem; width: auto; bottom: 0.6rem; } }
 </style>
 </head>
 <body>
@@ -145,7 +191,16 @@
 <div id="layout">
   <div id="controls">
 
-    <div class="group">
+    <div class="group" id="tour-launcher">
+      <h3>Guided tutorials</h3>
+      <button class="tour-launch-1" id="tour-btn-tour">▶ Start here — the cube &amp; every control</button>
+      <button class="tour-launch-2" id="tour-btn-thesis">▶ The mission — close the multipool zones</button>
+      <div class="hint">Cards appear on screen and arrows point at the control being explained; some
+        sliders move by themselves. Click <b>▶ Play</b> in a card to run it hands-free, or press
+        <b>Esc</b> to leave the tour.</div>
+    </div>
+
+    <div class="group" id="grp-mode">
       <h3>Render mode</h3>
       <div class="modebtns" id="modebtns">
         <button data-mode="volume" class="active">Volume fog</button>
@@ -158,7 +213,7 @@
       </div>
     </div>
 
-    <div class="group">
+    <div class="group" id="grp-metric">
       <h3>Color metric</h3>
       <div class="ctl">
         <select id="metric">
@@ -175,18 +230,18 @@
       <div class="hint" id="metric-hint"></div>
     </div>
 
-    <div class="group">
+    <div class="group" id="grp-presets">
       <h3>Scenario presets</h3>
       <div class="presets">
-        <button data-preset="baseline">Baseline (no CIP)</button>
-        <button data-preset="fee">Fee reform only</button>
-        <button data-preset="c50">CIP-50 only</button>
-        <button data-preset="c187">CIP-187 only</button>
-        <button data-preset="all" style="grid-column:1/3">All three families</button>
+        <button data-preset="baseline" id="pre-baseline">Baseline (no CIP)</button>
+        <button data-preset="fee" id="pre-fee">Fee reform only</button>
+        <button data-preset="c50" id="pre-c50">CIP-50 only</button>
+        <button data-preset="c187" id="pre-c187">CIP-187 only</button>
+        <button data-preset="all" id="pre-all" style="grid-column:1/3">All three families</button>
       </div>
     </div>
 
-    <div class="group">
+    <div class="group" id="grp-cip">
       <h3>CIP levers</h3>
 
       <div class="cipline">
@@ -214,7 +269,7 @@
       </div>
     </div>
 
-    <div class="group">
+    <div class="group" id="grp-strategy">
       <h3>Operator strategy &amp; protocol</h3>
       <div class="ctl">
         <label>Multipool count <code>N</code> <span class="val" id="v-N">5</span></label>
@@ -230,7 +285,7 @@
       </div>
     </div>
 
-    <div class="group">
+    <div class="group" id="grp-field">
       <h3>Field view</h3>
       <div class="ctl" id="wrap-iso">
         <label>Isosurface level <span class="val" id="v-iso">—</span></label>
@@ -809,6 +864,652 @@ document.querySelector('.presets').addEventListener('click', e => {
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
 applyPreset('baseline');   // start with no CIPs active; all three sliders greyed
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  Guided tutorials — cards + arrows + self-moving controls.
+//
+//  The engine is adapted from CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html. Differences:
+//    • All targets are DOM elements (this sim has no Chart.js datapoints to aim at);
+//      arrows land on a control/group and it pulses.
+//    • Actions can flip presets, render modes, and the metric selector — not just
+//      tween sliders — because that is how this simulator is actually driven.
+//
+//  Two scripts:
+//    tour   — "what is every control for", framed by the goal (close red / open blue).
+//    thesis — the argument: close each multipool corner in turn, then all at once.
+// ═════════════════════════════════════════════════════════════════════════════
+const TOUR_SCRIPTS = {
+  tour: [
+    {
+      title: 'Welcome — what this tool is for',
+      body: `<p>This tool is about keeping Cardano <em>fair</em>. On Cardano people earn rewards by
+        <strong>staking</strong> their coins through a <strong>stake pool</strong> — think of a pool as
+        a co-op that combines everyone's coins to earn a share of the network's rewards.</p>
+        <p>A few operators game the rules by running <strong>many</strong> near-identical pools
+        ("multipools") to grab more reward than one honest pool would. That crowds out small
+        operators and weakens the network.</p>
+        <p>This whole tool exists to find — and close — the situations where that gaming pays.
+        <span class="bad">Red</span> will mark "multipools win" (the regions we want to <strong>close</strong>);
+        <span class="good">blue</span> will mark "one honest pool wins" (the regions we want to
+        <strong>open</strong>). Press <strong>▶ Play</strong> to let the tour drive itself.</p>`,
+      targets: [],
+      actions: [
+        { kind: 'preset', name: 'baseline' },
+        { kind: 'select', id: 'metric', value: 'advantage' },
+        { kind: 'mode',   mode: 'volume' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 12000,
+    },
+    {
+      title: 'The cube: three things describe every pool',
+      body: `<p>Rather than look at pools one at a time, this tool draws <em>all</em> possible pools at
+        once, as a 3-D cube. Where a point sits is set by three numbers:</p>
+        <p>• <strong>Pledge</strong> (left–right, the X axis): how much of the operator's <em>own</em>
+        money is locked in the pool — their skin in the game.<br>
+        • <strong>Margin</strong> (up–down, the Y axis): the cut the operator keeps before sharing rewards.<br>
+        • <strong>Delegation</strong> (depth, the Z axis): how much money <em>other people</em> have
+        entrusted to the pool.</p>
+        <p>Every region of the cube is a different kind of pool. The colour at each point answers a
+        question — which we set next.</p>`,
+      targets: ['plot'],
+      actions: [],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+    {
+      title: 'The colour is the answer being computed',
+      body: `<p>Right now the colour shows the <strong>splitting advantage</strong>: how many extra
+        rewards an operator pockets by splitting into several pools instead of running one.</p>
+        <p><span class="bad">Red fog</span> = splitting wins (bad — a cheater's paradise we want to
+        close). <span class="good">Blue fog</span> = a single honest pool wins (good). The fog is
+        densest where the effect is strongest.</p>
+        <p>The panel here on the left keeps a running scorecard in plain words — watch it change as
+        the tour moves the dials.</p>`,
+      targets: ['plot', 'readout'],
+      actions: [],
+      cardPosition: 'bottom-left',
+      holdMs: 10000,
+    },
+    {
+      title: 'Choosing what the colour means',
+      body: `<p>This menu picks the question the colours answer. Besides <strong>splitting advantage</strong>,
+        you can colour by a single operator's income, by <strong>delegator ROA</strong> (the yearly
+        return ordinary members earn), by the operator's fee income, and more.</p>
+        <p>Two of these are the heroes of the story: when we squeeze the cheaters we want
+        <em>single-pool income</em> and <em>delegator ROA</em> to stay healthy. We'll return to them
+        at the end.</p>`,
+      targets: ['grp-metric'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 10000,
+    },
+    {
+      title: 'Three ways to look inside the cube',
+      body: `<p>A solid block of colour would hide its own middle, so the cube can be drawn three
+        ways — like three kinds of medical scan:</p>
+        <p>• <strong>Volume fog</strong> (showing now): a translucent cloud — see the whole shape at a glance.<br>
+        • <strong>Isosurface</strong>: a single shell wrapping everything above a chosen value — the exact
+        <em>boundary</em> of a region.<br>
+        • <strong>MRI slice</strong>: a flat plane you slide through the cube, like an MRI scanner moving
+        through a body.</p>`,
+      targets: ['grp-mode'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 10000,
+    },
+    {
+      title: 'Isosurface — find the boundary wall',
+      body: `<p>Here is the <strong>isosurface</strong> view. It draws the skin around the region where
+        the metric is high. For the splitting advantage, snapping the level to <strong>zero</strong>
+        shows the exact wall between <span class="bad">multipools-win</span> and
+        <span class="good">single-pool-wins</span>. Shrinking what's inside that wall is the whole
+        mission.</p>`,
+      targets: ['grp-mode', 'plot'],
+      actions: [
+        { kind: 'mode', mode: 'isosurface' },
+        { pause: 700 },
+        { kind: 'click', id: 'btn-snap' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 10000,
+    },
+    {
+      title: 'MRI slice — sweep a cross-section',
+      body: `<p>The <strong>MRI slice</strong> view shows one flat cross-section of the cube. Choose
+        which direction to cut, then drag the slice through — or press <strong>▶ Sweep</strong> to
+        animate it — to scan the whole interior, layer by layer. Useful when you want to read exact
+        values rather than judge an overall shape.</p>`,
+      targets: ['grp-field', 'plot'],
+      actions: [
+        { kind: 'mode', mode: 'slice' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 9000,
+    },
+    {
+      title: 'The presets — the fastest tour of the idea',
+      body: `<p>Back to the fog. These five buttons load ready-made scenarios. <strong>Baseline</strong>
+        is Cardano's rules today. The next three each switch on one proposed fix (a "CIP").
+        <strong>All three families</strong> turns them all on at once. This is the quickest way to
+        watch the red zone shrink — it's the heart of the second tutorial.</p>`,
+      targets: ['grp-presets'],
+      actions: [
+        { kind: 'mode', mode: 'volume' },
+      ],
+      cardPosition: 'bottom-right',
+      holdMs: 9500,
+    },
+    {
+      title: 'The policy dials (the CIPs)',
+      body: `<p>These three sliders are the real-world policy levers each preset moves for you:</p>
+        <p>• <strong>Fee reform</strong> lowers the flat fee every pool may charge — the thing that makes
+        running dozens of empty pools profitable today.<br>
+        • <strong>Leverage cap (L)</strong> stops a pool earning on far more delegation than the operator's
+        own pledge can back.<br>
+        • <strong>Pledge-bonus scaling (b)</strong> pays the operator's pledge reward only in proportion to
+        how <em>full</em> the pool is, so empty showcase pools earn nothing extra.</p>
+        <p>A greyed-out slider just means that CIP is currently switched off.</p>`,
+      targets: ['grp-cip'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 12000,
+    },
+    {
+      title: 'How the cheater splits: the N dial',
+      body: `<p><strong>N</strong> is how many pools the operator splits into. At <strong>N = 1</strong>
+        they play fair; higher N is the gaming strategy. The colours always show the operator's
+        <em>combined</em> take across all N pools, so you can watch splitting pay off — or stop paying
+        once the policies bite. I'll nudge it up and back so you can see the effect.</p>`,
+      targets: ['sl-N'],
+      actions: [
+        { kind: 'slider', id: 'sl-N', value: 9, ms: 800 },
+        { pause: 700 },
+        { kind: 'slider', id: 'sl-N', value: 5, ms: 600 },
+      ],
+      cardPosition: 'bottom-right',
+      holdMs: 9000,
+    },
+    {
+      title: 'Protocol constants: r and a₀',
+      body: `<p>The other two sliders here, <strong>r</strong> and <strong>a₀</strong>, are network-wide
+        settings from Cardano's reward formula (the base reward rate, and how strongly pledge is
+        rewarded). Normally you leave them at their defaults; they're here so advanced users can test
+        how the picture changes under different network conditions.</p>`,
+      targets: ['grp-strategy'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 9000,
+    },
+    {
+      title: 'Field view: detail vs. speed',
+      body: `<p>This group fine-tunes the picture. <strong>Grid resolution</strong> trades smoothness for
+        speed — higher looks better but recomputes more slowly. In isosurface mode you also get the
+        <strong>level</strong> slider and a <strong>Snap to pivot</strong> button (jumps the level onto the
+        red/blue dividing line); in slice mode you get the slice axis and <strong>Sweep</strong>.</p>`,
+      targets: ['grp-field'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 9000,
+    },
+    {
+      title: 'The scorecard, in words',
+      body: `<p>Finally, this panel translates the cube into plain language. It checks the three classic
+        gaming set-ups — the <em>fee-farm</em>, the <em>over-leveraged</em> pool, and the
+        <em>empty-pledge</em> pool — and tells you, for the current dials, whether
+        <span class="bad">multipools win</span> or a <span class="good">single pool wins</span> in each.
+        It updates the instant you change anything.</p>`,
+      targets: ['readout'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 10000,
+    },
+    {
+      title: "That's every control",
+      body: `<p>The big idea: drive the policy sliders until the <span class="bad">red</span>
+        (gaming-pays) regions vanish and the <span class="good">blue</span> (honest-pool-and-members-win)
+        regions fill the cube.</p>
+        <p>To watch that happen end-to-end, exit and run the second tutorial:
+        <strong>The mission — close the multipool zones</strong>. Press <strong>Esc</strong> or
+        <strong>Exit</strong> any time to explore on your own.</p>`,
+      targets: [],
+      actions: [],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+  ],
+
+  thesis: [
+    {
+      title: 'The mission, in one arc',
+      body: `<p>This walkthrough shows the tool's whole purpose. We take Cardano's rules as they are
+        today and watch proposed fixes <em>close</em> the regions where gaming with many pools pays.</p>
+        <p>We start at <strong>Baseline</strong> — today's rules — colouring by <strong>splitting
+        advantage</strong>. The <span class="bad">red cloud</span> is every pool set-up where splitting
+        into many pools beats running one honest pool. It is large. That is the problem.</p>`,
+      targets: ['plot'],
+      actions: [
+        { kind: 'preset', name: 'baseline' },
+        { kind: 'select', id: 'metric', value: 'advantage' },
+        { kind: 'mode',   mode: 'volume' },
+        { kind: 'slider', id: 'sl-N', value: 5, ms: 300 },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+    {
+      title: 'Three corners where the gaming lives',
+      body: `<p>The red cloud clusters in three corners of the cube — the three classic cheats:</p>
+        <p>• <strong>Fee-farm</strong>: low pledge, low delegation — many tiny pools each skimming the flat fee.<br>
+        • <strong>Over-leveraged</strong>: low pledge, huge delegation — little skin in the game, lots of
+        other people's money.<br>
+        • <strong>Empty-pledge</strong>: high pledge, no delegators — a showcase pool collecting a pledge
+        bonus it didn't earn.</p>
+        <p>Each needs a different fix. No single change closes all three — that's the key point.</p>`,
+      targets: ['plot', 'readout'],
+      actions: [],
+      cardPosition: 'bottom-left',
+      holdMs: 12000,
+    },
+    {
+      title: 'Fix #1 — fee reform (CIPs 23 / 74 / 75)',
+      body: `<p>Switching on <strong>fee reform</strong> drops the flat fee toward zero. Watch the
+        <strong>fee-farm</strong> part of the red cloud fade — running dozens of tiny pools just to skim
+        fixed fees stops paying.</p>
+        <p>But notice the other corners are still red. Fee reform alone is <em>not</em> enough.</p>`,
+      targets: ['grp-presets', 'plot'],
+      actions: [
+        { kind: 'preset', name: 'baseline' },
+        { pause: 1300 },
+        { kind: 'preset', name: 'fee' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+    {
+      title: 'Fix #2 — the leverage cap (CIP-50)',
+      body: `<p>Back to baseline, now switch on the <strong>leverage cap</strong>. A pool stops earning
+        extra once its delegation outruns what the operator's own pledge can back. The
+        <strong>over-leveraged</strong> corner cools from red toward blue.</p>
+        <p>Yet the empty-pledge and fee-farm corners remain. Again — not enough on its own.</p>`,
+      targets: ['grp-presets', 'plot'],
+      actions: [
+        { kind: 'preset', name: 'baseline' },
+        { pause: 1300 },
+        { kind: 'preset', name: 'c50' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+    {
+      title: 'Fix #3 — utilization-scaled pledge bonus (CIP-187)',
+      body: `<p>Reset again, then switch on <strong>pledge-bonus scaling</strong>. The operator's pledge
+        reward is now paid only in proportion to how full the pool is, so an <strong>empty-pledge</strong>
+        showcase pool earns nothing extra. That corner fades.</p>
+        <p>Three fixes, three different corners. Each one leaves the others wide open.</p>`,
+      targets: ['grp-presets', 'plot'],
+      actions: [
+        { kind: 'preset', name: 'baseline' },
+        { pause: 1300 },
+        { kind: 'preset', name: 'c187' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+    {
+      title: 'Why you need all three',
+      body: `<p>That's the heart of the argument: each fix closes exactly one of the three corners and
+        pushes the gaming toward the others. Turn on only one, and the multipools simply relocate to a
+        corner it doesn't reach.</p>
+        <p>So the only way to close the habitat is to close every corner at the same time.</p>`,
+      targets: ['plot'],
+      actions: [],
+      cardPosition: 'bottom-left',
+      holdMs: 10000,
+    },
+    {
+      title: 'All three together',
+      body: `<p>Now switch on <strong>all three families</strong> at once. The red cloud all but
+        disappears: across almost the entire cube, one honest pool now beats any multipool split. The
+        gaming habitat has been closed.</p>`,
+      targets: ['grp-presets', 'plot'],
+      actions: [
+        { kind: 'preset', name: 'all' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 10000,
+    },
+    {
+      title: 'And the honest players win',
+      body: `<p>Closing the cheats isn't the only goal — honest players must still prosper. Watch as I
+        re-colour by <strong>single-pool income</strong>, then by <strong>delegator ROA</strong> (the
+        yearly return for ordinary members). With all three fixes on, these stay strong: the space we
+        <em>opened</em> rewards exactly the operators and delegators Cardano wants.</p>`,
+      targets: ['grp-metric', 'plot'],
+      actions: [
+        { kind: 'select', id: 'metric', value: 'single' },
+        { pause: 2800 },
+        { kind: 'select', id: 'metric', value: 'roa' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 12000,
+    },
+    {
+      title: 'The mission in one picture',
+      body: `<p><strong>Close</strong> the red regions where multipools prosper; <strong>open</strong> the
+        blue regions where single operators and their delegators prosper — and it takes all three
+        reforms working together to do it.</p>
+        <p>Press <strong>Esc</strong> to explore freely, or replay <strong>Start here</strong> for a tour
+        of every control.</p>`,
+      targets: [],
+      actions: [
+        { kind: 'select', id: 'metric', value: 'advantage' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 11000,
+    },
+  ],
+};
+
+// Mutable pointer to the active script. startTour() reassigns this.
+let TOUR_STEPS = TOUR_SCRIPTS.tour;
+
+const tour = { i: 0, playing: false, open: false, rafId: null, autoTimerId: null, renderGuard: 0 };
+
+function tourClamp(min, max, v) { return Math.max(min, Math.min(max, v)); }
+function tourSleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// Tween a range slider to a value, firing 'input' each frame (live labels) and a
+// final 'change' (the debounced heavy recompute this sim listens for).
+function tweenSlider(id, targetValue, durationMs = 600) {
+  return new Promise(resolve => {
+    const el = $(id);
+    if (!el) { resolve(); return; }
+    const startValue = parseFloat(el.value);
+    const target = tourClamp(parseFloat(el.min), parseFloat(el.max), targetValue);
+    if (startValue === target) { el.dispatchEvent(new Event('change', { bubbles: true })); resolve(); return; }
+    const start = performance.now();
+    const myGuard = tour.renderGuard;
+    function frame(now) {
+      if (myGuard !== tour.renderGuard) { resolve(); return; }
+      const t = Math.min(1, (now - start) / durationMs);
+      const ease = 0.5 - 0.5 * Math.cos(Math.PI * t);
+      el.value = startValue + (target - startValue) * ease;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      if (t < 1) { tour.rafId = requestAnimationFrame(frame); }
+      else { tour.rafId = null; el.dispatchEvent(new Event('change', { bubbles: true })); resolve(); }
+    }
+    tour.rafId = requestAnimationFrame(frame);
+  });
+}
+
+function tourPreset(name) {
+  const b = $('pre-' + name) || document.querySelector('.presets button[data-preset="' + name + '"]');
+  if (b) b.click();
+}
+function tourMode(mode) {
+  const b = document.querySelector('#modebtns button[data-mode="' + mode + '"]');
+  if (b) b.click();
+}
+function tourSelect(id, val) {
+  const el = $(id);
+  if (!el) return;
+  el.value = val;
+  el.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function tourClick(id) { const el = $(id); if (el) el.click(); }
+
+async function applyStepActions(step) {
+  const myGuard = tour.renderGuard;
+  for (const a of step.actions ?? []) {
+    if (myGuard !== tour.renderGuard) return;
+    if (a.kind === 'slider')      await tweenSlider(a.id, a.value, a.ms ?? 600);
+    else if (a.kind === 'preset') tourPreset(a.name);
+    else if (a.kind === 'mode')   tourMode(a.mode);
+    else if (a.kind === 'select') tourSelect(a.id, a.value);
+    else if (a.kind === 'click')  tourClick(a.id);
+    if (a.pause) await tourSleep(a.pause);
+  }
+}
+
+function nearestEdgePoint(rect, fromX, fromY) {
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+  const dx = fromX - cx, dy = fromY - cy;
+  if (dx === 0 && dy === 0) return { x: cx, y: rect.top };
+  const hx = rect.width / 2, hy = rect.height / 2;
+  const sx = dx === 0 ? Infinity : hx / Math.abs(dx);
+  const sy = dy === 0 ? Infinity : hy / Math.abs(dy);
+  const s = Math.min(sx, sy);
+  return { x: cx + dx * s, y: cy + dy * s };
+}
+
+function resolveTarget(t) {
+  if (typeof t === 'string') {
+    const el = $(t);
+    if (!el) return null;
+    return { el, rect: el.getBoundingClientRect() };
+  }
+  return null;
+}
+
+function drawArrow(svg, cardR, resolved) {
+  const fromX = cardR.left;
+  const fromY = cardR.top + cardR.height / 2;
+  const tip = nearestEdgePoint(resolved.rect, fromX, fromY);
+  const dx = tip.x - fromX, dy = tip.y - fromY;
+  const len = Math.hypot(dx, dy) || 1;
+  const tipX = tip.x - (dx / len) * 8;
+  const tipY = tip.y - (dy / len) * 8;
+  const c1x = fromX + Math.sign(dx) * 80, c1y = fromY;
+  const c2x = tipX - Math.sign(dx) * 80, c2y = tipY;
+  const d = `M ${fromX} ${fromY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${tipX} ${tipY}`;
+  const NS = 'http://www.w3.org/2000/svg';
+
+  const path = document.createElementNS(NS, 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('stroke', '#4ecdc4');
+  path.setAttribute('stroke-width', '2.5');
+  path.setAttribute('fill', 'none');
+  path.setAttribute('stroke-linecap', 'round');
+  path.setAttribute('stroke-dasharray', '6 4');
+  svg.appendChild(path);
+
+  const ang = Math.atan2(tipY - c2y, tipX - c2x);
+  const a = 0.55, L = 11;
+  const head = document.createElementNS(NS, 'polygon');
+  head.setAttribute('points',
+    `${tipX} ${tipY} ` +
+    `${tipX - L * Math.cos(ang - a)} ${tipY - L * Math.sin(ang - a)} ` +
+    `${tipX - L * Math.cos(ang + a)} ${tipY - L * Math.sin(ang + a)}`);
+  head.setAttribute('fill', '#4ecdc4');
+  svg.appendChild(head);
+}
+
+function drawArrowsForStep(step) {
+  document.querySelectorAll('.tour-pulse').forEach(e => e.classList.remove('tour-pulse'));
+  const svg = document.getElementById('tour-arrow-layer');
+  if (!svg) return;
+  svg.innerHTML = '';
+  svg.setAttribute('width', window.innerWidth);
+  svg.setAttribute('height', window.innerHeight);
+  svg.setAttribute('viewBox', `0 0 ${window.innerWidth} ${window.innerHeight}`);
+
+  const resolved = (step.targets ?? []).map(resolveTarget).filter(Boolean);
+  if (resolved.length === 0) return;
+
+  const card = document.getElementById('tour-card');
+  if (!card) return;
+  const cardR = card.getBoundingClientRect();
+  resolved.forEach(r => {
+    r.el.classList.add('tour-pulse');
+    drawArrow(svg, cardR, r);
+  });
+}
+
+function nextFrame() { return new Promise(r => requestAnimationFrame(r)); }
+
+function applyCardPosition(pos) {
+  const card = document.getElementById('tour-card');
+  if (!card) return;
+  card.style.top = ''; card.style.bottom = ''; card.style.left = ''; card.style.right = '';
+  switch (pos) {
+    case 'top-right':   card.style.top = '1.2rem';    card.style.right = '1.2rem'; break;
+    case 'top-left':    card.style.top = '1.2rem';    card.style.left = '1.2rem';  break;
+    case 'bottom-left': card.style.bottom = '1.2rem'; card.style.left = '1.2rem';  break;
+    case 'bottom-right':
+    default:            card.style.bottom = '1.2rem'; card.style.right = '1.2rem'; break;
+  }
+}
+
+async function renderStep(i) {
+  tour.renderGuard++;
+  const myGuard = tour.renderGuard;
+  tour.i = Math.max(0, Math.min(TOUR_STEPS.length - 1, i));
+  const step = TOUR_STEPS[tour.i];
+
+  document.getElementById('tour-step-n').textContent = String(tour.i + 1);
+  document.getElementById('tour-step-total').textContent = String(TOUR_STEPS.length);
+  document.getElementById('tour-title').textContent = step.title;
+  document.getElementById('tour-body').innerHTML = step.body;
+  document.getElementById('tour-prev').disabled = tour.i === 0;
+  document.getElementById('tour-next').disabled = tour.i === TOUR_STEPS.length - 1;
+  applyCardPosition(step.cardPosition);
+
+  // Scroll the first (sidebar) target into view before actions fire, so the viewer
+  // is looking at the right control while sliders tween. The plot never scrolls.
+  const first = (step.targets ?? [])[0];
+  if (typeof first === 'string' && first !== 'plot') {
+    const el = $(first);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  await tourSleep(280);
+  if (myGuard !== tour.renderGuard) return;
+  await applyStepActions(step);
+  if (myGuard !== tour.renderGuard) return;
+  await nextFrame(); await nextFrame();
+  if (myGuard !== tour.renderGuard) return;
+  drawArrowsForStep(step);
+}
+
+async function nextStep() { if (tour.i < TOUR_STEPS.length - 1) await renderStep(tour.i + 1); }
+async function prevStep() { if (tour.i > 0)                     await renderStep(tour.i - 1); }
+
+function setAutoplayButton(isPlaying) {
+  const btn = document.getElementById('tour-autoplay');
+  btn.textContent = isPlaying ? '⏸ Pause' : '▶ Play';
+  btn.classList.toggle('playing', isPlaying);
+}
+async function autoPlay() {
+  tour.playing = true;
+  setAutoplayButton(true);
+  while (tour.playing) {
+    const step = TOUR_STEPS[tour.i];
+    const hold = step.holdMs ?? 6000;
+    await new Promise(res => { tour.autoTimerId = setTimeout(res, hold); });
+    tour.autoTimerId = null;
+    if (!tour.playing) break;
+    if (tour.i >= TOUR_STEPS.length - 1) break;
+    await nextStep();
+  }
+  tour.playing = false;
+  setAutoplayButton(false);
+}
+function pauseAutoplay() {
+  tour.playing = false;
+  if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+  setAutoplayButton(false);
+}
+function toggleAutoplay() { if (tour.playing) pauseAutoplay(); else autoPlay(); }
+
+function buildTourDom() {
+  const dim = document.createElement('div');
+  dim.id = 'tour-dim';
+  document.body.appendChild(dim);
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.id = 'tour-arrow-layer';
+  document.body.appendChild(svg);
+
+  const card = document.createElement('div');
+  card.id = 'tour-card';
+  card.tabIndex = -1;
+  card.innerHTML = `
+    <div class="tour-step-counter">Step <span id="tour-step-n">1</span> of <span id="tour-step-total">${TOUR_STEPS.length}</span></div>
+    <div id="tour-title"></div>
+    <div id="tour-body"></div>
+    <div class="tour-controls">
+      <button id="tour-prev">‹ Prev</button>
+      <button id="tour-next">Next ›</button>
+      <button id="tour-autoplay">▶ Play</button>
+      <button id="tour-exit">Exit (Esc)</button>
+    </div>`;
+  document.body.appendChild(card);
+
+  document.getElementById('tour-prev').addEventListener('click',     () => { pauseAutoplay(); prevStep(); });
+  document.getElementById('tour-next').addEventListener('click',     () => { pauseAutoplay(); nextStep(); });
+  document.getElementById('tour-autoplay').addEventListener('click', toggleAutoplay);
+  document.getElementById('tour-exit').addEventListener('click',     exitTour);
+}
+
+function startTour(scriptName = 'tour') {
+  TOUR_STEPS = TOUR_SCRIPTS[scriptName] ?? TOUR_SCRIPTS.tour;
+  if (tour.open) {
+    tour.renderGuard++;
+    tour.i = 0;
+    renderStep(0);
+    return;
+  }
+  tour.open = true;
+  tour.i = 0;
+  if (!document.getElementById('tour-dim')) buildTourDom();
+  document.getElementById('tour-dim').classList.add('shown');
+  document.getElementById('tour-card').style.display = 'block';
+  document.getElementById('tour-arrow-layer').style.display = 'block';
+  renderStep(0);
+  document.getElementById('tour-card').focus();
+}
+
+function exitTour() {
+  if (!tour.open) return;
+  pauseAutoplay();
+  tour.renderGuard++;
+  tour.open = false;
+  document.querySelectorAll('.tour-pulse').forEach(e => e.classList.remove('tour-pulse'));
+  const dim = document.getElementById('tour-dim');
+  const card = document.getElementById('tour-card');
+  const svg = document.getElementById('tour-arrow-layer');
+  if (dim) dim.classList.remove('shown');
+  if (card) card.style.display = 'none';
+  if (svg) { svg.innerHTML = ''; svg.style.display = 'none'; }
+}
+
+let _tourResizeRaf = null;
+function scheduleArrowRedraw() {
+  if (!tour.open) return;
+  if (_tourResizeRaf) cancelAnimationFrame(_tourResizeRaf);
+  _tourResizeRaf = requestAnimationFrame(() => {
+    _tourResizeRaf = null;
+    drawArrowsForStep(TOUR_STEPS[tour.i]);
+  });
+}
+window.addEventListener('resize', scheduleArrowRedraw);
+window.addEventListener('scroll', scheduleArrowRedraw, { passive: true, capture: true });
+
+document.addEventListener('keydown', e => {
+  if (!tour.open) return;
+  switch (e.key) {
+    case 'Escape':                   e.preventDefault(); exitTour();                       break;
+    case 'ArrowRight': case 'Enter': e.preventDefault(); pauseAutoplay(); nextStep();      break;
+    case 'ArrowLeft':                e.preventDefault(); pauseAutoplay(); prevStep();       break;
+    case ' ':                        e.preventDefault(); toggleAutoplay();                 break;
+  }
+});
+
+$('tour-btn-tour').addEventListener('click',   () => startTour('tour'));
+$('tour-btn-thesis').addEventListener('click', () => startTour('thesis'));
 </script>
 </body>
 </html>

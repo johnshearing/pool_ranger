@@ -3,7 +3,16 @@
 **Planning document for a forthcoming write-up and simulator.**
 **Author:** John Shearing (johnshearing@gmail.com)
 **Created:** 2026-05-31
-**Status:** Planning — not yet started on the deliverables.
+
+## Status Tracking
+
+| Item | Status |
+| --- | --- |
+| Plan document (this file) | A work in progress |
+| Draft write-up `Multi-CIPs_Needed_To_Close_The_Parameter_Spaces_Where_MultiPools_Operate.md` | Not started. |
+| Build combined simulator `/home/js/aiken/ranger/Multi_CIP_Simulator.html` | The main 3D simulator which allows the user to explore the protocol paramter space against combinations of various CIPs is complete. The simulator is not yet connected to current stake pool data. |
+| Publish new simulator to GitHub Pages: https://johnshearing.github.io/pool_ranger/Multi_CIP_Simulator.html | Done. |
+
 
 ---
 
@@ -70,7 +79,7 @@ the SPO P&L directly each epoch:
 This is a useful framing because most public CIP debate implicitly assumes that
 fixing delegator incentives is enough. It probably isn't.
 
-The author of CIP-187 proposes the [Pool Ranger project](https://github.com/johnshearing/pool_ranger) to help with the issue of sticky stake (unresponsive delegators) but CIPs that increase the protocol health without the need for delegator response is ideal. 
+The author of this document and CIP-187 proposes the [Pool Ranger project](https://github.com/johnshearing/pool_ranger) to help with the issue of sticky stake (unresponsive delegators) but CIPs that increase the protocol health without the need for delegator response is ideal. I also suspect that a large segment of dReps are multipool operators and that a large segment of Cardano governance is are also multipool operators. So I feel that CIPs which seek to disincentivize multipool operation are not likely to be adopted in the current environment. Pool Ranger and Pool Ranger spinoffs create a new coalition voters (organized delegators). This coalition is what will push the these CIPs through the governance process. 
 
 
 ---
@@ -340,35 +349,18 @@ When starting the next chat session, the project `CLAUDE.md`
 so the picture is complete:
 
 ```
-Always read /home/js/aiken/ranger/claude_queries/Multi_CIP_Plan.md at the start of each session.
+Always read /home/js/aiken/ranger/claude_queries/Multi_CIP_Plan.md at the start of each session.  
+Always read /home/js/aiken/ranger/Multi_CIP_Simulator.html at the start of each session.  
+Always read /home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html at the start of each session to understand the UI patterns.  
 ```
 
-In addition, the next session should — when actually starting work on the
-deliverables — read:
+---
 
-- `/home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html` (the existing
-  CIP-187 simulator — to understand the UI patterns and the pool data format to reuse).
-- The CIP-50 simulator source at `https://github.com/Cerkoryn/SPO-Incentives`
-  (for reference on the population/scatter view — fetch with WebFetch if needed).
-- Any pool dataset file referenced by the existing simulator : /home/js/aiken/ranger/epoch_agent/reports/epoch_XXX.txt
 
-These three only need to be loaded when work begins on the simulator itself,
-not at every session start.
 
 ---
 
-## 9. Status Tracking
-
-| Item | Status |
-| --- | --- |
-| Plan document (this file) | Created 2026-05-31. |
-| Draft write-up `Multi-CIPs_Needed_To_Close_The_Parameter_Spaces_Where_MultiPools_Operate.md` | Not started. |
-| Build combined simulator `Multi_CIP_Simulator.html` | Design fully specified 2026-06-01 (§5). Build not started. |
-| Publish new simulator to GitHub Pages | Not done. |
-
----
-
-## 10. One-Sentence Summary
+## 9. One-Sentence Summary
 
 > The argument is that closing the multipool problem requires *three* CIP families
 > working together — fixed-fee reduction (CIPs 23/74/75), pledge-leverage cap
