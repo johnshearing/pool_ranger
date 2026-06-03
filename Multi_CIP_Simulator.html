@@ -116,6 +116,7 @@
 
   .presets { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; }
   .presets button { font-size: 0.74rem; padding: 0.4rem 0.2rem; }
+  .presets button.active { background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 700; }
 
   #readout {
     font-size: 0.78rem; color: var(--muted); line-height: 1.5;
@@ -181,7 +182,7 @@
         <button data-preset="fee">Fee reform only</button>
         <button data-preset="c50">CIP-50 only</button>
         <button data-preset="c187">CIP-187 only</button>
-        <button data-preset="all" style="grid-column:1/3;background:var(--teal);color:#06201d;font-weight:700;border-color:var(--teal)">All three families</button>
+        <button data-preset="all" style="grid-column:1/3">All three families</button>
       </div>
     </div>
 
@@ -189,30 +190,27 @@
       <h3>CIP levers</h3>
 
       <div class="cipline">
-        <input type="checkbox" id="cip-fee" checked>
-        <label for="cip-fee" class="cip-on" id="lbl-fee">Fee reform — CIPs 23/74/75</label>
+        <label class="cip-off" id="lbl-fee">Fee reform — CIPs 23/74/75</label>
       </div>
-      <div class="ctl" id="wrap-F">
+      <div class="ctl disabled" id="wrap-F">
         <label>minPoolCost <code>F</code> (ADA/epoch) <span class="val" id="v-F">340</span></label>
         <input type="range" id="sl-F" min="0" max="1000" step="5" value="340">
       </div>
 
       <div class="cipline">
-        <input type="checkbox" id="cip-50">
-        <label for="cip-50" class="cip-off" id="lbl-50">Leverage cap — CIP-50</label>
+        <label class="cip-off" id="lbl-50">Leverage cap — CIP-50</label>
       </div>
-      <div class="ctl" id="wrap-L">
-        <label>L &nbsp;<span style="color:var(--muted);font-weight:400">σ′ = min(σ, L·p)</span> <span class="val" id="v-L">100</span></label>
-        <input type="range" id="sl-L" min="10" max="1000" step="10" value="100">
+      <div class="ctl disabled" id="wrap-L">
+        <label>L &nbsp;<span style="color:var(--muted);font-weight:400">σ′ = min(σ, L·p)</span> <span class="val" id="v-L">0</span></label>
+        <input type="range" id="sl-L" min="0" max="1000" step="10" value="0">
       </div>
 
       <div class="cipline">
-        <input type="checkbox" id="cip-187" checked>
-        <label for="cip-187" class="cip-on" id="lbl-187">Utilization-scaled pledge bonus — CIP-187</label>
+        <label class="cip-off" id="lbl-187">Utilization-scaled pledge bonus — CIP-187</label>
       </div>
-      <div class="ctl" id="wrap-b">
-        <label>b &nbsp;<span style="color:var(--muted);font-weight:400">A·(1−b+b·u)</span> <span class="val" id="v-b">1.00</span></label>
-        <input type="range" id="sl-b" min="0" max="1" step="0.01" value="1">
+      <div class="ctl disabled" id="wrap-b">
+        <label>b &nbsp;<span style="color:var(--muted);font-weight:400">A·(1−b+b·u)</span> <span class="val" id="v-b">0.00</span></label>
+        <input type="range" id="sl-b" min="0" max="1" step="0.01" value="0">
       </div>
     </div>
 
@@ -256,24 +254,8 @@
         </div>
       </div>
       <div class="ctl">
-        <label>Grid resolution <span class="val" id="v-res">24</span></label>
-        <input type="range" id="sl-res" min="12" max="40" step="2" value="24">
-      </div>
-    </div>
-
-    <div class="group">
-      <h3>Axis ranges</h3>
-      <div class="ctl">
-        <label>Pledge max (M ADA) <span class="val" id="v-pmax">10</span></label>
-        <input type="range" id="sl-pmax" min="1" max="75" step="1" value="10">
-      </div>
-      <div class="ctl">
-        <label>Margin max (%) <span class="val" id="v-mmax">5</span></label>
-        <input type="range" id="sl-mmax" min="1" max="100" step="1" value="5">
-      </div>
-      <div class="ctl">
-        <label>Delegation max (M ADA) <span class="val" id="v-dmax">75</span></label>
-        <input type="range" id="sl-dmax" min="10" max="150" step="5" value="75">
+        <label>Grid resolution <span class="val" id="v-res">32</span></label>
+        <input type="range" id="sl-res" min="12" max="48" step="2" value="32">
       </div>
     </div>
 
@@ -427,11 +409,15 @@ const $ = id => document.getElementById(id);
 let renderMode = 'volume';
 let showShells = false;
 
+// Which CIP families are active is now driven entirely by the scenario presets
+// (the per-lever checkboxes were removed). A disabled/greyed slider == inactive CIP.
+let cipState = { fee: false, c50: false, c187: false };
+
 function readCfg() {
   return {
-    cipFee : $('cip-fee').checked,
-    cip50  : $('cip-50').checked,
-    cip187 : $('cip-187').checked,
+    cipFee : cipState.fee,
+    cip50  : cipState.c50,
+    cip187 : cipState.c187,
     F      : parseFloat($('sl-F').value),
     L      : parseFloat($('sl-L').value),
     b      : parseFloat($('sl-b').value),
@@ -439,9 +425,9 @@ function readCfg() {
     r      : parseFloat($('sl-r').value),
     a0     : parseFloat($('sl-a0').value),
     res    : parseInt($('sl-res').value, 10),
-    pmax   : parseFloat($('sl-pmax').value) * 1e6,
-    mmax   : parseFloat($('sl-mmax').value) / 100,
-    dmax   : parseFloat($('sl-dmax').value) * 1e6,
+    pmax   : 75e6,    // fixed reference box: pledge 0–75M ADA
+    mmax   : 1.0,     // fixed reference box: margin 0–100%
+    dmax   : 75e6,    // fixed reference box: delegation 0–75M ADA
     metric : $('metric').value,
     iso    : parseFloat($('sl-iso').value) / 100,
     sliceAxis: $('slice-axis').value,
@@ -710,21 +696,17 @@ function syncLabels() {
   $('v-r').textContent  = parseFloat($('sl-r').value).toFixed(6);
   $('v-a0').textContent = parseFloat($('sl-a0').value).toFixed(2);
   $('v-res').textContent= $('sl-res').value;
-  $('v-pmax').textContent = $('sl-pmax').value;
-  $('v-mmax').textContent = $('sl-mmax').value;
-  $('v-dmax').textContent = $('sl-dmax').value;
   $('v-slicepos').textContent = $('sl-slicepos').value + '%';
 
-  // CIP label coloring + enable/disable dependent sliders
-  toggleCip('cip-fee', 'lbl-fee', 'sl-F', 'wrap-F');
-  toggleCip('cip-50',  'lbl-50',  'sl-L', 'wrap-L');
-  toggleCip('cip-187', 'lbl-187', 'sl-b', 'wrap-b');
+  // CIP label coloring + enable/disable dependent sliders (driven by the preset)
+  toggleCip(cipState.fee,  'lbl-fee', 'wrap-F');
+  toggleCip(cipState.c50,  'lbl-50',  'wrap-L');
+  toggleCip(cipState.c187, 'lbl-187', 'wrap-b');
   $('metric-hint').innerHTML = METRICS[$('metric').value].hint;
 }
-function toggleCip(cb, lbl, slId, wrapId) {
-  const on = $(cb).checked;
-  $(lbl).className = on ? 'cip-on' : 'cip-off';
-  if (wrapId) $(wrapId).classList.toggle('disabled', !on);
+function toggleCip(active, lbl, wrapId) {
+  $(lbl).className = active ? 'cip-on' : 'cip-off';
+  $(wrapId).classList.toggle('disabled', !active);
 }
 
 // Debounced heavy recompute (on release / change).
@@ -740,7 +722,7 @@ document.querySelectorAll('input[type=range]').forEach(el => {
   el.addEventListener('input', syncLabels);
   el.addEventListener('change', scheduleRender);
 });
-document.querySelectorAll('input[type=checkbox], select').forEach(el => {
+document.querySelectorAll('select').forEach(el => {
   el.addEventListener('change', scheduleRender);
 });
 
@@ -797,25 +779,36 @@ document.addEventListener('keydown', e => {
 });
 
 // ── Scenario presets ─────────────────────────────────────────────────────────
+// Each preset fully defines the three levers: whether the CIP is active (which also
+// enables/greys its slider) and the value the slider sits at. Inactive levers park at
+// their no-effect value (fee 340 = baseline minPoolCost; L 0; b 0). Active levers sit at
+// the value that demonstrates the reform (fee 0 = eliminated; b 1 = full utilization
+// scaling; L 100 = a representative leverage cap).
 const PRESETS = {
-  baseline: { fee:false, F:340, c50:false, c187:false, b:1 },
-  fee:      { fee:true,  F:0,   c50:false, c187:false, b:1 },
-  c50:      { fee:false, F:340, c50:true,  L:100, c187:false, b:1 },
-  c187:     { fee:false, F:340, c50:false, c187:true,  b:1 },
-  all:      { fee:true,  F:0,   c50:true,  L:100, c187:true, b:1 }
+  baseline: { fee:false, F:340, c50:false, L:0,   c187:false, b:0 },
+  fee:      { fee:true,  F:0,   c50:false, L:0,   c187:false, b:0 },
+  c50:      { fee:false, F:340, c50:true,  L:100, c187:false, b:0 },
+  c187:     { fee:false, F:340, c50:false, L:0,   c187:true,  b:1 },
+  all:      { fee:true,  F:0,   c50:true,  L:100, c187:true,  b:1 }
 };
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+  cipState = { fee: p.fee, c50: p.c50, c187: p.c187 };
+  $('sl-F').value = p.F;
+  $('sl-L').value = p.L;
+  $('sl-b').value = p.b;
+  document.querySelectorAll('.presets button').forEach(b =>
+    b.classList.toggle('active', b.dataset.preset === name));
+  scheduleRender();
+}
 document.querySelector('.presets').addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
-  const p = PRESETS[btn.dataset.preset];
-  $('cip-fee').checked = p.fee; $('sl-F').value = p.F;
-  $('cip-50').checked  = p.c50; if (p.L) $('sl-L').value = p.L;
-  $('cip-187').checked = p.c187; $('sl-b').value = p.b;
-  scheduleRender();
+  applyPreset(btn.dataset.preset);
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
-syncLabels();
-render();
+applyPreset('baseline');   // start with no CIPs active; all three sliders greyed
 </script>
 </body>
 </html>
