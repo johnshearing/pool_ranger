@@ -179,6 +179,11 @@
     100% { box-shadow: 0 0 0 0    rgba(78,205,196,0);    }
   }
   .tour-pulse { outline: 2px solid var(--teal) !important; outline-offset: 3px; border-radius: 6px; animation: tour-pulse 1.4s ease-out infinite; position: relative; z-index: 9050; }
+  /* Spotlight: lift a control (a whole group or one slider) above the dim sheet and
+     force it to full opacity even when it's a greyed-out, switched-off CIP slider —
+     keeps the left panel and the fee slider bright while a card explains them. No
+     outline, so the arrow's own pulse stays the single visual focus. */
+  .tour-spotlight { position: relative; z-index: 9050; opacity: 1 !important; }
   @media (max-width: 760px) { #tour-card { left: 0.6rem; right: 0.6rem; width: auto; bottom: 0.6rem; } }
 </style>
 </head>
@@ -931,12 +936,9 @@ const TOUR_SCRIPTS = {
         This is the <strong>Fee reform</strong> slider (labelled <code>minPoolCost F</code>) in the <em>CIP levers</em>
         group on the left. Slide it and the whole cube re-colours. One of the goals of this simulator is to explore the 
         effects of bringing the fixed fee to zero.</p>`,
-      targets: [
-        'sl-F',
-        { anchor: 'plot', fx: 0.30, fy: 0.82, label: 'Pledge axis' },
-        { anchor: 'plot', fx: 0.72, fy: 0.82, label: 'Margin axis' },
-        { anchor: 'plot', fx: 0.12, fy: 0.40, label: 'Delegation axis' },
-      ],
+      targets: ['sl-F'],
+      highlight: ['grp-cip', 'wrap-F'],
+      twinkleAxes: true,
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 11000,
@@ -950,7 +952,7 @@ const TOUR_SCRIPTS = {
         densest where the effect is strongest.</p>
         <p>The panel here on the left keeps a running scorecard in plain words — watch it change as
         the tour moves the dials.</p>`,
-      targets: ['plot'],
+      targets: [],
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 10000,
@@ -1177,7 +1179,7 @@ const TOUR_SCRIPTS = {
         <p>We start at <strong>Baseline</strong> — today's rules — colouring by <strong>splitting
         advantage</strong>. The <span class="bad">red cloud</span> is every pool set-up where splitting
         into many pools beats running one honest pool. It is large. That is the problem.</p>`,
-      targets: ['plot'],
+      targets: [],
       actions: [
         { kind: 'preset', name: 'baseline' },
         { kind: 'select', id: 'metric', value: 'advantage' },
@@ -1196,7 +1198,7 @@ const TOUR_SCRIPTS = {
         • <strong>Empty-pledge</strong>: high pledge, no delegators — a showcase pool collecting a pledge
         bonus it didn't earn.</p>
         <p>Each needs a different fix. No single change closes all three — that's the key point.</p>`,
-      targets: ['plot'],
+      targets: [],
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 12000,
@@ -1516,7 +1518,71 @@ function drawArrowsForStep(step) {
   });
 }
 
+// ── Per-step highlights: spotlight controls above the dim sheet, and twinkle the
+// cube's three axis titles. Applied after a step's actions settle; torn down at the
+// top of the next renderStep and on exit.
+const AXIS_BASE_COLOR = '#9aa6b5';
+const AXIS_HILITE_COLOR = '#4ecdc4';
+let axisTwinkleTimer = null;
+
+function applyStepHighlights(step) {
+  (step.highlight ?? []).forEach(id => {
+    const el = $(id);
+    if (el) el.classList.add('tour-spotlight');
+  });
+  if (step.twinkleAxes) startAxisTwinkle();
+}
+
+function clearStepHighlights() {
+  document.querySelectorAll('.tour-spotlight').forEach(e => e.classList.remove('tour-spotlight'));
+  stopAxisTwinkle();
+}
+
+function startAxisTwinkle() {
+  if (axisTwinkleTimer || !window.Plotly || !document.getElementById('plot')) return;
+  // Enlarge the three axis titles once, then pulse their colour so they twinkle
+  // while card 2 explains the cube's axes.
+  Plotly.relayout('plot', {
+    'scene.xaxis.title.font.size': 15,
+    'scene.yaxis.title.font.size': 15,
+    'scene.zaxis.title.font.size': 15,
+  });
+  let bright = true;
+  const tick = () => {
+    const c = bright ? AXIS_HILITE_COLOR : AXIS_BASE_COLOR;
+    Plotly.relayout('plot', {
+      'scene.xaxis.title.font.color': c,
+      'scene.yaxis.title.font.color': c,
+      'scene.zaxis.title.font.color': c,
+    });
+    bright = !bright;
+  };
+  tick();
+  axisTwinkleTimer = setInterval(tick, 700);
+}
+
+function stopAxisTwinkle() {
+  if (!axisTwinkleTimer) return;
+  clearInterval(axisTwinkleTimer);
+  axisTwinkleTimer = null;
+  if (window.Plotly && document.getElementById('plot')) {
+    Plotly.relayout('plot', {
+      'scene.xaxis.title.font.color': AXIS_BASE_COLOR,
+      'scene.yaxis.title.font.color': AXIS_BASE_COLOR,
+      'scene.zaxis.title.font.color': AXIS_BASE_COLOR,
+      'scene.xaxis.title.font.size': 11,
+      'scene.yaxis.title.font.size': 11,
+      'scene.zaxis.title.font.size': 11,
+    });
+  }
+}
+
 function nextFrame() { return new Promise(r => requestAnimationFrame(r)); }
+
+// Right offset that tucks the card just left of the plot's colour legend (the
+// vertical colour bar + its tick labels) without covering it. Bump this if the
+// colour bar ever gets wider.
+const CARD_LEGEND_GAP = '4.75rem';
 
 function applyCardPosition(pos) {
   const card = document.getElementById('tour-card');
@@ -1525,13 +1591,10 @@ function applyCardPosition(pos) {
   // the scripted per-step placement yank it back.
   if (tourCardMoved) return;
   card.style.top = ''; card.style.bottom = ''; card.style.left = ''; card.style.right = '';
-  switch (pos) {
-    case 'top-right':   card.style.top = '1.2rem';    card.style.right = '1.2rem'; break;
-    case 'top-left':    card.style.top = '1.2rem';    card.style.left = '1.2rem';  break;
-    case 'bottom-left': card.style.bottom = '1.2rem'; card.style.left = '1.2rem';  break;
-    case 'bottom-right':
-    default:            card.style.bottom = '1.2rem'; card.style.right = '1.2rem'; break;
-  }
+  // Every card in both walkthroughs starts in the upper-right, as close to the
+  // colour legend as it can sit without covering it. Still draggable from here.
+  card.style.top = '1.2rem';
+  card.style.right = CARD_LEGEND_GAP;
 }
 
 async function renderStep(i) {
@@ -1539,6 +1602,7 @@ async function renderStep(i) {
   const myGuard = tour.renderGuard;
   tour.i = Math.max(0, Math.min(TOUR_STEPS.length - 1, i));
   const step = TOUR_STEPS[tour.i];
+  clearStepHighlights();   // tear down the previous step's spotlight / axis twinkle
 
   document.getElementById('tour-step-n').textContent = String(tour.i + 1);
   document.getElementById('tour-step-total').textContent = String(TOUR_STEPS.length);
@@ -1563,6 +1627,7 @@ async function renderStep(i) {
   await nextFrame(); await nextFrame();
   if (myGuard !== tour.renderGuard) return;
   drawArrowsForStep(step);
+  applyStepHighlights(step);
 }
 
 async function nextStep() { if (tour.i < TOUR_STEPS.length - 1) await renderStep(tour.i + 1); }
@@ -1652,6 +1717,7 @@ function exitTour() {
   tour.renderGuard++;
   tour.open = false;
   document.querySelectorAll('.tour-pulse').forEach(e => e.classList.remove('tour-pulse'));
+  clearStepHighlights();
   const dim = document.getElementById('tour-dim');
   const card = document.getElementById('tour-card');
   const svg = document.getElementById('tour-arrow-layer');
