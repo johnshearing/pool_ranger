@@ -151,9 +151,13 @@
     box-shadow: 0 10px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,159,67,0.18);
     font-size: 0.86rem; line-height: 1.5; color: var(--text);
   }
-  .tour-step-counter { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.35rem; cursor: move; user-select: none; }
-  #tour-title { font-size: 1.0rem; color: var(--accent); margin-bottom: 0.5rem; font-weight: 700; cursor: move; user-select: none; }
-  #tour-title::before { content: "⠿ "; color: var(--muted); font-weight: 400; }
+  .tour-step-counter { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.45rem; cursor: move; user-select: none;
+    display: inline-block; background: var(--panel); border: 1px solid var(--border); border-radius: 5px; padding: 0.2rem 0.5rem; }
+  #tour-title { font-size: 1.0rem; color: var(--accent); margin-bottom: 0.5rem; font-weight: 700; cursor: move; user-select: none;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 0.35rem 0.6rem; transition: border-color 0.15s, background 0.15s; }
+  .tour-step-counter:hover, #tour-title:hover { border-color: var(--accent); background: var(--bg); }
+  #tour-title::before { content: "⠿ "; color: var(--accent); font-weight: 400; }
+  #tour-title::after { content: " ⠿"; color: var(--muted); font-weight: 400; }
   #tour-card.dragging { box-shadow: 0 14px 40px rgba(0,0,0,0.75), 0 0 0 1px rgba(255,159,67,0.4); }
   #tour-body strong { color: var(--accent); }
   #tour-body em { color: var(--teal); font-style: normal; font-weight: 600; }
@@ -626,12 +630,12 @@ function render() {
     const cr = colorRange(cfg.metric, g.vmin, g.vmax);
     traces = [{
       type: 'surface',
-      x: g.xs, y: g.ys, z: g.zs, surfacecolor: g.cs,
+      x: g.xs, y: g.ys, z: g.zs, surfacecolor: g.cs, text: g.cs,
       colorscale: cs, cmin: cr.cmin, cmax: cr.cmax,
       colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
       contours: { z: { show: false } },
       lighting: { ambient: 0.95, diffuse: 0.2, specular: 0.05 },
-      hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<extra></extra>'
+      hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<br>'+m.label+': %{text:.3s}<extra></extra>'
     }];
     const axisName = cfg.sliceAxis === 'z' ? 'Delegation' : cfg.sliceAxis === 'x' ? 'Pledge' : 'Margin';
     const axisMax  = cfg.sliceAxis === 'z' ? cfg.dmax/1e6+' M' : cfg.sliceAxis === 'x' ? cfg.pmax/1e6+' M' : (cfg.mmax*100).toFixed(1)+'%';
@@ -912,6 +916,11 @@ const TOUR_SCRIPTS = {
         • <strong>Margin axis</strong>: the cut the operator keeps before sharing rewards.<br>
         • <strong>Delegation axis</strong>: how much money <em>other people</em> have entrusted to the
         pool.</p>
+        <p>A fourth number also describes every pool — the <strong>fixed fee</strong> (Cardano's
+        <code>minPoolCost</code>) the operator charges each epoch. It isn't drawn as an axis because it's a
+        single network-wide setting rather than something that varies from pool to pool; instead it lives on
+        the <strong>Fee reform</strong> slider (labelled <code>minPoolCost F</code>) in the <em>CIP levers</em>
+        group on the left. Slide it and the whole cube re-colours.</p>
         <p>Each axis is labelled where it meets the cube. You can grab the cube and spin it, so an axis
         won't always point the same way on your screen. 
         Every region of the cube is a different kind of pool, and the colour at each point answers a question 
@@ -1036,7 +1045,7 @@ const TOUR_SCRIPTS = {
         earn the best return</span>.</p>
         <p>Turning a CIP preset on and watching the multipool shell <em>shrink</em> while the single-pool
         and delegator shells <em>hold their ground</em> is the visual proof at the heart of this project.</p>`,
-      targets: ['grp-field', 'plot'],
+      targets: ['grp-field'],
       actions: [
         { pause: 600 },
         { kind: 'click', id: 'btn-shells' },
