@@ -908,23 +908,29 @@ const TOUR_SCRIPTS = {
       holdMs: 12000,
     },
     {
-      title: 'The cube: three things describe every pool',
+      title: 'The cube: A parameter space which describes every pool',
       body: `<p>Rather than look at pools one at a time, this tool draws <em>all</em> possible pools at
-        once, as a 3-D cube. Where a point sits is set by three numbers, one for each axis:</p>
+        once, as a 3-D cube. Where a pool sits inside this cube is set by three numbers, one for each axis:</p>
         <p>• <strong>Pledge axis</strong>: how much of the operator's <em>own</em> money is locked in
         the pool — their skin in the game.<br>
         • <strong>Margin axis</strong>: the cut the operator keeps before sharing rewards.<br>
         • <strong>Delegation axis</strong>: how much money <em>other people</em> have entrusted to the
         pool.</p>
-        <p>A fourth number also describes every pool — the <strong>fixed fee</strong> (Cardano's
-        <code>minPoolCost</code>) the operator charges each epoch. It isn't drawn as an axis because it's a
-        single network-wide setting rather than something that varies from pool to pool; instead it lives on
-        the <strong>Fee reform</strong> slider (labelled <code>minPoolCost F</code>) in the <em>CIP levers</em>
-        group on the left. Slide it and the whole cube re-colours.</p>
         <p>Each axis is labelled where it meets the cube. You can grab the cube and spin it, so an axis
         won't always point the same way on your screen. 
         Every region of the cube is a different kind of pool, and the colour at each point answers a question 
-        we set next.</p>`,
+        that we can set. More on this on the next card in this walkthrough.</p>
+        <p>A fourth number completes the description of every pool — the <strong>fixed fee.</strong> This is Cardano's
+        <code>minPoolCost</code>. This is the amount of ADA the stake pool operator takes from the block rewards every epoch
+        before delegators get paid. This amount is supposed to pay the stake pool operator for the cost of running the pool
+        but it has become a way to take funds from the block rewards without providing any benefit to the protocol.
+        Currently the operator has control of this parameter. This simulator evaluates the benefits of taking the control
+        of this parameter away from the stake pool operators and handing it over to governance. In that case, governance
+        will set the value of the fixed fee and this will apply to all stake pools. For this reason, the fixed fee
+        is controlled by a slider rather than by showing it on the cube with the other parameters that define a stake pool.
+        This is the <strong>Fee reform</strong> slider (labelled <code>minPoolCost F</code>) in the <em>CIP levers</em>
+        group on the left. Slide it and the whole cube re-colours. One of the goals of this simulator is to explore the 
+        effects of bringing the fixed fee to zero.</p>`,
       targets: ['plot'],
       actions: [],
       cardPosition: 'bottom-left',
@@ -1236,7 +1242,7 @@ const TOUR_SCRIPTS = {
       holdMs: 11000,
     },
     {
-      title: 'Why you need all three',
+      title: 'Why you need all three CIPs',
       body: `<p>That's the heart of the argument: each fix closes exactly one of the three corners and
         pushes the gaming toward the others. Turn on only one, and the multipools simply relocate to a
         corner it doesn't reach.</p>
