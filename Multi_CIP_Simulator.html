@@ -931,7 +931,12 @@ const TOUR_SCRIPTS = {
         This is the <strong>Fee reform</strong> slider (labelled <code>minPoolCost F</code>) in the <em>CIP levers</em>
         group on the left. Slide it and the whole cube re-colours. One of the goals of this simulator is to explore the 
         effects of bringing the fixed fee to zero.</p>`,
-      targets: ['plot'],
+      targets: [
+        'sl-F',
+        { anchor: 'plot', fx: 0.30, fy: 0.82, label: 'Pledge axis' },
+        { anchor: 'plot', fx: 0.72, fy: 0.82, label: 'Margin axis' },
+        { anchor: 'plot', fx: 0.12, fy: 0.40, label: 'Delegation axis' },
+      ],
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 11000,
@@ -945,7 +950,7 @@ const TOUR_SCRIPTS = {
         densest where the effect is strongest.</p>
         <p>The panel here on the left keeps a running scorecard in plain words — watch it change as
         the tour moves the dials.</p>`,
-      targets: ['plot', 'readout'],
+      targets: ['plot'],
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 10000,
@@ -981,7 +986,7 @@ const TOUR_SCRIPTS = {
         the net rewards.<br>
         • <strong>Operator pledge income</strong>: the operator's own pledge share of the net rewards —
         exactly the stream CIP-187 scales down when a pool sits empty.</p>`,
-      targets: ['grp-metric', 'plot'],
+      targets: ['grp-metric'],
       actions: [],
       cardPosition: 'bottom-right',
       holdMs: 13000,
@@ -1027,7 +1032,7 @@ const TOUR_SCRIPTS = {
         jumps the level straight onto that line for you (0 for the difference metric, 1 for the ratio),
         so the shell becomes the exact wall of the gaming habitat. Shrinking the volume inside that wall
         is the whole mission.</p>`,
-      targets: ['grp-field', 'plot'],
+      targets: ['grp-field'],
       actions: [
         { kind: 'mode', mode: 'isosurface' },
         { pause: 700 },
@@ -1065,7 +1070,7 @@ const TOUR_SCRIPTS = {
         which direction to cut, then drag the slice through — or press <strong>▶ Sweep</strong> to
         animate it — to scan the whole interior, layer by layer. Useful when you want to read exact
         values rather than judge an overall shape.</p>`,
-      targets: ['grp-field', 'plot'],
+      targets: ['grp-field'],
       actions: [
         { kind: 'mode', mode: 'slice' },
       ],
@@ -1191,7 +1196,7 @@ const TOUR_SCRIPTS = {
         • <strong>Empty-pledge</strong>: high pledge, no delegators — a showcase pool collecting a pledge
         bonus it didn't earn.</p>
         <p>Each needs a different fix. No single change closes all three — that's the key point.</p>`,
-      targets: ['plot', 'readout'],
+      targets: ['plot'],
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 12000,
@@ -1202,7 +1207,7 @@ const TOUR_SCRIPTS = {
         <strong>fee-farm</strong> part of the red cloud fade — running dozens of tiny pools just to skim
         fixed fees stops paying.</p>
         <p>But notice the other corners are still red. Fee reform alone is <em>not</em> enough.</p>`,
-      targets: ['grp-presets', 'plot'],
+      targets: ['grp-presets'],
       actions: [
         { kind: 'preset', name: 'baseline' },
         { pause: 1300 },
@@ -1217,7 +1222,7 @@ const TOUR_SCRIPTS = {
         extra once its delegation outruns what the operator's own pledge can back. The
         <strong>over-leveraged</strong> corner cools from red toward blue.</p>
         <p>Yet the empty-pledge and fee-farm corners remain. Again — not enough on its own.</p>`,
-      targets: ['grp-presets', 'plot'],
+      targets: ['grp-presets'],
       actions: [
         { kind: 'preset', name: 'baseline' },
         { pause: 1300 },
@@ -1232,7 +1237,7 @@ const TOUR_SCRIPTS = {
         reward is now paid only in proportion to how full the pool is, so an <strong>empty-pledge</strong>
         showcase pool earns nothing extra. That corner fades.</p>
         <p>Three fixes, three different corners. Each one leaves the others wide open.</p>`,
-      targets: ['grp-presets', 'plot'],
+      targets: ['grp-presets'],
       actions: [
         { kind: 'preset', name: 'baseline' },
         { pause: 1300 },
@@ -1247,7 +1252,7 @@ const TOUR_SCRIPTS = {
         pushes the gaming toward the others. Turn on only one, and the multipools simply relocate to a
         corner it doesn't reach.</p>
         <p>So the only way to close the habitat is to close every corner at the same time.</p>`,
-      targets: ['plot'],
+      targets: [],
       actions: [],
       cardPosition: 'bottom-left',
       holdMs: 10000,
@@ -1257,7 +1262,7 @@ const TOUR_SCRIPTS = {
       body: `<p>Now switch on <strong>all three families</strong> at once. The red cloud all but
         disappears: across almost the entire cube, one honest pool now beats any multipool split. The
         gaming habitat has been closed.</p>`,
-      targets: ['grp-presets', 'plot'],
+      targets: ['grp-presets'],
       actions: [
         { kind: 'preset', name: 'all' },
       ],
@@ -1270,7 +1275,7 @@ const TOUR_SCRIPTS = {
         re-colour by <strong>single-pool income</strong>, then by <strong>delegator ROA</strong> (the
         yearly return for ordinary members). With all three fixes on, these stay strong: the space we
         <em>opened</em> rewards exactly the operators and delegators Cardano wants.</p>`,
-      targets: ['grp-metric', 'plot'],
+      targets: ['grp-metric'],
       actions: [
         { kind: 'select', id: 'metric', value: 'single' },
         { pause: 2800 },
@@ -1421,6 +1426,19 @@ function resolveTarget(t) {
     if (!el) return null;
     return { el, rect: el.getBoundingClientRect() };
   }
+  // Anchored point target: a fraction (fx, fy) of another element's box, plus an
+  // optional caption. Used to aim arrows at the cube's axis labels, which are drawn
+  // inside the Plotly WebGL plot and so have no element of their own to point at.
+  // Tuned to the plot's starting camera angle; it does not follow a spun cube.
+  if (t && t.anchor) {
+    const host = $(t.anchor);
+    if (!host) return null;
+    const hr = host.getBoundingClientRect();
+    const x = hr.left + (t.fx ?? 0.5) * hr.width;
+    const y = hr.top  + (t.fy ?? 0.5) * hr.height;
+    const rect = { left: x - 1, top: y - 1, right: x + 1, bottom: y + 1, width: 2, height: 2 };
+    return { el: null, rect, label: t.label ?? null };
+  }
   return null;
 }
 
@@ -1455,6 +1473,26 @@ function drawArrow(svg, cardR, resolved) {
     `${tipX - L * Math.cos(ang + a)} ${tipY - L * Math.sin(ang + a)}`);
   head.setAttribute('fill', '#4ecdc4');
   svg.appendChild(head);
+
+  // Optional caption next to the tip — names the thing the arrow lands on (e.g. an
+  // axis), with a dark halo so it stays readable over the plot.
+  if (resolved.label) {
+    const ux = dx / len, uy = dy / len;
+    const text = document.createElementNS(NS, 'text');
+    text.setAttribute('x', tipX + ux * 12);
+    text.setAttribute('y', tipY + uy * 12);
+    text.setAttribute('fill', '#4ecdc4');
+    text.setAttribute('font-size', '13');
+    text.setAttribute('font-weight', '700');
+    text.setAttribute('dominant-baseline', 'middle');
+    text.setAttribute('text-anchor', ux < 0 ? 'end' : 'start');
+    text.setAttribute('paint-order', 'stroke');
+    text.setAttribute('stroke', '#0e1117');
+    text.setAttribute('stroke-width', '3.5');
+    text.setAttribute('stroke-linejoin', 'round');
+    text.textContent = resolved.label;
+    svg.appendChild(text);
+  }
 }
 
 function drawArrowsForStep(step) {
@@ -1473,7 +1511,7 @@ function drawArrowsForStep(step) {
   if (!card) return;
   const cardR = card.getBoundingClientRect();
   resolved.forEach(r => {
-    r.el.classList.add('tour-pulse');
+    if (r.el) r.el.classList.add('tour-pulse');
     drawArrow(svg, cardR, r);
   });
 }
