@@ -129,6 +129,34 @@
   .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.4; }
   code { color: var(--accent); font-size: 0.92em; }
 
+  /* ── MRI cursor box: floats over the top-left of the cube, slice mode only ──── */
+  #cur-box {
+    position: absolute; top: 0.6rem; left: 0.6rem; z-index: 500; width: 210px;
+    background: rgba(22,27,34,0.92); border: 1px solid var(--border);
+    border-radius: 8px; padding: 0.55rem 0.65rem;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.45);
+  }
+  #cur-box h4 {
+    margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.03em;
+    text-transform: uppercase; color: var(--muted); font-weight: 700;
+  }
+  .cur-row { display: flex; align-items: center; justify-content: space-between; gap: 0.4rem; margin-bottom: 0.35rem; }
+  .cur-row label { font-size: 0.74rem; color: var(--text); }
+  .cur-row input {
+    width: 64px; padding: 0.2rem 0.3rem; text-align: right;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-radius: 5px; font-size: 0.76rem;
+  }
+  #cur-apply {
+    margin-top: 0.2rem; padding: 0.35rem; font-size: 0.76rem; font-weight: 700;
+    background: var(--accent); color: #1a1205; border-color: var(--accent);
+  }
+  .cur-val {
+    margin-top: 0.5rem; padding-top: 0.4rem; border-top: 1px solid var(--border);
+    font-size: 0.72rem; color: var(--muted); line-height: 1.45;
+  }
+  .cur-val b { color: var(--text); }
+
   /* ── Guided tutorial: launcher, dim, card, arrows ─────────────────────────── */
   #tour-launcher button { margin-bottom: 0.4rem; text-align: left; font-weight: 700; line-height: 1.3; }
   #tour-launcher .hint { margin-top: 0.45rem; }
@@ -332,7 +360,17 @@
     <div id="readout">Recomputing…</div>
   </div>
 
-  <div id="plotwrap"><div id="plot"></div></div>
+  <div id="plotwrap">
+    <div id="plot"></div>
+    <div id="cur-box" style="display:none">
+      <h4>Cursor position</h4>
+      <div class="cur-row"><label>Pledge (M ADA)</label><input type="number" id="cur-P" min="0" max="75" step="0.5" value="37.50"></div>
+      <div class="cur-row"><label>Margin (%)</label><input type="number" id="cur-m" min="0" max="100" step="1" value="50.0"></div>
+      <div class="cur-row"><label>Delegation (M ADA)</label><input type="number" id="cur-D" min="0" max="75" step="0.5" value="37.50"></div>
+      <button id="cur-apply">Move cursor here</button>
+      <div class="cur-val" id="cur-val"></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -416,26 +454,27 @@ function mpoCombined(P, D, m, cfg) {
 const METRICS = {
   advantage: {
     label: 'Splitting advantage (ADA/epoch)',
-    diverging: true, pivot: 0, colorscale: 'RdBu', reverse: true,
+    colorscale: 'Viridis',
     fn: (P, D, m, cfg) => mpoCombined(P, D, m, cfg) - spoIncome(P + D, P, m, cfg),
     hint: 'How many extra ADA per epoch the operator earns by splitting into N pools '
-        + 'instead of running one. RED (positive) = multipools win — the region to close. '
-        + 'BLUE (negative) = a single pool is better.'
+        + 'instead of running one. Brighter (yellow) = a larger splitting advantage — the '
+        + 'region to close. Dark = a single pool is as good or better.'
   },
   advratio: {
     label: 'Splitting advantage (ratio)',
-    diverging: true, pivot: 1, colorscale: 'RdBu', reverse: true, clamp: [0, 3],
+    colorscale: 'Viridis', clamp: [0, 3],
     fn: (P, D, m, cfg) => {
       const single = spoIncome(P + D, P, m, cfg);
       const comb   = mpoCombined(P, D, m, cfg);
       if (single < 1) return comb < 1 ? 1 : 3;
       return Math.min(comb / single, 3);
     },
-    hint: 'N-pool take ÷ 1-pool take. >1 (red) = splitting pays; 1 = neutral; <1 (blue) = single pool wins.'
+    hint: 'N-pool take ÷ 1-pool take, capped at 3×. Brighter = splitting pays more; '
+        + 'dark = neutral or a single pool wins.'
   },
   mpo: {
     label: 'MPO combined take (ADA/epoch)',
-    colorscale: 'Hot',
+    colorscale: 'Viridis',
     fn: (P, D, m, cfg) => mpoCombined(P, D, m, cfg),
     hint: 'Total operator income across all N pools. The high-value region is what each CIP family aims to shrink.'
   },
@@ -453,19 +492,19 @@ const METRICS = {
   },
   fee: {
     label: 'Operator fixed-fee income (ADA/epoch)',
-    colorscale: 'Hot',
+    colorscale: 'Viridis',
     fn: (P, D, m, cfg) => feeIncome(P + D, P, m, cfg),
     hint: 'The minPoolCost fee actually extracted (capped by what the pool earns). The fee-farm revenue stream.'
   },
   margin: {
     label: 'Operator margin income (ADA/epoch)',
-    colorscale: 'Hot',
+    colorscale: 'Viridis',
     fn: (P, D, m, cfg) => marginIncome(P + D, P, m, cfg),
     hint: 'Income from the percentage margin on net rewards.'
   },
   pledgeinc: {
     label: 'Operator pledge income (ADA/epoch)',
-    colorscale: 'Hot',
+    colorscale: 'Viridis',
     fn: (P, D, m, cfg) => pledgeIncome(P + D, P, m, cfg),
     hint: "The operator's own pledge share of net rewards — what CIP-187 scales by utilization."
   }
@@ -478,6 +517,18 @@ const $ = id => document.getElementById(id);
 
 let renderMode = 'volume';
 let showShells = false;
+
+// Isosurface level is tracked as an ABSOLUTE metric value (not a slider %) so that
+// switching presets — which rescales the field — keeps the shell at the same value
+// for comparison. Switching metric resets it (the units change). See render().
+let isoLevel = null, isoMetric = null;
+
+// MRI cursor (slice mode only): a single crosshair positioned by the three text
+// boxes. The point — x = pledge (M ADA), y = margin (%), z = delegation (M ADA) — is
+// the source of truth. The slice-position slider is tied to whichever axis is
+// currently sliced, so the cursor always lies on the slice plane; switching the
+// slice axis keeps the same point and re-aims the slice through it.
+let cursor = { x: 37.5, y: 50, z: 37.5 };
 
 // Which CIP families are active is now driven entirely by the scenario presets
 // (the per-lever checkboxes were removed). A disabled/greyed slider == inactive CIP.
@@ -593,6 +644,82 @@ function buildSlice(cfg) {
 }
 function clean(v) { return isFinite(v) ? v : 0; }
 
+// Whole-cube value range for the current metric. Used so the MRI slice keeps a FIXED
+// colour scale as it sweeps: the plane moves through a stable field instead of the
+// colours re-normalising on every slice.
+function cubeRange(cfg) {
+  const m = METRICS[cfg.metric];
+  const n = cfg.res;
+  const Pvals = lin(0, cfg.pmax, n);
+  const Mvals = lin(0, cfg.mmax, n);
+  const Dvals = lin(0, cfg.dmax, n);
+  let vmin = Infinity, vmax = -Infinity;
+  for (let k = 0; k < n; k++)
+    for (let j = 0; j < n; j++)
+      for (let i = 0; i < n; i++) {
+        let v = m.fn(Pvals[i], Dvals[k], Mvals[j], cfg);
+        if (!isFinite(v)) v = 0;
+        if (v < vmin) vmin = v;
+        if (v > vmax) vmax = v;
+      }
+  return { vmin, vmax };
+}
+
+// ── MRI cursor helpers ───────────────────────────────────────────────────────
+// The cursor's sliced-axis coordinate, as a 0–1 fraction of that axis' range.
+function cursorSlicedFrac(cfg) {
+  if (cfg.sliceAxis === 'x') return cursor.x / (cfg.pmax / 1e6);
+  if (cfg.sliceAxis === 'y') return cursor.y / (cfg.mmax * 100);
+  return cursor.z / (cfg.dmax / 1e6);
+}
+// Move the slice-position slider so the plane passes through the cursor.
+function cursorSlicedAxisToSlider(cfg) {
+  $('sl-slicepos').value = Math.max(0, Math.min(100, cursorSlicedFrac(cfg) * 100));
+}
+// Write the slider's position back into the cursor's sliced-axis coordinate.
+function sliderToCursorSlicedAxis(cfg) {
+  const pos = parseFloat($('sl-slicepos').value) / 100;
+  if (cfg.sliceAxis === 'x')      cursor.x = pos * (cfg.pmax / 1e6);
+  else if (cfg.sliceAxis === 'y') cursor.y = pos * (cfg.mmax * 100);
+  else                            cursor.z = pos * (cfg.dmax / 1e6);
+}
+function refreshCursorBoxes() {
+  $('cur-P').value = cursor.x.toFixed(2);
+  $('cur-m').value = cursor.y.toFixed(1);
+  $('cur-D').value = cursor.z.toFixed(2);
+}
+// Read the three boxes, clamp to the cube, then move the slice + crosshair there.
+function applyCursor() {
+  const cfg = readCfg();
+  const px = parseFloat($('cur-P').value); if (isFinite(px)) cursor.x = Math.max(0, Math.min(cfg.pmax / 1e6, px));
+  const my = parseFloat($('cur-m').value); if (isFinite(my)) cursor.y = Math.max(0, Math.min(cfg.mmax * 100, my));
+  const dz = parseFloat($('cur-D').value); if (isFinite(dz)) cursor.z = Math.max(0, Math.min(cfg.dmax / 1e6, dz));
+  cursorSlicedAxisToSlider(cfg);   // the sliced-axis box drives the slice position
+  refreshCursorBoxes();
+  syncLabels();                    // refresh the slice-position label
+  render();
+}
+// A single scatter3d point that sits ON the slice plane (sliced coord == slice pos).
+function cursorTrace(cfg) {
+  const m = METRICS[cfg.metric];
+  const val = clean(m.fn(cursor.x * 1e6, cursor.z * 1e6, cursor.y / 100, cfg));
+  return {
+    type: 'scatter3d', mode: 'markers',
+    x: [cursor.x], y: [cursor.y], z: [cursor.z],
+    marker: { size: 6, color: '#00e5ff', symbol: 'cross', line: { color: '#ffffff', width: 1 } },
+    showlegend: false,
+    hovertemplate: `P=${cursor.x.toFixed(2)}M  m=${cursor.y.toFixed(2)}%  D=${cursor.z.toFixed(2)}M`
+      + `<br>${m.label}: ${fmt(val)}<extra>cursor</extra>`
+  };
+}
+// The little readout under the boxes: the same P/m/D + metric value the hover gives.
+function updateCursorReadout(cfg, m) {
+  const val = clean(m.fn(cursor.x * 1e6, cursor.z * 1e6, cursor.y / 100, cfg));
+  $('cur-val').innerHTML =
+    `P <b>${cursor.x.toFixed(2)}</b>M · m <b>${cursor.y.toFixed(1)}</b>% · D <b>${cursor.z.toFixed(2)}</b>M`
+    + `<br>${m.label}: <b>${fmt(val)}</b>`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Color-range helper: for diverging metrics, center on the pivot.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -635,8 +762,9 @@ function render() {
 
   if (renderMode === 'slice') {
     const g = buildSlice(cfg);
-    lastGridRange = [g.vmin, g.vmax];
-    const cr = colorRange(cfg.metric, g.vmin, g.vmax);
+    const cubeR = cubeRange(cfg);                 // FIXED colour scale across the whole cube
+    lastGridRange = [cubeR.vmin, cubeR.vmax];     //   → the slice moves; the colours don't rescale
+    const cr = colorRange(cfg.metric, cubeR.vmin, cubeR.vmax);
     traces = [{
       type: 'surface',
       x: g.xs, y: g.ys, z: g.zs, surfacecolor: g.cs, text: g.cs,
@@ -646,6 +774,8 @@ function render() {
       lighting: { ambient: 0.95, diffuse: 0.2, specular: 0.05 },
       hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<br>'+m.label+': %{text:.3s}<extra></extra>'
     }];
+    traces.push(cursorTrace(cfg));                // the typed crosshair, on the slice plane
+    updateCursorReadout(cfg, m);
     const axisName = cfg.sliceAxis === 'z' ? 'Delegation' : cfg.sliceAxis === 'x' ? 'Pledge' : 'Margin';
     const axisMax  = cfg.sliceAxis === 'z' ? cfg.dmax/1e6+' M' : cfg.sliceAxis === 'x' ? cfg.pmax/1e6+' M' : (cfg.mmax*100).toFixed(1)+'%';
     const posVal   = cfg.sliceAxis === 'z' ? (cfg.dmax*cfg.slicePos/1e6).toFixed(1)+' M ADA'
@@ -675,7 +805,17 @@ function render() {
       info = 'Volume fog — opacity follows the metric. Denser color = larger value.';
 
     } else {  // isosurface
-      const lvl = g.vmin + cfg.iso * (g.vmax - g.vmin);
+      // Keep the shell at a fixed ABSOLUTE value across presets (same metric); only a
+      // metric change resets it. Then reflect that value back onto the 0–100 slider.
+      let lvl;
+      if (isoMetric === cfg.metric && isoLevel !== null) {
+        lvl = Math.max(g.vmin, Math.min(g.vmax, isoLevel));
+      } else {
+        lvl = g.vmin + cfg.iso * (g.vmax - g.vmin);
+        isoMetric = cfg.metric;
+      }
+      isoLevel = lvl;
+      $('sl-iso').value = g.vmax > g.vmin ? 100 * (lvl - g.vmin) / (g.vmax - g.vmin) : 50;
       const band = (g.vmax - g.vmin) * 0.001 || 1e-6;
       const isomin = showShells ? g.vmin : lvl;
       const isomax = showShells ? g.vmax : lvl + band;
@@ -804,6 +944,33 @@ document.querySelectorAll('select').forEach(el => {
   el.addEventListener('change', scheduleRender);
 });
 
+// Absolute iso level — update it live while the iso-level slider is dragged, using the
+// range of the field currently on screen. render() then holds this value across presets.
+$('sl-iso').addEventListener('input', () => {
+  const [vmin, vmax] = lastGridRange;
+  isoLevel = vmin + (parseFloat($('sl-iso').value) / 100) * (vmax - vmin);
+  isoMetric = $('metric').value;
+});
+
+// MRI: slice-position slider ↔ the cursor's sliced-axis coordinate (two-way bind).
+$('sl-slicepos').addEventListener('input', () => {
+  const cfg = readCfg();
+  sliderToCursorSlicedAxis(cfg);
+  refreshCursorBoxes();
+});
+
+// MRI: switching the slice axis keeps the same point and re-aims the slice through it.
+$('slice-axis').addEventListener('change', () => {
+  const cfg = readCfg();
+  cursorSlicedAxisToSlider(cfg);
+  refreshCursorBoxes();
+  syncLabels();
+});
+
+// MRI cursor text boxes: type a position, place the crosshair there (button or Enter).
+$('cur-apply').addEventListener('click', applyCursor);
+['cur-P', 'cur-m', 'cur-D'].forEach(id => $(id).addEventListener('change', applyCursor));
+
 // Render-mode buttons
 $('modebtns').addEventListener('click', e => {
   const btn = e.target.closest('button'); if (!btn) return;
@@ -811,6 +978,8 @@ $('modebtns').addEventListener('click', e => {
   document.querySelectorAll('#modebtns button').forEach(b => b.classList.toggle('active', b === btn));
   $('wrap-iso').style.display   = renderMode === 'isosurface' ? '' : 'none';
   $('wrap-slice').style.display = renderMode === 'slice' ? '' : 'none';
+  $('cur-box').style.display    = renderMode === 'slice' ? '' : 'none';
+  if (renderMode === 'slice') { const cfg = readCfg(); cursorSlicedAxisToSlider(cfg); refreshCursorBoxes(); }
   const hints = {
     volume: "Semi-transparent fog: opacity follows the metric, so dense color marks where the metric is large. Best first look at the field's shape.",
     isosurface: 'A surface of constant metric value. Slide the level to find the boundary; for the advantage metrics, snap to the 0 / 1 pivot to see exactly where multipools stop winning.',
@@ -824,10 +993,11 @@ $('modebtns').addEventListener('click', e => {
 $('btn-snap').addEventListener('click', () => {
   const cfg = readCfg();
   const m = METRICS[cfg.metric];
-  const pivot = m.diverging ? m.pivot : (lastGridRange[0]+lastGridRange[1])/2;
   const [vmin, vmax] = lastGridRange;
-  const pct = vmax > vmin ? Math.max(0, Math.min(100, 100*(pivot - vmin)/(vmax - vmin))) : 50;
-  $('sl-iso').value = pct; showShells = false;
+  const pivot = m.diverging ? m.pivot : (vmin + vmax) / 2;
+  isoLevel = Math.max(vmin, Math.min(vmax, pivot));   // set the absolute level directly
+  isoMetric = cfg.metric;
+  showShells = false;
   scheduleRender();
 });
 $('btn-shells').addEventListener('click', () => { showShells = !showShells; render(); });
@@ -841,6 +1011,9 @@ $('btn-sweep').addEventListener('click', () => {
   sweepTimer = setInterval(() => {
     p = (p + 4) % 102;
     $('sl-slicepos').value = p;
+    const cfg = readCfg();
+    sliderToCursorSlicedAxis(cfg);
+    refreshCursorBoxes();
     syncLabels(); render();
   }, 120);
 });
