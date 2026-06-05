@@ -258,8 +258,15 @@
         <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
           <button id="btn-hidesat" style="font-size:0.74rem">Hide above saturation</button>
         </div>
+        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+          <button id="btn-save-surf" style="font-size:0.74rem">＋ Save surface</button>
+          <button id="btn-clear-surf" style="font-size:0.74rem">Clear saved</button>
+        </div>
         <div class="hint">Saturation = 75M ADA of combined pledge + delegation (P + D). Hiding it
           blanks every voxel beyond that line so only sub-saturation pools are drawn.</div>
+        <div class="hint"><b>Save surface</b> freezes the shell now on screen in its own colour so you
+          can move the sliders or pick another metric and lay a new surface beside it — many surfaces at
+          once tell a story one can't. <b>Clear saved</b> removes them, leaving only the live surface.</div>
       </div>
       <div class="ctl" id="wrap-slice" style="display:none">
         <label>Slice axis</label>
@@ -526,6 +533,16 @@ let hideAboveSat = false;
 // for comparison. Switching metric resets it (the units change). See render().
 let isoLevel = null, isoMetric = null;
 
+// Saved isosurfaces: frozen snapshots layered in the cube for comparison. Each entry is
+// { trace, color, label } — the trace is a recoloured copy of whatever was live when the
+// user clicked "Save surface", so moving the sliders afterwards never disturbs it. Only
+// drawn in isosurface mode; switching render mode hides them but keeps them for later.
+const SAVED_COLORS = ['#4ecdc4', '#ff6b6b', '#5b8def', '#ff9f43', '#b07cff', '#ffe066'];
+const MAX_SAVED    = 6;
+let savedSurfaces  = [];
+let lastLiveIso    = null;   // the live isosurface trace from the most recent render()
+let lastIsoDesc    = '';     // a human label describing the field that produced it
+
 // Which CIP families are active is now driven entirely by the scenario presets
 // (the per-lever checkboxes were removed). A disabled/greyed slider == inactive CIP.
 let cipState = { fee: false, c50: false, c187: false };
@@ -786,12 +803,19 @@ function render() {
         colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
         hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M' + isoValLine + '<extra></extra>'
       }];
+      lastLiveIso = traces[0];                          // what "Save surface" would freeze
+      lastIsoDesc = isoDescription(cfg, lvl, showShells);
       $('v-iso').textContent = fmt(lvl);
       info = showShells
         ? 'Nested shells — several constant-value surfaces from min to max.'
         : `Isosurface at <b>${fmt(lvl)}</b> — the boundary of the region above this value.`;
       if (hideAboveSat) info += ' <b>Above-saturation pools (P + D &gt; 75M ADA) hidden.</b>';
     }
+  }
+
+  // Layer any frozen surfaces beneath the live one (isosurface mode only).
+  if (renderMode === 'isosurface' && savedSurfaces.length) {
+    traces = savedSurfaces.map(s => s.trace).concat(traces);
   }
 
   Plotly.react('plot', traces, layout3d, plotConfig);
@@ -852,7 +876,8 @@ function updateReadout(cfg, m, info) {
     + `<div style="margin-bottom:0.4rem">Active CIPs: <b>${cipTxt}</b> · N=<b>${cfg.N}</b></div>`
     + `<div style="font-size:0.74rem;color:var(--muted);margin-bottom:0.3rem">Splitting advantage (m=0%) at the three MPO archetypes:</div>`
     + rows
-    + `<div class="hint">${m.hint}</div>`;
+    + `<div class="hint">${m.hint}</div>`
+    + savedLegendHtml();
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -944,6 +969,61 @@ $('btn-hidesat').addEventListener('click', () => {
   btn.style.fontWeight   = hideAboveSat ? '700' : '';
   render();
 });
+
+// ── Saved isosurfaces ──────────────────────────────────────────────────────────
+// A short human label for the field that produced a surface: metric, level, the CIP
+// levers in force, and N. Used in the snapshot legend so each colour is identifiable.
+function isoDescription(cfg, lvl, shells) {
+  const cips = [];
+  if (cfg.cipFee) cips.push('fee→' + cfg.F);
+  if (cfg.cip50)  cips.push('L=' + cfg.L);
+  if (cfg.cip187) cips.push('b=' + cfg.b.toFixed(2));
+  const cipTxt = cips.length ? cips.join('/') : 'baseline';
+  const lvlTxt = shells ? 'nested shells' : 'iso=' + fmt(lvl);
+  return `${METRICS[cfg.metric].label} · ${lvlTxt} · ${cipTxt} · N=${cfg.N}`;
+}
+
+// Freeze the surface currently on screen into its own flat colour. The trace's geometry
+// arrays are never mutated in place (render() rebuilds fresh ones every frame), so a
+// shallow copy is a safe permanent snapshot.
+function saveSurface() {
+  if (renderMode !== 'isosurface' || !lastLiveIso) return;
+  if (savedSurfaces.length >= MAX_SAVED) {
+    const btn = $('btn-save-surf');
+    btn.textContent = `Max ${MAX_SAVED} saved`;
+    setTimeout(() => { btn.textContent = '＋ Save surface'; }, 1400);
+    return;
+  }
+  const color = SAVED_COLORS[savedSurfaces.length % SAVED_COLORS.length];
+  const t = Object.assign({}, lastLiveIso);
+  t.colorscale = [[0, color], [1, color]];   // single flat colour
+  t.cmin = 0; t.cmax = 1; t.cmid = 0.5;
+  t.showscale = false;
+  delete t.colorbar;
+  t.opacity = 0.45;                            // translucent so stacked shells stay visible
+  t.hovertemplate = lastIsoDesc + '<br>P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<extra></extra>';
+  savedSurfaces.push({ trace: t, color, label: lastIsoDesc });
+  render();
+}
+
+// Legend rows for the readout: a colour swatch + the saved surface's description.
+function savedLegendHtml() {
+  if (!savedSurfaces.length) return '';
+  const rows = savedSurfaces.map((s, i) =>
+    `<div style="display:flex;align-items:center;gap:0.4rem;margin-top:0.22rem">
+       <span style="width:11px;height:11px;border-radius:2px;background:${s.color};flex:0 0 auto"></span>
+       <span style="font-size:0.72rem;color:var(--text)">${i + 1}. ${s.label}</span>
+     </div>`).join('');
+  const note = renderMode === 'isosurface' ? '' :
+    ' <span style="color:var(--muted)">(shown in Isosurface mode)</span>';
+  return `<div style="margin-top:0.55rem;padding-top:0.45rem;border-top:1px solid var(--border)">
+            <div style="font-size:0.72rem;color:var(--muted)">Saved surfaces (${savedSurfaces.length})${note}:</div>
+            ${rows}
+          </div>`;
+}
+
+$('btn-save-surf').addEventListener('click', saveSurface);
+$('btn-clear-surf').addEventListener('click', () => { savedSurfaces = []; render(); });
 
 // MRI sweep animation
 let sweepTimer = null;
