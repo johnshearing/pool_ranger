@@ -732,13 +732,17 @@ function render() {
       // number shown on the Isosurface-level slider. Bake it into the hover. Nested
       // shells have several different levels at once, so there we show coordinates only.
       const isoValLine = showShells ? '' : '<br>' + m.label + ': ' + fmt(lvl);
-      // Optionally suppress everything above saturation: blank (NaN) every voxel whose
-      // combined pledge + delegation exceeds S_SAT. Marching cubes skips cells touching
-      // a NaN corner, so this carves a clean hole rather than an artificial boundary wall.
+      // Optionally suppress everything above saturation. A NaN value blanks Plotly's
+      // entire isosurface trace, so instead we push every voxel whose combined pledge +
+      // delegation exceeds S_SAT to a sentinel far BELOW the iso level. No surface can
+      // form there (nothing crosses the level), so the above-saturation half disappears
+      // while the sub-saturation half renders normally — with a flat cap where the shell
+      // meets the saturation plane.
       let isoValue = g.value;
       if (hideAboveSat) {
-        const satM = S_SAT / 1e6;   // g.x and g.z are stored in M ADA
-        isoValue = g.value.map((v, idx) => (g.x[idx] + g.z[idx] > satM + 1e-9) ? NaN : v);
+        const satM = S_SAT / 1e6;                          // g.x and g.z are stored in M ADA
+        const sentinel = g.vmin - (g.vmax - g.vmin) - 1;   // strictly below any iso level
+        isoValue = g.value.map((v, idx) => (g.x[idx] + g.z[idx] > satM + 1e-9) ? sentinel : v);
       }
       traces = [{
         type: 'isosurface',
