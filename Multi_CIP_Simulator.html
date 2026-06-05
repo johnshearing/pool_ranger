@@ -129,19 +129,6 @@
   .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.4; }
   code { color: var(--accent); font-size: 0.92em; }
 
-  /* Cursor readout for the volume & isosurface views. Plotly's native hover on
-     those mesh traces snaps the reported value to the nearest synthetic grid corner
-     (often the metric's neutral value), so we hide it and recompute the metric from
-     the exact hovered point ourselves — see wireHover(). */
-  #hover-tip {
-    position: fixed; z-index: 8000; pointer-events: none; display: none;
-    background: rgba(22,27,34,0.96); border: 1px solid var(--border);
-    border-radius: 6px; padding: 0.4rem 0.55rem;
-    font-size: 0.78rem; line-height: 1.45; color: var(--text);
-    white-space: nowrap; box-shadow: 0 4px 14px rgba(0,0,0,0.55);
-  }
-  #hover-tip b { color: var(--accent); }
-
   /* ── Guided tutorial: launcher, dim, card, arrows ─────────────────────────── */
   #tour-launcher button { margin-bottom: 0.4rem; text-align: left; font-weight: 700; line-height: 1.3; }
   #tour-launcher .hint { margin-top: 0.45rem; }
@@ -348,8 +335,6 @@
   <div id="plotwrap"><div id="plot"></div></div>
 </div>
 
-<div id="hover-tip"></div>
-
 <script>
 "use strict";
 
@@ -493,7 +478,6 @@ const $ = id => document.getElementById(id);
 
 let renderMode = 'volume';
 let showShells = false;
-let hoverWired = false;   // plot hover listeners attached once (see wireHover)
 
 // Which CIP families are active is now driven entirely by the scenario presets
 // (the per-lever checkboxes were removed). A disabled/greyed slider == inactive CIP.
@@ -683,7 +667,10 @@ function render() {
         colorscale: cs,
         opacity: 0.12, surface: { count: 18 },
         colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
-        hoverinfo: 'none'   // value recomputed from the hovered point in wireHover()
+        // Only the coordinates at the cursor. The fog is only ever hovered on the
+        // cube's outer surface, and Plotly's value reading there snaps to the
+        // nearest grid corner (unreliable), so we deliberately omit the metric.
+        hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M<extra></extra>'
       }];
       info = 'Volume fog — opacity follows the metric. Denser color = larger value.';
 
@@ -692,6 +679,11 @@ function render() {
       const band = (g.vmax - g.vmin) * 0.001 || 1e-6;
       const isomin = showShells ? g.vmin : lvl;
       const isomax = showShells ? g.vmax : lvl + band;
+      // A single isosurface is, by definition, the surface where the metric equals
+      // the level — so the value at every point on it is exactly fmt(lvl), the same
+      // number shown on the Isosurface-level slider. Bake it into the hover. Nested
+      // shells have several different levels at once, so there we show coordinates only.
+      const isoValLine = showShells ? '' : '<br>' + m.label + ': ' + fmt(lvl);
       traces = [{
         type: 'isosurface',
         x: g.x, y: g.y, z: g.z, value: g.value,
@@ -701,7 +693,7 @@ function render() {
         cmin: cr.cmin, cmax: cr.cmax, cmid: cr.cmid,
         colorscale: cs, opacity: showShells ? 0.35 : 0.9,
         colorbar: { title: { text: m.label, side: 'right' }, len: 0.7, thickness: 14 },
-        hoverinfo: 'none'   // value recomputed from the hovered point in wireHover()
+        hovertemplate: 'P=%{x:.2f}M  m=%{y:.2f}%  D=%{z:.2f}M' + isoValLine + '<extra></extra>'
       }];
       $('v-iso').textContent = fmt(lvl);
       info = showShells
@@ -711,53 +703,7 @@ function render() {
   }
 
   Plotly.react('plot', traces, layout3d, plotConfig);
-  wireHover();
-  const tip = $('hover-tip');           // hide any stale tooltip from the previous field
-  if (tip) tip.style.display = 'none';
   updateReadout(cfg, m, info);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Cursor readout for volume & isosurface.
-//
-//  Plotly's native hover on these mesh traces reports the value of the nearest
-//  *synthetic grid corner*, not the value at the point under the cursor. For the
-//  ratio metric, large swaths of the grid sit at exactly the neutral value (1.0),
-//  so the snapped reading reads "1.00" even while you hover the 2.4 isosurface.
-//
-//  The hovered coordinates (P, m, D), by contrast, ARE reported correctly — so we
-//  hide Plotly's value (hoverinfo:'none' on those traces) and recompute the metric
-//  ourselves from the exact hovered point. The MRI/slice view already reads its
-//  value from an explicit per-vertex text array, so it keeps its native tooltip.
-// ─────────────────────────────────────────────────────────────────────────────
-function wireHover() {
-  if (hoverWired) return;
-  const gd = $('plot');
-  if (!gd || typeof gd.on !== 'function') return;
-  hoverWired = true;
-
-  gd.on('plotly_hover', e => {
-    const tip = $('hover-tip');
-    if (!tip || renderMode === 'slice') return;   // slice keeps its (correct) native hover
-    const p = e.points && e.points[0];
-    if (!p || p.x == null) return;
-    const cfg = readCfg();
-    const mdef = METRICS[cfg.metric];
-    const P = p.x * 1e6, mm = p.y / 100, D = p.z * 1e6;   // invert buildGrid's scaling
-    let v = mdef.fn(P, D, mm, cfg);
-    if (!isFinite(v)) v = 0;
-    tip.innerHTML =
-      `P=${p.x.toFixed(2)}M&nbsp;&nbsp;m=${p.y.toFixed(2)}%&nbsp;&nbsp;D=${p.z.toFixed(2)}M`
-      + `<br>${mdef.label}: <b>${fmt(v)}</b>`;
-    const ev = e.event;
-    if (ev) { tip.style.left = (ev.clientX + 14) + 'px'; tip.style.top = (ev.clientY + 14) + 'px'; }
-    tip.style.display = 'block';
-  });
-
-  gd.on('plotly_unhover', () => {
-    const tip = $('hover-tip');
-    if (tip) tip.style.display = 'none';
-  });
 }
 
 // Build a reversed copy of a named Plotly colorscale (so red = "bad/MPO-wins").
