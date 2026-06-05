@@ -237,6 +237,11 @@
           <button id="btn-snap" style="font-size:0.74rem">Snap to pivot (0 / 1)</button>
           <button id="btn-shells" style="font-size:0.74rem">Nested shells</button>
         </div>
+        <div style="display:flex;gap:0.3rem;margin-top:0.3rem">
+          <button id="btn-hidesat" style="font-size:0.74rem">Hide above saturation</button>
+        </div>
+        <div class="hint">Saturation = 75M ADA of combined pledge + delegation (P + D). Hiding it
+          blanks every voxel beyond that line so only sub-saturation pools are drawn.</div>
       </div>
       <div class="ctl" id="wrap-slice" style="display:none">
         <label>Slice axis</label>
@@ -481,6 +486,9 @@ const $ = id => document.getElementById(id);
 
 let renderMode = 'volume';
 let showShells = false;
+// When true, the isosurface view blanks every grid point whose combined pledge +
+// delegation exceeds saturation (S_SAT), so only sub-saturation pools are imaged.
+let hideAboveSat = false;
 
 // Isosurface level is tracked as an ABSOLUTE metric value (not a slider %) so that
 // switching presets — which rescales the field — keeps the shell at the same value
@@ -724,9 +732,17 @@ function render() {
       // number shown on the Isosurface-level slider. Bake it into the hover. Nested
       // shells have several different levels at once, so there we show coordinates only.
       const isoValLine = showShells ? '' : '<br>' + m.label + ': ' + fmt(lvl);
+      // Optionally suppress everything above saturation: blank (NaN) every voxel whose
+      // combined pledge + delegation exceeds S_SAT. Marching cubes skips cells touching
+      // a NaN corner, so this carves a clean hole rather than an artificial boundary wall.
+      let isoValue = g.value;
+      if (hideAboveSat) {
+        const satM = S_SAT / 1e6;   // g.x and g.z are stored in M ADA
+        isoValue = g.value.map((v, idx) => (g.x[idx] + g.z[idx] > satM + 1e-9) ? NaN : v);
+      }
       traces = [{
         type: 'isosurface',
-        x: g.x, y: g.y, z: g.z, value: g.value,
+        x: g.x, y: g.y, z: g.z, value: isoValue,
         isomin, isomax,
         surface: { count: showShells ? 4 : 1, fill: 1.0 },
         caps: { x:{show:false}, y:{show:false}, z:{show:false} },
@@ -739,6 +755,7 @@ function render() {
       info = showShells
         ? 'Nested shells — several constant-value surfaces from min to max.'
         : `Isosurface at <b>${fmt(lvl)}</b> — the boundary of the region above this value.`;
+      if (hideAboveSat) info += ' <b>Above-saturation pools (P + D &gt; 75M ADA) hidden.</b>';
     }
   }
 
@@ -880,6 +897,18 @@ $('btn-snap').addEventListener('click', () => {
   scheduleRender();
 });
 $('btn-shells').addEventListener('click', () => { showShells = !showShells; render(); });
+
+// Toggle: hide everything above saturation (P + D > 75M ADA) in the isosurface view.
+$('btn-hidesat').addEventListener('click', () => {
+  hideAboveSat = !hideAboveSat;
+  const btn = $('btn-hidesat');
+  btn.textContent = hideAboveSat ? '✓ Above saturation hidden' : 'Hide above saturation';
+  btn.style.background   = hideAboveSat ? 'var(--accent)' : '';
+  btn.style.color        = hideAboveSat ? '#1a1205' : '';
+  btn.style.borderColor  = hideAboveSat ? 'var(--accent)' : '';
+  btn.style.fontWeight   = hideAboveSat ? '700' : '';
+  render();
+});
 
 // MRI sweep animation
 let sweepTimer = null;
