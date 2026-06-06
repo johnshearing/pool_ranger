@@ -1485,7 +1485,7 @@ const TOUR_SCRIPTS = {
     {
       title: 'The mission — which multipools, and why',
       body: `<p>Instead of chasing individual pools and guessing which are multipools, this tool tracks
-        the <strong>parameter space</strong> where multipools can profitably exist — every set-up where
+        the <strong>parameter space</strong> where multipools can profitably exist. Every set-up where
         splitting your pledge and delegation across many pools earns <em>more</em> than running one pool.</p>
         <p>Not every multipool is a problem. An operator who buys enough ADA to <em>fully saturate</em>
         one pool with their own pledge and then opens another is just using their own money well — no one
@@ -1493,11 +1493,12 @@ const TOUR_SCRIPTS = {
         their own</strong>, splitting borrowed delegation thinly across pool after pool — typically each
         with a <strong>low margin and a high flat fee</strong>. They <em>fee-farm</em>: they collect a fee
         on every pool without investing pledge and without offering delegators a good return.</p>
-        <p>I've set the scene: <strong>Baseline (no CIP)</strong>, coloured by <strong>splitting advantage
-        — ratio</strong>, drawn as an <strong>isosurface</strong> at level <strong>1.2</strong> across
-        <strong>N = 10</strong> pools, with the saturated region hidden. The shape you see is every pool
-        set-up where splitting across 10 pools earns at least <strong>20% more</strong> than one pool. The
-        mission: find which reforms make that shape disappear.</p>`,
+        <p>I've set the scene: <strong>Baseline (no CIP)</strong>: We are seeing current protocol behavior. 
+        The Color Metric is <strong>splitting advantage — ratio</strong> which is drawn as an 
+        <strong>isosurface</strong> at level <strong>1.2</strong> across <strong>N = 10</strong> pools, 
+        with the saturated region hidden. The shape you see is every pool set-up where splitting across 10 
+        pools earns at least <strong>20% more</strong> than one pool. The mission: find which reforms make 
+        that shape disappear.</p>`,
       targets: [],
       actions: [
         { kind: 'preset', name: 'baseline' },
@@ -1511,13 +1512,12 @@ const TOUR_SCRIPTS = {
       holdMs: 15000,
     },
     {
-      title: 'The colour now measures advantage, not blame',
-      body: `<p>One thing to unlearn first: the colour scale changed. It used to run red→blue with
-        "red = bad". It now runs the <strong>Viridis</strong> way — <span class="cool">dark deep-purple</span>
-        for low values up to <span class="hot">bright yellow</span> for high ones — and the
+      title: 'The color measures advantage',
+      body: `<p><span class="cool">dark deep-purple</span> represents low values 
+        <span class="hot">bright yellow</span> represents high values — and the
         <strong>Color metric</strong> menu is set to <strong>splitting advantage — ratio</strong>
         (N-pool take ÷ 1-pool take, capped at 3×).</p>
-        <p>So read the colour as a <em>measurement</em>, not a verdict: <span class="hot">bright</span>
+        <p>So read the color as a <em>measurement</em>, not a verdict: <span class="hot">bright</span>
         simply means splitting pays <em>more</em> there, <span class="cool">dark</span> means a single
         pool is as good or better. A bright region isn't automatically a villain — that's why we hid the
         saturated, self-funded case. What's left is the fee-farming set-up we actually want to close.</p>`,
