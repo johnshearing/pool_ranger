@@ -199,11 +199,11 @@
   #tour-body em { color: var(--teal); font-style: normal; font-weight: 600; }
   #tour-body .bad  { color: var(--red);  font-weight: 700; }
   #tour-body .good { color: var(--teal); font-weight: 700; }
-  /* Viridis colour language for tutorial #1: the live colour scale runs from dark deep-purple
-     (low value) up to bright yellow (high value). So in this tutorial "hot" = the bright yellow
-     splitting-pays zone we want to close, and "cool" = the dark region where one honest pool
-     already wins. (Tutorial #2 still uses the red/blue .bad/.good wording above and is left
-     untouched on purpose.) */
+  /* Viridis colour language for both tutorials: the live colour scale runs from dark deep-purple
+     (low value) up to bright yellow (high value). So "hot" = the bright yellow splitting-pays zone
+     we want to close, and "cool" = the dark region where one honest pool already wins. The older
+     red/blue .bad/.good classes are retained only in case some legacy copy still references them;
+     both walkthroughs now speak Viridis. */
   #tour-body .hot  { color: #f2e23c; font-weight: 700; }
   #tour-body .cool { color: #9aa6d8; font-weight: 700; }
   #tour-body code { color: var(--accent); }
@@ -312,8 +312,8 @@
       <h3>Color metric</h3>
       <div class="ctl">
         <select id="metric">
-          <option value="advantage" selected>Splitting advantage — N-pool take − 1-pool take (ADA/epoch)</option>
-          <option value="advratio">Splitting advantage — ratio (N-pool ÷ 1-pool)</option>
+          <option value="advantage">Splitting advantage — N-pool take − 1-pool take (ADA/epoch)</option>
+          <option value="advratio" selected>Splitting advantage — ratio (N-pool ÷ 1-pool)</option>
           <option value="mpo">MPO combined take — all N pools (ADA/epoch)</option>
           <option value="single">Single-pool operator take (ADA/epoch)</option>
           <option value="roa">Delegator ROA (%/yr)</option>
@@ -1130,14 +1130,18 @@ applyPreset('baseline');   // start with no CIPs active; all three sliders greye
 //      tween sliders — because that is how this simulator is actually driven.
 //
 //  Two scripts:
-//    tour   — "what is every control for", framed by the goal (close red / open blue).
-//    thesis — the argument: close each multipool corner in turn, then all at once.
+//    tour   — "what is every control for", framed by the goal (close the bright
+//             splitting-pays zone / keep the dark single-pool zone open).
+//    thesis — the mission: starting from the splitting-advantage ratio isosurface at
+//             1.2 (N=10, saturation hidden), watch each CIP family close its own door,
+//             then all three together blank the multipool parameter space. Uses the
+//             Viridis hot/cool colour language, not the old red/blue.
 // ═════════════════════════════════════════════════════════════════════════════
 const TOUR_SCRIPTS = {
   tour: [
     {
       title: 'Welcome — what this tool is for',
-      body: `<p>This tool is about keeping Cardano <em>fair</em>. On Cardano people earn rewards by
+      body: `<p>This tool is about keeping Cardano <em>fair</em>. On Cardano, people earn rewards by
         <strong>staking</strong> their coins through a <strong>stake pool</strong> — think of a pool as
         a co-op that combines everyone's coins to earn a share of the network's rewards.</p>
         <p>Some operators run <strong>many</strong> pools at once (a "multipool"). That is not wrong by
@@ -1479,132 +1483,189 @@ const TOUR_SCRIPTS = {
 
   thesis: [
     {
-      title: 'The mission, in one arc',
-      body: `<p>This walkthrough shows the tool's whole purpose. We take Cardano's rules as they are
-        today and watch proposed fixes <em>close</em> the regions where gaming with many pools pays.</p>
-        <p>We start at <strong>Baseline</strong> — today's rules — colouring by <strong>splitting
-        advantage</strong>. The <span class="bad">red cloud</span> is every pool set-up where splitting
-        into many pools beats running one honest pool. It is large. That is the problem.</p>`,
+      title: 'The mission — which multipools, and why',
+      body: `<p>Instead of chasing individual pools and guessing which are multipools, this tool tracks
+        the <strong>parameter space</strong> where multipools can profitably exist — every set-up where
+        splitting your pledge and delegation across many pools earns <em>more</em> than running one pool.</p>
+        <p>Not every multipool is a problem. An operator who buys enough ADA to <em>fully saturate</em>
+        one pool with their own pledge and then opens another is just using their own money well — no one
+        can fault that. The set-up we're after is narrower: operators with <strong>little or no pledge of
+        their own</strong>, splitting borrowed delegation thinly across pool after pool — typically each
+        with a <strong>low margin and a high flat fee</strong>. They <em>fee-farm</em>: they collect a fee
+        on every pool without investing pledge and without offering delegators a good return.</p>
+        <p>I've set the scene: <strong>Baseline (no CIP)</strong>, coloured by <strong>splitting advantage
+        — ratio</strong>, drawn as an <strong>isosurface</strong> at level <strong>1.2</strong> across
+        <strong>N = 10</strong> pools, with the saturated region hidden. The shape you see is every pool
+        set-up where splitting across 10 pools earns at least <strong>20% more</strong> than one pool. The
+        mission: find which reforms make that shape disappear.</p>`,
       targets: [],
       actions: [
         { kind: 'preset', name: 'baseline' },
-        { kind: 'select', id: 'metric', value: 'advantage' },
-        { kind: 'mode',   mode: 'volume' },
-        { kind: 'slider', id: 'sl-N', value: 5, ms: 300 },
+        { kind: 'select', id: 'metric', value: 'advratio' },
+        { kind: 'mode',   mode: 'isosurface' },
+        { kind: 'slider', id: 'sl-N', value: 10, ms: 400 },
+        { kind: 'hidesat', on: true },
+        { kind: 'isolevel', value: 1.2, metric: 'advratio' },
       ],
       cardPosition: 'bottom-left',
-      holdMs: 11000,
+      holdMs: 15000,
     },
     {
-      title: 'Three corners where the gaming lives',
-      body: `<p>The red cloud clusters in three corners of the cube — the three classic cheats:</p>
-        <p>• <strong>Fee-farm</strong>: low pledge, low delegation — many tiny pools each skimming the flat fee.<br>
-        • <strong>Over-leveraged</strong>: low pledge, huge delegation — little skin in the game, lots of
-        other people's money.<br>
-        • <strong>Empty-pledge</strong>: high pledge, no delegators — a showcase pool collecting a pledge
-        bonus it didn't earn.</p>
-        <p>Each needs a different fix. No single change closes all three — that's the key point.</p>`,
-      targets: [],
+      title: 'The colour now measures advantage, not blame',
+      body: `<p>One thing to unlearn first: the colour scale changed. It used to run red→blue with
+        "red = bad". It now runs the <strong>Viridis</strong> way — <span class="cool">dark deep-purple</span>
+        for low values up to <span class="hot">bright yellow</span> for high ones — and the
+        <strong>Color metric</strong> menu is set to <strong>splitting advantage — ratio</strong>
+        (N-pool take ÷ 1-pool take, capped at 3×).</p>
+        <p>So read the colour as a <em>measurement</em>, not a verdict: <span class="hot">bright</span>
+        simply means splitting pays <em>more</em> there, <span class="cool">dark</span> means a single
+        pool is as good or better. A bright region isn't automatically a villain — that's why we hid the
+        saturated, self-funded case. What's left is the fee-farming set-up we actually want to close.</p>`,
+      targets: ['grp-metric'],
       actions: [],
-      cardPosition: 'bottom-left',
-      holdMs: 12000,
+      cardPosition: 'bottom-right',
+      holdMs: 13000,
     },
     {
-      title: 'Fix #1 — fee reform (CIPs 23 / 74 / 75)',
-      body: `<p>Switching on <strong>fee reform</strong> drops the flat fee toward zero. Watch the
-        <strong>fee-farm</strong> part of the red cloud fade — running dozens of tiny pools just to skim
-        fixed fees stops paying.</p>
-        <p>But notice the other corners are still red. Fee reform alone is <em>not</em> enough.</p>`,
+      title: 'Reading the dials behind the shape',
+      body: `<p>Three controls define exactly what this shell means:</p>
+        <p>• <strong>Isosurface level = 1.2</strong>: the shell wraps every point where the multipool
+        operator earns <strong>20% more</strong> by splitting. Lower it and the shell grows; raise it and
+        only the most lucrative splitting survives.<br>
+        • <strong>N = 10</strong>: we're doing the maths assuming pledge and delegation are split across
+        <strong>10 pools</strong>.<br>
+        • <strong>Above saturation hidden</strong>: any pledge + delegation beyond ~75M ADA is blanked.
+        No honest operator wants to run above saturation, and the self-funded operator who saturates one
+        pool then opens another lives out here — so hiding it sweeps the <em>fair</em> multipool out of
+        view and leaves only the low-pledge fee-farmers.</p>`,
+      targets: ['grp-field'],
+      actions: [],
+      cardPosition: 'bottom-right',
+      holdMs: 13000,
+    },
+    {
+      title: 'Fee reform (CIPs 23 / 74 / 75) — the shape vanishes',
+      body: `<p>Now press <strong>Fee reform only</strong>. CIPs 23, 74 and 75 remove the flat fixed fee
+        (<code>minPoolCost</code>), and the whole shape <em>disappears</em>. Spoiler: on this scoreboard,
+        fee reform wins — splitting across 10 pools no longer beats one pool anywhere we can see.</p>
+        <p>Some argue the fixed fee helps operators cover running costs. But a small honest operator can
+        recover that through <strong>margin</strong> instead. The flat fee is a fixed ADA amount whatever
+        the pool's size: 170 ADA is a heavy drag on a small pool's delegator return and a rounding error
+        for a large one — so it actually makes small pools <em>less</em> attractive. Margin is a
+        percentage of net rewards, so it's size-neutral. Shifting cost recovery from a flat fee to margin
+        is arguably better for decentralization.</p>`,
       targets: ['grp-presets'],
       actions: [
         { kind: 'preset', name: 'baseline' },
-        { pause: 1300 },
+        { kind: 'isolevel', value: 1.2, metric: 'advratio' },
+        { pause: 1500 },
         { kind: 'preset', name: 'fee' },
       ],
       cardPosition: 'bottom-left',
-      holdMs: 11000,
+      holdMs: 13000,
     },
     {
-      title: 'Fix #2 — the leverage cap (CIP-50)',
-      body: `<p>Back to baseline, now switch on the <strong>leverage cap</strong>. A pool stops earning
-        extra once its delegation outruns what the operator's own pledge can back. The
-        <strong>over-leveraged</strong> corner cools from red toward blue.</p>
-        <p>Yet the empty-pledge and fee-farm corners remain. Again — not enough on its own.</p>`,
+      title: 'CIP-50 only — just a sliver removed',
+      body: `<p>Back to baseline, now press <strong>CIP-50 only</strong> (the leverage cap). Only a small
+        part of the shell is removed — most of it remains. That looks underwhelming next to fee reform,
+        which erased the whole shape. So what is CIP-50 actually doing, and where?</p>
+        <p>To see it, we'll switch to the MRI slice view next and cut straight through the
+        <strong>zero-pledge</strong> wall.</p>`,
       targets: ['grp-presets'],
       actions: [
         { kind: 'preset', name: 'baseline' },
-        { pause: 1300 },
+        { kind: 'isolevel', value: 1.2, metric: 'advratio' },
+        { pause: 1500 },
         { kind: 'preset', name: 'c50' },
-      ],
-      cardPosition: 'bottom-left',
-      holdMs: 11000,
-    },
-    {
-      title: 'Fix #3 — utilization-scaled pledge bonus (CIP-187)',
-      body: `<p>Reset again, then switch on <strong>pledge-bonus scaling</strong>. The operator's pledge
-        reward is now paid only in proportion to how full the pool is, so an <strong>empty-pledge</strong>
-        showcase pool earns nothing extra. That corner fades.</p>
-        <p>Three fixes, three different corners. Each one leaves the others wide open.</p>`,
-      targets: ['grp-presets'],
-      actions: [
-        { kind: 'preset', name: 'baseline' },
-        { pause: 1300 },
-        { kind: 'preset', name: 'c187' },
-      ],
-      cardPosition: 'bottom-left',
-      holdMs: 11000,
-    },
-    {
-      title: 'Why you need all three CIPs',
-      body: `<p>That's the heart of the argument: each fix closes exactly one of the three corners and
-        pushes the gaming toward the others. Turn on only one, and the multipools simply relocate to a
-        corner it doesn't reach.</p>
-        <p>So the only way to close the habitat is to close every corner at the same time.</p>`,
-      targets: [],
-      actions: [],
-      cardPosition: 'bottom-left',
-      holdMs: 10000,
-    },
-    {
-      title: 'All three together',
-      body: `<p>Now switch on <strong>all three families</strong> at once. The red cloud all but
-        disappears: across almost the entire cube, one honest pool now beats any multipool split. The
-        gaming habitat has been closed.</p>`,
-      targets: ['grp-presets'],
-      actions: [
-        { kind: 'preset', name: 'all' },
-      ],
-      cardPosition: 'bottom-left',
-      holdMs: 10000,
-    },
-    {
-      title: 'And the honest players win',
-      body: `<p>Closing the cheats isn't the only goal — honest players must still prosper. Watch as I
-        re-colour by <strong>single-pool income</strong>, then by <strong>delegator ROA</strong> (the
-        yearly return for ordinary members). With all three fixes on, these stay strong: the space we
-        <em>opened</em> rewards exactly the operators and delegators Cardano wants.</p>`,
-      targets: ['grp-metric'],
-      actions: [
-        { kind: 'select', id: 'metric', value: 'single' },
-        { pause: 2800 },
-        { kind: 'select', id: 'metric', value: 'roa' },
       ],
       cardPosition: 'bottom-left',
       holdMs: 12000,
     },
     {
-      title: 'The mission in one picture',
-      body: `<p><strong>Close</strong> the red regions where multipools prosper; <strong>open</strong> the
-        blue regions where single operators and their delegators prosper — and it takes all three
-        reforms working together to do it.</p>
-        <p>Press <strong>Esc</strong> to explore freely, or replay <strong>Start here</strong> for a tour
-        of every control.</p>`,
-      targets: [],
+      title: 'MRI slice — CIP-50 shuts the zero-pledge regime',
+      body: `<p>This is an MRI slice cut at <strong>zero pledge</strong>. At <strong>baseline</strong> the
+        slice lights up <span class="hot">bright yellow</span> — a massive splitting advantage for an
+        operator who puts up <em>no pledge at all</em>. Watch what happens when CIP-50 switches on: that
+        bright band collapses to <span class="cool">dark</span>. CIP-50 shuts the zero-pledge incentive.</p>
+        <p>Fee reform also kills zero-pledge splitting, so what does CIP-50 add? Its real job is
+        <strong>Sybil resistance</strong>: reward-earning stake must scale with pledge, so controlling
+        stake costs capital in proportion to the stake you control. Disincentivizing zero-pledge
+        multipools is a welcome side effect — but the main value is making sure you can't earn on stake
+        you didn't back with your own money.</p>`,
+      targets: ['grp-mode'],
       actions: [
-        { kind: 'select', id: 'metric', value: 'advantage' },
+        { kind: 'mode',   mode: 'slice' },
+        { kind: 'select', id: 'slice-axis', value: 'x' },
+        { kind: 'slider', id: 'sl-slicepos', value: 0, ms: 500 },
+        { kind: 'preset', name: 'baseline' },
+        { pause: 2200 },
+        { kind: 'preset', name: 'c50' },
+      ],
+      cardPosition: 'bottom-right',
+      holdMs: 14000,
+    },
+    {
+      title: 'CIP-187 only — a different sliver, and the deepest fix',
+      body: `<p>Back to the isosurface. Press <strong>CIP-187 only</strong> (utilization-scaled pledge
+        bonus). Again only a small portion of the shell goes — but a <em>different</em> portion than
+        CIP-50 removed. Since fee reform already knocks out the whole shape, why bother with CIP-187?
+        Because the shell is the wrong scoreboard for what CIP-187 fixes.</p>
+        <p>Today the pledge bonus a pool earns is shared across <em>all</em> its stake, so delegating to a
+        good high-pledge pool <strong>dilutes</strong> that bonus — every delegator already there sees
+        their return drop. Good pools get less attractive the moment anyone joins. CIP-187 scales the
+        pledge bonus by <strong>utilization</strong>: an empty pledged pool earns no bonus, a half-full
+        one earns half, a saturated one earns today's full bonus. Adding delegation no longer dilutes
+        anyone.</p>
+        <p>And there's a brake on splitting that <em>survives fee reform</em>: split a real pledge across
+        N pools and each is under-utilized, so each one's bonus is scaled down — the total pledge bonus
+        shrinks versus running one full pool. Fee reform closes the fee-farm, but once the fee is gone it
+        has nothing more to say about splitting. CIP-187 keeps penalizing fragmentation at the formula
+        level, permanently.</p>`,
+      targets: ['grp-presets'],
+      actions: [
+        { kind: 'mode',   mode: 'isosurface' },
+        { kind: 'preset', name: 'baseline' },
+        { kind: 'isolevel', value: 1.2, metric: 'advratio' },
+        { pause: 1500 },
+        { kind: 'preset', name: 'c187' },
       ],
       cardPosition: 'bottom-left',
-      holdMs: 11000,
+      holdMs: 16000,
+    },
+    {
+      title: 'The real conclusion — three doors, not three rivals',
+      body: `<p>Set the three families side by side and the picture isn't "fee reform wins." It's that each
+        proposal guards a <em>different door</em>:</p>
+        <p>• <strong>CIPs 23 / 74 / 75</strong> close the <strong>fee-farm</strong> door — the biggest,
+        most visible region here, because the cube is measuring fees. But removing the flat fee leaves the
+        other doors open.<br>
+        • <strong>CIP-50</strong> closes the <strong>Sybil</strong> door — reward-earning stake must scale
+        with pledge.<br>
+        • <strong>CIP-187</strong> closes the <strong>dilution</strong> door — it aligns the delegator's
+        incentive with the protocol's so good pools fill instead of being punished for filling, and keeps
+        splitting penalized whether or not a fee exists.</p>
+        <p>They're complementary, not competing. That's why turning on every reform at once is where the
+        multipool parameter space finally goes completely dark.</p>`,
+      targets: [],
+      actions: [],
+      cardPosition: 'bottom-left',
+      holdMs: 13000,
+    },
+    {
+      title: 'All three families — the space goes dark',
+      body: `<p>Now press <strong>All three families</strong>. The shape is gone: across the visible cube,
+        one honest pool beats any 10-way split. Every door is shut at once.</p>
+        <p>The simulator isn't crowning a winner — it's showing in three dimensions that these reforms are
+        complementary, and that the protocol is healthiest with all three. Press <strong>Esc</strong> to
+        explore freely, or replay <strong>Start here</strong> for a tour of every control.</p>`,
+      targets: ['grp-presets'],
+      actions: [
+        { kind: 'mode',   mode: 'isosurface' },
+        { kind: 'isolevel', value: 1.2, metric: 'advratio' },
+        { kind: 'preset', name: 'all' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 12000,
     },
   ],
 };
@@ -1703,15 +1764,34 @@ function tourSelect(id, val) {
 }
 function tourClick(id) { const el = $(id); if (el) el.click(); }
 
+// Set the isosurface level to an ABSOLUTE metric value (e.g. 1.2 on the ratio),
+// not a slider fraction — the value the field range maps to drifts per preset, but
+// "the shell where splitting pays 20% more" must stay pinned at 1.2 regardless.
+// render() holds this value across presets (see the isoMetric/isoLevel branch there).
+function tourIsoLevel(value, metric) {
+  isoLevel  = value;
+  isoMetric = metric || $('metric').value;
+  showShells = false;
+  scheduleRender();
+}
+// Drive the "Hide above saturation" toggle to a known state. The button only flips
+// on click, so clicking blindly could turn it off if the viewer left it on — compare
+// the live flag and click only when it actually needs to change.
+function tourSetHidesat(on) {
+  if (hideAboveSat !== on) tourClick('btn-hidesat');
+}
+
 async function applyStepActions(step) {
   const myGuard = tour.renderGuard;
   for (const a of step.actions ?? []) {
     if (myGuard !== tour.renderGuard) return;
-    if (a.kind === 'slider')      await tweenSlider(a.id, a.value, a.ms ?? 600);
-    else if (a.kind === 'preset') tourPreset(a.name);
-    else if (a.kind === 'mode')   tourMode(a.mode);
-    else if (a.kind === 'select') tourSelect(a.id, a.value);
-    else if (a.kind === 'click')  tourClick(a.id);
+    if (a.kind === 'slider')        await tweenSlider(a.id, a.value, a.ms ?? 600);
+    else if (a.kind === 'preset')   tourPreset(a.name);
+    else if (a.kind === 'mode')     tourMode(a.mode);
+    else if (a.kind === 'select')   tourSelect(a.id, a.value);
+    else if (a.kind === 'click')    tourClick(a.id);
+    else if (a.kind === 'isolevel') tourIsoLevel(a.value, a.metric);
+    else if (a.kind === 'hidesat')  tourSetHidesat(a.on);
     if (a.pause) await tourSleep(a.pause);
   }
 }
