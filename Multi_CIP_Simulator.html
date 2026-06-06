@@ -132,6 +132,20 @@
   .hint { font-size: 0.72rem; color: var(--muted); margin-top: 0.3rem; line-height: 1.4; }
   code { color: var(--accent); font-size: 0.92em; }
 
+  /* Field-view buttons: light the ACTIVE shell mode (single shell ↔ nested shells) so the
+     viewer can always tell which is showing, mirroring the render-mode buttons above. */
+  #btn-snap.active, #btn-shells.active {
+    background: var(--accent); color: #1a1205; border-color: var(--accent); font-weight: 700;
+  }
+  /* Physical-button press feedback. :active covers a click held by the mouse; the .pressed class
+     is added briefly from JS so even a fast — or scripted — click visibly depresses the button,
+     the way a real key bottoms out. */
+  #wrap-iso button:active,
+  #btn-save-surf.pressed, #btn-clear-surf.pressed {
+    transform: translateY(1px);
+    box-shadow: inset 0 2px 6px rgba(0,0,0,0.55);
+  }
+
   /* ── Donations card (mirrors SPO_REWARD_ANALYSIS_CHART.html, themed teal) ─────── */
   #donate-panel {
     border: 2px dashed var(--teal);
@@ -185,6 +199,13 @@
   #tour-body em { color: var(--teal); font-style: normal; font-weight: 600; }
   #tour-body .bad  { color: var(--red);  font-weight: 700; }
   #tour-body .good { color: var(--teal); font-weight: 700; }
+  /* Viridis colour language for tutorial #1: the live colour scale runs from dark deep-purple
+     (low value) up to bright yellow (high value). So in this tutorial "hot" = the bright yellow
+     splitting-pays zone we want to close, and "cool" = the dark region where one honest pool
+     already wins. (Tutorial #2 still uses the red/blue .bad/.good wording above and is left
+     untouched on purpose.) */
+  #tour-body .hot  { color: #f2e23c; font-weight: 700; }
+  #tour-body .cool { color: #9aa6d8; font-weight: 700; }
   #tour-body code { color: var(--accent); }
   #tour-body p { margin: 0 0 0.55rem; }
   #tour-body p:last-child { margin-bottom: 0; }
@@ -820,6 +841,24 @@ function render() {
 
   Plotly.react('plot', traces, layout3d, plotConfig);
   updateReadout(cfg, m, info);
+  syncFieldModeButtons();
+}
+
+// Light whichever shell-drawing mode is active: a single shell (Snap to pivot) or several
+// (Nested shells). They are mutually exclusive ways to draw the isosurface, so exactly one
+// reads as "on" — just like the render-mode buttons.
+function syncFieldModeButtons() {
+  const snap = $('btn-snap'), shells = $('btn-shells');
+  if (snap)   snap.classList.toggle('active', !showShells);
+  if (shells) shells.classList.toggle('active', showShells);
+}
+
+// Briefly depress a button so a click — even a scripted one from the tour — is visibly
+// registered, like a physical key bottoming out.
+function flashPressed(btn) {
+  if (!btn) return;
+  btn.classList.add('pressed');
+  setTimeout(() => btn.classList.remove('pressed'), 150);
 }
 
 // Build a reversed copy of a named Plotly colorscale (so red = "bad/MPO-wins").
@@ -1022,8 +1061,8 @@ function savedLegendHtml() {
           </div>`;
 }
 
-$('btn-save-surf').addEventListener('click', saveSurface);
-$('btn-clear-surf').addEventListener('click', () => { savedSurfaces = []; render(); });
+$('btn-save-surf').addEventListener('click', () => { flashPressed($('btn-save-surf')); saveSurface(); });
+$('btn-clear-surf').addEventListener('click', () => { flashPressed($('btn-clear-surf')); savedSurfaces = []; render(); });
 
 // MRI sweep animation
 let sweepTimer = null;
@@ -1101,21 +1140,27 @@ const TOUR_SCRIPTS = {
       body: `<p>This tool is about keeping Cardano <em>fair</em>. On Cardano people earn rewards by
         <strong>staking</strong> their coins through a <strong>stake pool</strong> — think of a pool as
         a co-op that combines everyone's coins to earn a share of the network's rewards.</p>
-        <p>A few operators game the rules by running <strong>many</strong> near-identical pools
-        ("multipools") to grab more reward than one honest pool would. That crowds out small
-        operators and weakens the network.</p>
-        <p>This whole tool exists to find — and close — the situations where that gaming pays.
-        <span class="bad">Red</span> will mark "multipools win" (the regions we want to <strong>close</strong>);
-        <span class="good">blue</span> will mark "one honest pool wins" (the regions we want to
-        <strong>open</strong>). Press <strong>▶ Play</strong> to let the tour drive itself.</p>`,
+        <p>Some operators run <strong>many</strong> pools at once (a "multipool"). That is not wrong by
+        itself: an operator who fills one pool to the brim with their <em>own</em> money and then opens
+        another is simply using their own funds well — no one can fault that. The problem is narrower.
+        It's the operators who put up <em>little or no money of their own</em>, then slice borrowed
+        delegation thinly across pool after pool — each pool charging a high flat fee, each advertising a
+        low margin — so they collect a fee on every pool while giving delegators a poor return. They
+        <em>fee-farm</em> instead of investing. This tool finds exactly where <em>that</em> kind of
+        splitting pays, so we can close it.</p>
+        <p>The colour shows how strongly splitting beats running one pool.
+        <span class="hot">Bright yellow</span> marks where splitting wins — the zone we want to
+        <strong>close</strong>. <span class="cool">Dark (deep purple)</span> marks where a single honest
+        pool wins — the zone we want to keep <strong>open</strong>. Press <strong>▶ Play</strong> to let
+        the tour drive itself.</p>`,
       targets: [],
       actions: [
         { kind: 'preset', name: 'baseline' },
-        { kind: 'select', id: 'metric', value: 'advantage' },
+        { kind: 'select', id: 'metric', value: 'advratio' },
         { kind: 'mode',   mode: 'volume' },
       ],
       cardPosition: 'bottom-left',
-      holdMs: 12000,
+      holdMs: 13000,
     },
     {
       title: 'The cube: A parameter space which describes every pool',
@@ -1150,28 +1195,34 @@ const TOUR_SCRIPTS = {
     },
     {
       title: 'The colour is the answer being computed',
-      body: `<p>Right now the colour shows the <strong>splitting advantage</strong>: how many extra
-        rewards an operator pockets by splitting into several pools instead of running one.</p>
-        <p><span class="bad">Red fog</span> = splitting wins (bad — a cheater's paradise we want to
-        close). <span class="good">Blue fog</span> = a single honest pool wins (good). The fog is
-        densest where the effect is strongest.</p>`,
+      body: `<p>Right now the colour shows the <strong>splitting advantage as a ratio</strong>: the
+        operator's take running N pools divided by their take running one. Above 1 splitting pays; at or
+        below 1 a single pool is as good or better. The ratio is capped at 3× so a few runaway numbers
+        don't wash out the colours.</p>
+        <p><span class="hot">Bright yellow</span> = splitting wins. <span class="cool">Dark</span> = a
+        single honest pool wins. Now spin the cube and notice <em>where</em> the yellow lives: pressed
+        against the <strong>low-pledge</strong> wall and the <strong>low-margin</strong> wall, and
+        running all the way up the <strong>delegation</strong> axis. That exact shape is the fingerprint
+        of the operators we worry about — almost no pledge of their own, a low advertised margin, and
+        delegation spread thin across many pools so each one can still collect its flat fee. Where an
+        operator puts up real pledge, the colour falls away to dark and splitting stops paying.</p>`,
       targets: [],
       actions: [],
       cardPosition: 'bottom-left',
-      holdMs: 10000,
+      holdMs: 13000,
     },
     {
       title: 'The colour menu — splitting advantage',
       body: `<p>This menu picks the <strong>question the colours answer</strong>. There are eight
-        choices. The first two are the ones the tour leans on most, because they measure the gaming
+        choices. The first two are the ones the tour leans on most, because they measure the splitting
         directly:</p>
-        <p>• <strong>Splitting advantage — difference</strong> (the default): the extra ADA <em>per
-        epoch</em> an operator pockets by splitting into N pools instead of running one.
-        <span class="bad">Red</span> = splitting wins (the strategy we want to disincentivize);
-        <span class="good">blue</span> = one honest pool wins.<br>
-        • <strong>Splitting advantage — ratio</strong>: the same comparison as a multiple (N-pool take
-        ÷ 1-pool take). Above 1 (red) splitting pays; exactly 1 is a tie; below 1 (blue) the single
-        pool wins. The ratio is capped at 3 so a few runaway numbers don't wash out the colours.</p>`,
+        <p>• <strong>Splitting advantage — difference</strong>: the extra ADA <em>per epoch</em> an
+        operator pockets by splitting into N pools instead of running one.<br>
+        • <strong>Splitting advantage — ratio</strong> (showing now): the same comparison as a multiple
+        (N-pool take ÷ 1-pool take), capped at 3×. Above 1 splitting pays; exactly 1 is a tie; below 1
+        the single pool wins.</p>
+        <p>On both, <span class="hot">bright yellow</span> is where splitting wins — the zone we want to
+        close — and <span class="cool">dark</span> is where one honest pool wins.</p>`,
       targets: ['grp-metric'],
       actions: [],
       cardPosition: 'bottom-right',
@@ -1201,10 +1252,11 @@ const TOUR_SCRIPTS = {
       body: `<p>The last choice looks at the people the network is really for:</p>
         <p>• <strong>Delegator ROA</strong>: the annual percentage return an ordinary member earns by
         delegating to a single pool. Bright means members are well rewarded there.</p>
-        <p>Across all eight, two are the <em>heroes</em> of the mission: when we squeeze the cheaters we
-        want <strong>single-pool take</strong> and <strong>delegator ROA</strong> to stay strong. If
-        closing the red zones also keeps honest operators and their members prosperous, the reforms are
-        doing exactly what Cardano wants — and we return to these two at the very end.</p>`,
+        <p>Across all eight, two are the <em>heroes</em> of the mission: when we squeeze the problem
+        operators we want <strong>single-pool take</strong> and <strong>delegator ROA</strong> to stay
+        strong. If closing the bright <span class="hot">splitting-pays</span> zones also keeps honest
+        operators and their members prosperous, the reforms are doing exactly what Cardano wants — and we
+        return to these two at the very end.</p>`,
       targets: ['grp-metric'],
       actions: [],
       cardPosition: 'bottom-right',
@@ -1231,12 +1283,13 @@ const TOUR_SCRIPTS = {
         map turned into a 3-D skin. Everything <em>inside</em> the shell is above that value; everything
         outside is below it.</p>
         <p>The <strong>Isosurface level</strong> slider (in the Field view group, just below) chooses
-        which value the shell wraps. For the splitting-advantage metric the value that matters is
-        <strong>zero</strong> — the dividing line between <span class="bad">multipools win</span> and
-        <span class="good">single pool wins</span>. The <strong>Snap to pivot (0 / 1)</strong> button
-        jumps the level straight onto that line for you (0 for the difference metric, 1 for the ratio),
-        so the shell becomes the exact wall of the gaming habitat. Shrinking the volume inside that wall
-        is the whole mission.</p>`,
+        which value the shell wraps. For the ratio metric the value that matters is <strong>1</strong> —
+        the dividing line between <span class="hot">splitting wins</span> and <span class="cool">one
+        honest pool wins</span>. The <strong>Snap to pivot (0 / 1)</strong> button jumps the level
+        straight onto that line for you (1 for the ratio, 0 for the difference metric), so the shell
+        becomes the exact wall of the zone we want to close. Shrinking the volume inside that wall is the
+        whole mission. The button now stays <em>lit</em> while it is the active way of drawing the
+        shell, so you can always tell which view you are in.</p>`,
       targets: ['grp-field'],
       actions: [
         { kind: 'mode', mode: 'isosurface' },
@@ -1251,16 +1304,19 @@ const TOUR_SCRIPTS = {
       body: `<p><strong>Nested shells</strong> draws several shells at once — like the layers of an
         onion — from the lowest value out to the highest. One shell shows a single boundary; nested
         shells show how steeply the metric climbs, so you see not just <em>where</em> a region begins
-        but where its concentrated "hot core" sits.</p>
-        <p>This view is how you locate each group's territory, one metric at a time:</p>
-        <p>• Colour by <strong>splitting advantage</strong> and snap to zero → the shell walls off where
-        <span class="bad">multipools profit</span> (the region to close).<br>
-        • Switch to <strong>single-pool take</strong> → the shell wraps where an <span class="good">honest
-        single operator profits</span>.<br>
-        • Switch to <strong>delegator ROA</strong> → the shell wraps where <span class="good">delegators
-        earn the best return</span>.</p>
-        <p>Turning a CIP preset on and watching the multipool shell <em>shrink</em> while the single-pool
-        and delegator shells <em>hold their ground</em> is the visual proof at the heart of this project.</p>`,
+        but where its concentrated bright core sits. <strong>Snap to pivot</strong> and
+        <strong>Nested shells</strong> are the two ways to draw the shell, and whichever is active now
+        stays <em>lit</em> so you can tell them apart.</p>
+        <p>This view is how you locate each territory, one metric at a time:</p>
+        <p>• Colour by <strong>splitting advantage</strong> and snap to the pivot → the bright shell
+        walls off where <span class="hot">splitting profits</span> — the region to close.<br>
+        • Switch to <strong>single-pool take</strong> → the shell wraps where an <em>honest single
+        operator profits</em>.<br>
+        • Switch to <strong>delegator ROA</strong> → the shell wraps where <em>delegators earn the best
+        return</em>.</p>
+        <p>Turning a CIP preset on and watching the splitting-pays shell <em>shrink</em> while the
+        single-pool and delegator shells <em>hold their ground</em> is the visual proof at the heart of
+        this project.</p>`,
       targets: ['grp-field'],
       actions: [
         { pause: 600 },
@@ -1268,6 +1324,49 @@ const TOUR_SCRIPTS = {
       ],
       cardPosition: 'bottom-left',
       holdMs: 13000,
+    },
+    {
+      title: 'Field view — Hide above saturation',
+      body: `<p>A pool stops earning extra rewards once it is <strong>saturated</strong> — here, once its
+        pledge plus delegation reaches about <strong>75M ADA</strong>. <strong>Hide above saturation</strong>
+        blanks every part of the cube beyond that line, leaving only pools still small enough to be
+        growing.</p>
+        <p>This is also where the <em>fair</em> multipool steps aside. An operator who fills one pool to
+        saturation with their own pledge and then opens another is using their own money well — there is
+        nothing there to fix. Hiding the saturated region sweeps those legitimate cases out of view, so
+        the bright <span class="hot">splitting-pays</span> zone that remains is the one we actually care
+        about: small, low-pledge, low-margin pools multiplied just for the fee.</p>`,
+      targets: ['btn-hidesat'],
+      actions: [
+        { kind: 'mode', mode: 'isosurface' },
+        { pause: 500 },
+        { kind: 'click', id: 'btn-hidesat' },
+        { pause: 1600 },
+        { kind: 'click', id: 'btn-hidesat' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 12000,
+    },
+    {
+      title: 'Field view — save & compare surfaces',
+      body: `<p>The real power of the isosurface view is <em>comparison</em>.
+        <strong>＋ Save surface</strong> freezes the shell now on screen in its own colour and leaves it
+        floating in the cube. Then change a CIP preset, or pick a different metric, and draw a fresh shell
+        beside it — the saved one doesn't budge. Stack a few and a single picture shows how a reform
+        reshapes the zone. A little legend in the scorecard names each saved colour.</p>
+        <p><strong>Clear saved</strong> removes them all, leaving just the live shell. Watch — I'll save
+        the shell now on screen, then clear it. Each of these buttons now presses in like a real button,
+        so you can tell the click registered.</p>`,
+      targets: ['btn-save-surf'],
+      actions: [
+        { kind: 'mode', mode: 'isosurface' },
+        { pause: 500 },
+        { kind: 'click', id: 'btn-save-surf' },
+        { pause: 1800 },
+        { kind: 'click', id: 'btn-clear-surf' },
+      ],
+      cardPosition: 'bottom-left',
+      holdMs: 12000,
     },
     {
       title: 'MRI slice — sweep a cross-section',
@@ -1287,7 +1386,8 @@ const TOUR_SCRIPTS = {
       body: `<p>Back to the fog. These five buttons load ready-made scenarios. <strong>Baseline</strong>
         is Cardano's rules today. The next three each switch on one proposed fix (a "CIP").
         <strong>All three families</strong> turns them all on at once. This is the quickest way to
-        watch the red zone shrink — it's the heart of the second tutorial.</p>`,
+        watch the bright <span class="hot">splitting-pays</span> zone shrink — it's the heart of the
+        second tutorial.</p>`,
       targets: ['grp-presets'],
       actions: [
         { kind: 'mode', mode: 'volume' },
@@ -1311,11 +1411,11 @@ const TOUR_SCRIPTS = {
       holdMs: 12000,
     },
     {
-      title: 'How the cheater splits: the N dial',
+      title: 'How an operator splits: the N dial',
       body: `<p><strong>N</strong> is how many pools the operator splits into. At <strong>N = 1</strong>
-        they play fair; higher N is the gaming strategy. The colours always show the operator's
-        <em>combined</em> take across all N pools, so you can watch splitting pay off — or stop paying
-        once the policies bite. I'll nudge it up and back so you can see the effect.</p>`,
+        they run a single pool; higher N is the splitting strategy. The colours always show the
+        operator's <em>combined</em> take across all N pools, so you can watch splitting pay off — or
+        stop paying once the policies bite. I'll nudge it up and back so you can see the effect.</p>`,
       targets: ['sl-N'],
       actions: [
         { kind: 'slider', id: 'sl-N', value: 9, ms: 800 },
@@ -1340,8 +1440,10 @@ const TOUR_SCRIPTS = {
       title: 'Field view: detail vs. speed',
       body: `<p>This group fine-tunes the picture. <strong>Grid resolution</strong> trades smoothness for
         speed — higher looks better but recomputes more slowly. In isosurface mode you also get the
-        <strong>level</strong> slider and a <strong>Snap to pivot</strong> button (jumps the level onto the
-        red/blue dividing line); in slice mode you get the slice axis and <strong>Sweep</strong>.</p>`,
+        <strong>level</strong> slider, the <strong>Snap to pivot</strong> and <strong>Nested shells</strong>
+        buttons (the lit one is the active view), <strong>Hide above saturation</strong>, and
+        <strong>Save / Clear surface</strong>; in slice mode you get the slice axis and
+        <strong>Sweep</strong>.</p>`,
       targets: ['grp-field'],
       actions: [],
       cardPosition: 'bottom-right',
@@ -1350,9 +1452,9 @@ const TOUR_SCRIPTS = {
     {
       title: 'The scorecard, in words',
       body: `<p>Finally, this panel translates the cube into plain language. It checks the three classic
-        gaming set-ups — the <em>fee-farm</em>, the <em>over-leveraged</em> pool, and the
+        set-ups — the <em>fee-farm</em>, the <em>over-leveraged</em> pool, and the
         <em>empty-pledge</em> pool — and tells you, for the current dials, whether
-        <span class="bad">multipools win</span> or a <span class="good">single pool wins</span> in each.
+        <span class="hot">splitting wins</span> or a <span class="cool">single pool wins</span> in each.
         It updates the instant you change anything.</p>`,
       targets: ['readout'],
       actions: [],
@@ -1361,9 +1463,10 @@ const TOUR_SCRIPTS = {
     },
     {
       title: "That's every control",
-      body: `<p>The big idea: drive the policy sliders until the <span class="bad">red</span>
-        (gaming-pays) regions vanish and the <span class="good">blue</span> (honest-pool-and-members-win)
-        regions fill the cube.</p>
+      body: `<p>The big idea: drive the policy sliders until the <span class="hot">bright</span>
+        (splitting-pays) zone collapses and the <span class="cool">dark</span>
+        (one-honest-pool-and-members-win) zone fills the cube — while honest operators and their
+        delegators stay well rewarded.</p>
         <p>To watch that happen end-to-end, exit and run the second tutorial:
         <strong>The mission — close the multipool zones</strong>. Press <strong>Esc</strong> or
         <strong>Exit</strong> any time to explore on your own.</p>`,
