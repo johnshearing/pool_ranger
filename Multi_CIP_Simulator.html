@@ -722,7 +722,10 @@ const layout3d = {
     xaxis: { title: 'Pledge P (M ADA)',      backgroundcolor:'#0e1117', gridcolor:'#2b333f', zerolinecolor:'#3a4350', color:'#9aa6b5' },
     yaxis: { title: 'Margin m (%)',          backgroundcolor:'#0e1117', gridcolor:'#2b333f', zerolinecolor:'#3a4350', color:'#9aa6b5' },
     zaxis: { title: 'Delegation D (M ADA)',  backgroundcolor:'#0e1117', gridcolor:'#2b333f', zerolinecolor:'#3a4350', color:'#9aa6b5' },
-    camera: { eye: { x: 1.7, y: 1.5, z: 1.1 } },
+    // center.z lifts the cube's focal point so it sits vertically centred in the
+    // window instead of hugging the bottom. Make it more negative to raise the
+    // cube further; less negative (toward 0) to drop it back down.
+    camera: { eye: { x: 1.7, y: 1.5, z: 1.1 }, center: { x: 0, y: 0, z: -0.12 } },
     aspectmode: 'cube'
   }
 };
@@ -1673,7 +1676,80 @@ const TOUR_SCRIPTS = {
 // Mutable pointer to the active script. startTour() reassigns this.
 let TOUR_STEPS = TOUR_SCRIPTS.tour;
 
-const tour = { i: 0, playing: false, open: false, rafId: null, autoTimerId: null, renderGuard: 0 };
+const tour = { i: 0, playing: false, open: false, rafId: null, autoTimerId: null, renderGuard: 0,
+               muted: false, _utterance: null, _narrationResolve: null };
+
+// ---- Narration (Web Speech API) -------------------------------------------
+// Voice plays only while autoplay ("▶ Play") is running. It is 100% client-side
+// (window.speechSynthesis) — no server, no API key, nothing leaves the browser,
+// which keeps the member-facing tools permissionless. A 🔊/🔇 toggle lets the
+// viewer silence it; muting takes effect immediately, unmuting from the next card.
+const speechSupported = typeof window !== 'undefined'
+  && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+
+let _voiceCache = null;
+function pickVoice() {
+  if (!speechSupported) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  if (_voiceCache && voices.includes(_voiceCache)) return _voiceCache;
+  // Prefer the natural-sounding English voices that ship with common browsers/OSes,
+  // falling back to any en-* voice, then to whatever the platform offers.
+  const prefer = [
+    /Google US English/i, /Microsoft (Aria|Jenny|Guy|Michelle|Zira|David)/i,
+    /Samantha/i, /English \(United States\)/i,
+  ];
+  for (const re of prefer) {
+    const m = voices.find(v => re.test(v.name) || re.test(v.voiceURI || ''));
+    if (m) { _voiceCache = m; return m; }
+  }
+  _voiceCache = voices.find(v => /^en[-_]/i.test(v.lang)) || voices[0];
+  return _voiceCache;
+}
+if (speechSupported) {
+  // Voice lists load asynchronously in most browsers; reset the cache when they arrive.
+  window.speechSynthesis.onvoiceschanged = () => { _voiceCache = null; pickVoice(); };
+  pickVoice();
+}
+
+// Flatten a step's HTML body to plain prose the synthesizer can read.
+function stepNarrationText(step) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = step.body || '';
+  const body = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+  return body ? `${step.title}. ${body}` : String(step.title || '');
+}
+
+function stopSpeaking() {
+  if (speechSupported) window.speechSynthesis.cancel();
+  tour._utterance = null;
+}
+
+// Narrate one step and resolve when narration is "done": when speech ends, or —
+// if muted / unsupported — after the step's fallback hold (the old fixed timing).
+function narrateStep(step) {
+  return new Promise(resolve => {
+    tour._narrationResolve = resolve;
+    const finish = () => {
+      if (tour._narrationResolve !== resolve) return;  // a newer step superseded us
+      tour._narrationResolve = null;
+      resolve();
+    };
+    const fallback = () => { tour.autoTimerId = setTimeout(finish, step.holdMs ?? 6000); };
+
+    if (tour.muted || !speechSupported) { fallback(); return; }
+
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(stepNarrationText(step));
+    const v = pickVoice();
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = 1.0; u.pitch = 1.0;
+    u.onend = finish;
+    u.onerror = finish;   // e.g. cancel() — let the loop move on rather than hang
+    tour._utterance = u;
+    window.speechSynthesis.speak(u);
+  });
+}
 
 // Set true the moment the viewer drags the card; from then on the scripted
 // per-step placement (applyCardPosition) leaves the card alone. Reset on each
@@ -2028,12 +2104,14 @@ async function autoPlay() {
   tour.playing = true;
   setAutoplayButton(true);
   while (tour.playing) {
-    const step = TOUR_STEPS[tour.i];
-    const hold = step.holdMs ?? 6000;
-    await new Promise(res => { tour.autoTimerId = setTimeout(res, hold); });
+    // The card stays up for as long as its narration takes to read aloud (or the
+    // step's fallback hold when muted / speech is unavailable).
+    await narrateStep(TOUR_STEPS[tour.i]);
     tour.autoTimerId = null;
     if (!tour.playing) break;
     if (tour.i >= TOUR_STEPS.length - 1) break;
+    await tourSleep(450);   // a short breath between cards
+    if (!tour.playing) break;
     await nextStep();
   }
   tour.playing = false;
@@ -2042,9 +2120,36 @@ async function autoPlay() {
 function pauseAutoplay() {
   tour.playing = false;
   if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+  stopSpeaking();
+  if (tour._narrationResolve) { const r = tour._narrationResolve; tour._narrationResolve = null; r(); }
   setAutoplayButton(false);
 }
 function toggleAutoplay() { if (tour.playing) pauseAutoplay(); else autoPlay(); }
+
+function setMuteButton() {
+  const btn = document.getElementById('tour-mute');
+  if (!btn) return;
+  btn.textContent = tour.muted ? '🔇' : '🔊';
+  btn.title = tour.muted ? 'Narration muted — click to unmute' : 'Mute narration';
+  btn.setAttribute('aria-pressed', String(tour.muted));
+}
+function toggleMute() {
+  tour.muted = !tour.muted;
+  setMuteButton();
+  if (!tour.muted) return;   // unmuting takes effect on the next card
+
+  // Muting: silence the current voice immediately without letting the cancelled
+  // utterance's onend yank us to the next card — keep this card up for its
+  // fallback hold instead, so the pacing stays sane.
+  if (tour._utterance) { tour._utterance.onend = null; tour._utterance.onerror = null; }
+  stopSpeaking();
+  if (tour.playing && tour._narrationResolve) {
+    if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+    tour.autoTimerId = setTimeout(() => {
+      if (tour._narrationResolve) { const r = tour._narrationResolve; tour._narrationResolve = null; r(); }
+    }, TOUR_STEPS[tour.i]?.holdMs ?? 6000);
+  }
+}
 
 function buildTourDom() {
   const dim = document.createElement('div');
@@ -2067,6 +2172,7 @@ function buildTourDom() {
       <button id="tour-prev">‹ Prev</button>
       <button id="tour-next">Next ›</button>
       <button id="tour-autoplay">▶ Play</button>
+      <button id="tour-mute" title="Mute narration" aria-pressed="false">🔊</button>
       <button id="tour-exit">Exit (Esc)</button>
     </div>`;
   document.body.appendChild(card);
@@ -2074,7 +2180,11 @@ function buildTourDom() {
   document.getElementById('tour-prev').addEventListener('click',     () => { pauseAutoplay(); prevStep(); });
   document.getElementById('tour-next').addEventListener('click',     () => { pauseAutoplay(); nextStep(); });
   document.getElementById('tour-autoplay').addEventListener('click', toggleAutoplay);
+  document.getElementById('tour-mute').addEventListener('click',     toggleMute);
   document.getElementById('tour-exit').addEventListener('click',     exitTour);
+  // Hide the mute toggle entirely when the browser has no speech synthesis.
+  if (!speechSupported) document.getElementById('tour-mute').style.display = 'none';
+  setMuteButton();
   initCardDrag(card);
 }
 
