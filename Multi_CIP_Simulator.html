@@ -1602,11 +1602,16 @@ const TOUR_SCRIPTS = {
         { kind: 'select', id: 'slice-axis', value: 'x' },
         { kind: 'slider', id: 'sl-slicepos', value: 0, ms: 500 },
         { kind: 'preset', name: 'baseline' },
-        { pause: 2200 },
-        { kind: 'preset', name: 'c50' },
+      ],
+      // Hold the bright-yellow baseline slice on screen and flip CIP-50 on only after
+      // ~20s — about when the narration finishes the sentence "Watch what happens when
+      // CIP-50 switches on" — so the collapse to dark lands with the words. Anchored to
+      // the moment the card appears / its narration begins (see scheduleDelayedActions).
+      delayedActions: [
+        { at: 20000, kind: 'preset', name: 'c50' },
       ],
       cardPosition: 'bottom-right',
-      holdMs: 14000,
+      holdMs: 23000,
     },
     {
       title: 'CIP-187 only — a different sliver, and the deepest fix',
@@ -1678,7 +1683,7 @@ const TOUR_SCRIPTS = {
 let TOUR_STEPS = TOUR_SCRIPTS.tour;
 
 const tour = { i: 0, playing: false, open: false, rafId: null, autoTimerId: null, renderGuard: 0,
-               muted: false, _utterance: null, _narrationResolve: null };
+               muted: false, _utterance: null, _narrationResolve: null, delayedTimers: [] };
 
 // ---- Narration (Web Speech API) -------------------------------------------
 // Voice plays only while autoplay ("▶ Play") is running. It is 100% client-side
@@ -1729,6 +1734,9 @@ function stopSpeaking() {
 // Narrate one step and resolve when narration is "done": when speech ends, or —
 // if muted / unsupported — after the step's fallback hold (the old fixed timing).
 function narrateStep(step) {
+  // Re-anchor any timed on-screen changes to the start of narration (and so to resume,
+  // which re-narrates the current card), overriding the at-render scheduling below.
+  scheduleDelayedActions(step);
   return new Promise(resolve => {
     tour._narrationResolve = resolve;
     const finish = () => {
@@ -1858,18 +1866,49 @@ function tourSetHidesat(on) {
   if (hideAboveSat !== on) tourClick('btn-hidesat');
 }
 
+// Dispatch one action object (a single entry from a step's `actions` /
+// `delayedActions` list). A bare { pause: ... } entry matches no kind and is a no-op
+// here — applyStepActions handles its sleep separately.
+async function runAction(a) {
+  if (a.kind === 'slider')        await tweenSlider(a.id, a.value, a.ms ?? 600);
+  else if (a.kind === 'preset')   tourPreset(a.name);
+  else if (a.kind === 'mode')     tourMode(a.mode);
+  else if (a.kind === 'select')   tourSelect(a.id, a.value);
+  else if (a.kind === 'click')    tourClick(a.id);
+  else if (a.kind === 'isolevel') tourIsoLevel(a.value, a.metric);
+  else if (a.kind === 'hidesat')  tourSetHidesat(a.on);
+}
+
 async function applyStepActions(step) {
   const myGuard = tour.renderGuard;
   for (const a of step.actions ?? []) {
     if (myGuard !== tour.renderGuard) return;
-    if (a.kind === 'slider')        await tweenSlider(a.id, a.value, a.ms ?? 600);
-    else if (a.kind === 'preset')   tourPreset(a.name);
-    else if (a.kind === 'mode')     tourMode(a.mode);
-    else if (a.kind === 'select')   tourSelect(a.id, a.value);
-    else if (a.kind === 'click')    tourClick(a.id);
-    else if (a.kind === 'isolevel') tourIsoLevel(a.value, a.metric);
-    else if (a.kind === 'hidesat')  tourSetHidesat(a.on);
+    await runAction(a);
     if (a.pause) await tourSleep(a.pause);
+  }
+}
+
+// Cancel any pending delayed actions (e.g. on pause, exit, or stepping to a new card).
+function clearDelayedActions() {
+  (tour.delayedTimers || []).forEach(id => clearTimeout(id));
+  tour.delayedTimers = [];
+}
+
+// Fire a step's `delayedActions` on their own timers, measured from "now" (the moment
+// the card appears or its narration begins). Used to time an on-screen change to land
+// with a specific sentence in the spoken narration — e.g. flipping CIP-50 on exactly
+// when the voice says "Watch what happens when CIP-50 switches on." Each fire is guarded
+// so a card change or pause cancels anything still pending. Re-anchored on resume because
+// narrateStep calls this again. `at` is milliseconds from the anchor.
+function scheduleDelayedActions(step) {
+  clearDelayedActions();
+  const myGuard = tour.renderGuard;
+  for (const a of step.delayedActions ?? []) {
+    const id = setTimeout(() => {
+      if (myGuard !== tour.renderGuard) return;
+      runAction(a);
+    }, a.at ?? 0);
+    tour.delayedTimers.push(id);
   }
 }
 
@@ -2091,6 +2130,10 @@ async function renderStep(i) {
   if (myGuard !== tour.renderGuard) return;
   drawArrowsForStep(step);
   applyStepHighlights(step);
+  // Start any timed on-screen changes from the moment the card appears. In autoplay
+  // narrateStep re-anchors these to the voice; for manual click-through this is the
+  // only anchor, so the change still happens ~its `at` ms after the card shows.
+  scheduleDelayedActions(step);
 }
 
 async function nextStep() { if (tour.i < TOUR_STEPS.length - 1) await renderStep(tour.i + 1); }
@@ -2121,6 +2164,7 @@ async function autoPlay() {
 function pauseAutoplay() {
   tour.playing = false;
   if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+  clearDelayedActions();
   stopSpeaking();
   if (tour._narrationResolve) { const r = tour._narrationResolve; tour._narrationResolve = null; r(); }
   setAutoplayButton(false);
