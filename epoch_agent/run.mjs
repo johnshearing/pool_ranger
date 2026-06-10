@@ -24,7 +24,7 @@ import { fileURLToPath } from 'url';
 
 import { fetchPoolsInfo, fetchPoolHistory, fetchEpochInfo,
          fetchCurrentEpoch, fetchRecentR, fetchSupply } from './koios.mjs';
-import { classifyPool, Rec } from './classify.mjs';
+import { classifyPool, applyRelativeFloor, Rec } from './classify.mjs';
 import { globalAllocateWithR } from './allocate.mjs';
 import { formatReport } from './report.mjs';
 import { delegROA, computeSsat } from './math.mjs';
@@ -223,6 +223,12 @@ async function main() {
     classifications.push(result);
   }
 
+  // 9b. Relative floor ("below best alternative") — downgrade DELEGATE candidates
+  // that aren't needed because strictly-better pools can absorb the full budget.
+  // Budget = total member stake minus in-flight ADDs (already committed elsewhere).
+  const globalBudget = Math.max(0, state.totalMemberStakeAda - pendingStake);
+  applyRelativeFloor(classifications, globalBudget, sSat);
+
   // 10. Forced withdrawals — unsafe pools (ALL_RED or unclearable HAS_RED_ZONE)
   const forcedWithdrawals = classifications.filter(c => c.recommendation === Rec.WITHDRAW);
 
@@ -232,9 +238,7 @@ async function main() {
   const safePools    = classifications.filter(
     c => c.recommendation === Rec.DELEGATE || c.recommendation === Rec.HOLD
   );
-  // Budget = total member stake minus in-flight ADDs (those are already committed to
-  // specific pools and must not be double-counted).
-  const globalBudget = Math.max(0, state.totalMemberStakeAda - pendingStake);
+  // globalBudget computed above (step 9b) — total member stake minus in-flight ADDs.
   const allocation   = globalAllocateWithR(safePools, globalBudget, sSat, r);
 
   // 12. Compute weighted ROA before and after changes
@@ -346,10 +350,11 @@ async function main() {
       }));
     if (detected.length === 0) continue;
     paramChanges.push({
-      poolId:             c.poolId,
-      ticker:             c.ticker,
-      recommendation:     c.recommendation,
-      rangerCurrentStake: c.rangerCurrentStake,
+      poolId:               c.poolId,
+      ticker:               c.ticker,
+      recommendation:       c.recommendation,
+      recommendationReason: c.recommendationReason,
+      rangerCurrentStake:   c.rangerCurrentStake,
       totalChanges:       entry.changes.length,
       detected,
     });

@@ -140,6 +140,11 @@ export function formatReport(reportData) {
     (c.classType === ClassType.HAS_RED_ZONE && !c.canClearTrough && !c.cursorPastTrough)
   ).sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
   const perfFailed = avoids.filter(c => c.classType === ClassType.ALL_GREEN && !c.perfPasses);
+  // Pools downgraded by an ROA floor (absolute 2%/yr, or relative "better
+  // alternatives exist"). recommendationReason is set only by the floor logic,
+  // so this bucket is disjoint from the safety / performance buckets above.
+  const floorAvoided = avoids.filter(c => c.recommendationReason)
+    .sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
 
   // Solicitation candidates: AVOID pools where Pool Ranger's projected ROA beats the pool's ROA.
   // Sorted lowest ROA first — most under-served delegators listed first (HOW_TO_RUN.md step 4).
@@ -196,6 +201,7 @@ export function formatReport(reportData) {
         push(`  ${ch.field.padEnd(10)} ${fromStr}  →  ${toStr}   ${arrow} ${verb}`);
       }
       push(`  Current recommendation:  ${p.recommendation}`);
+      if (p.recommendationReason) push(`    Reason:  ${p.recommendationReason}`);
       blank();
     }
   }
@@ -305,6 +311,7 @@ export function formatReport(reportData) {
       push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
       roaLines('  ', c).forEach(l => push(l));
       push(`  Current recommendation:  ${c.recommendation}`);
+      if (c.recommendationReason) push(`    Reason:  ${c.recommendationReason}`);
       blank();
     }
   }
@@ -315,6 +322,27 @@ export function formatReport(reportData) {
     push(line());
     for (const c of avoidSafety) {
       push(formatPool(c, undefined));
+      blank();
+    }
+  }
+
+  // ── Pools Avoided (ROA floor) ────────────────────────────────────────────
+  if (floorAvoided.length > 0) {
+    push('POOLS AVOIDED (ROA too low or better alternatives exist)');
+    push(line());
+    push('  Safe to delegate to, but rejected on return: either below the absolute');
+    push('  ROA floor or out-competed by higher-ROA pools that can absorb the budget.');
+    blank();
+    for (const c of floorAvoided) {
+      const label = c.ticker ? `[${c.ticker}]` : `[${c.poolId.slice(0, 12)}…]`;
+      push(`${label}  P=${ada(c.pledgeAda)}, F=${c.fixedCostAda} ADA, m=${(c.margin * 100).toFixed(1)}%`);
+      push(`  Full ID:           ${c.poolId}`);
+      push(`  Classification:    ${describeClass(c)}`);
+      push(`  Performance:       ${(c.perf * 100).toFixed(1)}%  (${c.perfValidEpochs} valid epochs)`);
+      push(`  Active stake:      ${ada(c.activeStakeAda)}  (Pool Ranger: ${ada(c.rangerCurrentStake)})`);
+      roaLines('  ', c).forEach(l => push(l));
+      push(`  Recommendation:    AVOID`);
+      push(`    Reason:  ${c.recommendationReason}`);
       blank();
     }
   }

@@ -18,6 +18,14 @@ export const Rec = Object.freeze({
   AVOID:    'AVOID',      // not currently delegating; do not start
 });
 
+// Absolute ROA floor (%/yr). Pool Ranger will not START a new delegation to a
+// pool whose projected post-delegation delegator ROA falls below this, no matter
+// how "cooperative" its reward curve looks. A pool can be geometrically safe
+// (ALL_GREEN / past-trough) yet still be a terrible deal for members — e.g. after
+// raising margin to 100% the delegator ROA collapses to ~0. This floor catches
+// exactly those cases.
+export const ABSOLUTE_ROA_FLOOR_PCT = 2.0;
+
 // computePerformance — port of the chart's computePerformance() function.
 // Excludes epochs with < 0.5 expected blocks (small pool noise).
 // Caps perf at 1.0 (lucky streaks don't inflate the factor).
@@ -261,6 +269,21 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
   }
   const roaAtProposed = delegROA(proposedTotalStake, P, F, m, r, perf, sSat);
 
+  // ── Absolute ROA floor ─────────────────────────────────────────────────────
+  // Refuse to START a delegation whose delegator ROA is below the floor. We test
+  // roaAtCurrent (the pool's ROA at its present stake — the figure shown as
+  // "Projected ROA" and the basis the allocator ranks by), NOT roaAtProposed:
+  // the latter assumes we dump our entire available budget into this one pool, a
+  // scenario the 20% concentration cap and saturation room never allow (it can
+  // crash a healthy 2.4% pool to a fictional 1.3%). Held pools are left to the
+  // global allocator, so we only gate new DELEGATEs here.
+  let recommendationReason = null;
+  if (recommendation === Rec.DELEGATE && roaAtCurrent < ABSOLUTE_ROA_FLOOR_PCT) {
+    recommendation       = Rec.AVOID;
+    recommendationReason =
+      `projected ROA ${roaAtCurrent.toFixed(2)}%/yr is below the ${ABSOLUTE_ROA_FLOOR_PCT.toFixed(2)}%/yr absolute floor`;
+  }
+
   return {
     poolId,
     ticker:        poolInfo.ticker,
@@ -283,6 +306,7 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     troughBeyondSat,
     rangerCurrentStake,
     recommendation,
+    recommendationReason,
     proposedTotalStake,
     roaAtProposed,
     roaAtCurrent,
@@ -294,4 +318,50 @@ export function classifyPool(poolInfo, poolHistory, epochInfoMap,
     solicitCandidate,
     poolAgeEpochs: poolHistory.length,
   };
+}
+
+// applyRelativeFloor — cross-pool "below best alternative" gate.
+//
+// Ranks the new-delegation candidates (recommendation === DELEGATE) by their
+// projected post-delegation ROA and keeps only as many as are actually needed
+// to deploy the budget, given the per-pool concentration cap and each pool's
+// room to saturation. A candidate is downgraded to AVOID once strictly-better
+// candidates already have enough combined capacity to absorb the whole budget —
+// i.e. there is a better home for that stake. The highest-ROA pools are never
+// downgraded, and the cap guarantees enough pools survive to deploy the budget,
+// so member funds are never stranded.
+//
+// Mutates recommendation / recommendationReason on the passed objects and
+// returns the same array.
+export function applyRelativeFloor(classifications, budgetAda, sSat, config = {}) {
+  const concentrationFrac = config.concentrationFrac ?? 0.20;
+  const minMeaningfulAda  = config.minMeaningfulAda  ?? 10_000;
+  if (budgetAda <= 0) return classifications;
+
+  const perPoolCap = budgetAda * concentrationFrac;
+  // Rank by roaAtCurrent — the same basis the allocator uses and the figure the
+  // report shows as "Projected ROA". (roaAtProposed assumes a full-budget dump
+  // and is unreliable for near-saturation pools — see the absolute-floor note.)
+  const candidates = classifications
+    .filter(c => c.recommendation === Rec.DELEGATE)
+    .sort((a, b) => b.roaAtCurrent - a.roaAtCurrent);
+
+  if (candidates.length === 0) return classifications;
+  const bestRoa = candidates[0].roaAtCurrent;
+
+  let capacityAbove = 0;   // deployable ADA held by strictly-better candidates
+  for (const c of candidates) {
+    if (capacityAbove >= budgetAda) {
+      // Strictly-better pools already soak up the entire budget — not needed.
+      c.recommendation       = Rec.AVOID;
+      c.recommendationReason =
+        `better pools (ROA up to ${bestRoa.toFixed(2)}%/yr) can absorb the full budget; ` +
+        `this pool's ${c.roaAtCurrent.toFixed(2)}%/yr is not needed`;
+      continue;
+    }
+    const roomToSat  = Math.max(0, sSat - c.activeStakeAda);
+    const deployable = Math.min(roomToSat, perPoolCap);
+    if (deployable >= minMeaningfulAda) capacityAbove += deployable;
+  }
+  return classifications;
 }
