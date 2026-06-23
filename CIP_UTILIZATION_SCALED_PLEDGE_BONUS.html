@@ -2059,20 +2059,22 @@ TOUR_SCRIPTS.benefits = [
       per-pool pledge bonus small for split pools, and rational delegators avoid them.
       <strong>The CIP leaves <code>a₀</code> untouched</strong> — today's Sybil deterrent
       is preserved exactly as it stands. On top of that, the CIP adds a <em>formula-level</em>
-      cost for splitting. Numbers for a 50 M ADA holder:</p>
+      cost for splitting. Numbers for a 50 M ADA holder (50 M pledge + 25 M delegation,
+      both split evenly across the N pools):</p>
       <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
         <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N pools):</td>
             <td style="text-align:right">≈ 4,615 ADA/epoch · 337 K/yr</td></tr>
         <tr><td>Proposed, unsplit (N = 1):</td>
-            <td style="text-align:right">≈ 3,077 ADA/epoch · 225 K/yr</td></tr>
-        <tr><td>Proposed, 10 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;308 ADA/epoch · &nbsp;22 K/yr</td></tr>
-        <tr><td>Proposed, 100 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;31 ADA/epoch · &nbsp;&nbsp;2 K/yr</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch · 337 K/yr</td></tr>
+        <tr><td>Proposed, 10 pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;462 ADA/epoch · &nbsp;34 K/yr</td></tr>
+        <tr><td>Proposed, 100 pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;46 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
       </table>
-      <p>A 10-way split costs roughly <strong>202 K ADA/year</strong> in forgone bonus
-      versus staying in one pool. Multi-pool operation is discouraged at the formula level —
-      while Sybil resistance via <code>a₀</code> remains exactly what it is today.</p>`,
+      <p>A 10-way split costs roughly <strong>303 K ADA/year</strong> in forgone bonus
+      versus staying in one pool (337 K − 34 K). Multi-pool operation is discouraged at the
+      formula level — while Sybil resistance via <code>a₀</code> remains exactly what it is
+      today.</p>`,
     targets: ['m-A-prop'],
     actions: [
       { kind: 'slider', id: 'sl-p', value: 0.5, ms: 600 },
@@ -2225,24 +2227,35 @@ TOUR_SCRIPTS.mpo = [
   {
     title: 'The numbers — 50 M ADA holder',
     body: `<p>Total pledge bonus under each strategy for an entity with 50 M ADA of pledge
-      (<code>r = 0.000400</code>, <code>a₀ = 0.3</code>, <code>S<sub>sat</sub> = 75 M</code>),
-      assuming each split pool is funded only by the operator's own share:</p>
+      <em>and</em> 25 M ADA of delegation
+      (<code>r = 0.000400</code>, <code>a₀ = 0.3</code>, <code>S<sub>sat</sub> = 75 M</code>,
+      fixed fee = 340 ADA, margin = 1%), assuming <strong>both the 50 M pledge and the
+      25 M delegation are split evenly across the N pools</strong> (so each pool holds
+      <code>50 M / N</code> pledge + <code>25 M / N</code> delegation):</p>
       <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
         <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N):</td>
             <td style="text-align:right">≈ 4,615 ADA/epoch · 337 K/yr</td></tr>
         <tr><td>Proposed, unsplit (N = 1):</td>
-            <td style="text-align:right">≈ 3,077 ADA/epoch · 225 K/yr</td></tr>
-        <tr><td>Proposed, 2 self-funded pools:</td>
-            <td style="text-align:right">≈ 1,538 ADA/epoch · 112 K/yr</td></tr>
-        <tr><td>Proposed, 10 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;308 ADA/epoch · &nbsp;22 K/yr</td></tr>
-        <tr><td>Proposed, 100 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;31 ADA/epoch · &nbsp;&nbsp;2 K/yr</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch · 337 K/yr</td></tr>
+        <tr><td>Proposed, 2 pools:</td>
+            <td style="text-align:right">≈ 2,308 ADA/epoch · 168 K/yr</td></tr>
+        <tr><td>Proposed, 10 pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;462 ADA/epoch · &nbsp;34 K/yr</td></tr>
+        <tr><td>Proposed, 100 pools:</td>
+            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;46 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
       </table>
-      <p>The cost of a 10-way self-funded split vs leaving the stake in one pool:
-      <strong>~202 K ADA/year of forgone bonus</strong>. The cost grows linearly with N.</p>`,
+      <p>The unsplit pool holds 50 M + 25 M = 75 M = <code>S<sub>sat</sub></code> exactly, so
+      <code>u = 1</code> and the proposed formula returns the <em>full</em> bonus — a
+      fully-utilized honest pool is never penalised. That is why the first two rows match.</p>
+      <p>Two figures, two meanings: the <strong>34 K/yr</strong> on the 10-pool row is the bonus
+      the operator <em>still earns</em> after splitting; the <strong>forgone</strong> bonus is the
+      gap versus not splitting — <code>337 K − 34 K ≈ 303 K ADA/year</code> left on the table.
+      The more pools they split into, the more they forgo (total earned bonus scales as
+      <code>1 / N</code>).</p>`,
     targets: [],
-    actions: [],
+    actions: [
+      { kind: 'slider', id: 'sl-d', value: 2.5, ms: 600 },
+    ],
     holdMs: 13000,
   },
   {
@@ -2478,7 +2491,8 @@ TOUR_SCRIPTS.cerkoryn = [
           giving SPOs a continuous incentive to <em>retain</em> large
           delegators.</li>
         <li><strong>MPO deterrence at the formula level.</strong> A 10-way
-          self-funded split costs roughly <strong>202 K ADA/year</strong> in
+          split (pledge + delegation both divided across the pools) costs
+          roughly <strong>303 K ADA/year</strong> in
           forgone bonus under the proposal; today it costs zero.
           <code>a<sub>0</sub></code> is untouched, so Sybil resistance via
           delegator preference is preserved exactly. The new cost stacks on
