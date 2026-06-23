@@ -671,7 +671,7 @@ input[type=range] {
     <span class="hl">m<sub>min</sub></span> = (A_eff − F) / (p·r·P − F) &nbsp; when A_eff &gt; F, else 0%
       &nbsp;|&nbsp; Ceiling: a₀/(1+a₀) ≈ 23.1%<br>
 
-    <span class="hl">r</span> = <span id="formula-r">0.000548</span> (epoch rate — slowly declining as ADA reserve depletes)
+    <span class="hl">r</span> = <span id="formula-r">0.000400</span> (epoch rate — slowly declining as ADA reserve depletes)
       &nbsp;|&nbsp; Saturation S<sub>sat</sub> ≈ 75 M ADA (2025)<br>
 
     <span class="hl">Performance p</span>
@@ -679,7 +679,7 @@ input[type=range] {
       &nbsp;|&nbsp; expected = (pool active stake / network active stake) × total epoch blocks
     <br><br>
 
-    <strong style="color:#4ecdc4">Proposed formula — utilization-scaled pledge bonus</strong><br>
+    <strong id="proposed-formula-heading" style="color:#4ecdc4">Proposed formula — utilization-scaled pledge bonus</strong><br>
     <span class="hl-prop">u</span> = min(S, S<sub>sat</sub>) / S<sub>sat</sub>
       &nbsp;(pool utilization, 0 to 1)
       &nbsp;|&nbsp;
@@ -1839,7 +1839,7 @@ const TOUR_SCRIPTS = {
         { kind: 'slider', id: 'sl-p', value: 5,        ms: 500 },
         { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
         { kind: 'slider', id: 'sl-f', value: 170,      ms: 400 },
-        { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 400 },
+        { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 400 },
         { kind: 'check',  id: 'cb-show-current',  value: true },
         { kind: 'check',  id: 'cb-show-proposed', value: true },
         { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
@@ -1957,7 +1957,7 @@ TOUR_SCRIPTS.benefits = [
       { kind: 'slider', id: 'sl-p', value: 10,       ms: 500 },
       { kind: 'slider', id: 'sl-m', value: 2,        ms: 400 },
       { kind: 'slider', id: 'sl-f', value: 340,      ms: 400 },
-      { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 400 },
+      { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 400 },
       { kind: 'check',  id: 'cb-show-current',  value: true },
       { kind: 'check',  id: 'cb-show-proposed', value: true },
       { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
@@ -2062,15 +2062,15 @@ TOUR_SCRIPTS.benefits = [
       cost for splitting. Numbers for a 50 M ADA holder:</p>
       <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
         <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N pools):</td>
-            <td style="text-align:right">≈ 6,323 ADA/epoch · 462 K/yr</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch · 337 K/yr</td></tr>
         <tr><td>Proposed, unsplit (N = 1):</td>
-            <td style="text-align:right">≈ 4,218 ADA/epoch · 308 K/yr</td></tr>
+            <td style="text-align:right">≈ 3,077 ADA/epoch · 225 K/yr</td></tr>
         <tr><td>Proposed, 10 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;422 ADA/epoch · &nbsp;31 K/yr</td></tr>
+            <td style="text-align:right">≈ &nbsp;&nbsp;308 ADA/epoch · &nbsp;22 K/yr</td></tr>
         <tr><td>Proposed, 100 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;42 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
+            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;31 ADA/epoch · &nbsp;&nbsp;2 K/yr</td></tr>
       </table>
-      <p>A 10-way split costs roughly <strong>277 K ADA/year</strong> in forgone bonus
+      <p>A 10-way split costs roughly <strong>202 K ADA/year</strong> in forgone bonus
       versus staying in one pool. Multi-pool operation is discouraged at the formula level —
       while Sybil resistance via <code>a₀</code> remains exactly what it is today.</p>`,
     targets: ['m-A-prop'],
@@ -2144,7 +2144,7 @@ TOUR_SCRIPTS.mpo = [
       { kind: 'slider', id: 'sl-p', value: 50,       ms: 600 },
       { kind: 'slider', id: 'sl-m', value: 1,        ms: 400 },
       { kind: 'slider', id: 'sl-f', value: 340,      ms: 400 },
-      { kind: 'slider', id: 'sl-r', value: 0.000548, ms: 400 },
+      { kind: 'slider', id: 'sl-r', value: 0.000400, ms: 400 },
       { kind: 'check',  id: 'cb-show-current',  value: true },
       { kind: 'check',  id: 'cb-show-proposed', value: true },
       { kind: 'slider', id: 'sl-b', value: 1,        ms: 300 },
@@ -2189,11 +2189,11 @@ TOUR_SCRIPTS.mpo = [
       pledge bonus today:</p>
       <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
         <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">50 M ADA in 1 pool:</td>
-            <td style="text-align:right">≈ 6,323 ADA/epoch</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch</td></tr>
         <tr><td>50 M ADA across 10 pools (5 M each):</td>
-            <td style="text-align:right">≈ 6,323 ADA/epoch</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch</td></tr>
         <tr><td>50 M ADA across 100 pools (0.5 M each):</td>
-            <td style="text-align:right">≈ 6,323 ADA/epoch</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch</td></tr>
       </table>
       <p>The total is <em>identical</em>. The operator pays nothing at the formula level for
       splitting. If they can attract even a small fraction of delegators per pool — or
@@ -2215,7 +2215,7 @@ TOUR_SCRIPTS.mpo = [
       The new formula-level cost stacks <em>on top of</em> today's behavioural defense.</p>
       <p>The blending coefficient <code>b</code> below the chart lets you watch the effect
       ramp from <em>0 (today)</em> to <em>1 (full proposal)</em>.</p>`,
-    targets: ['formula-panel', 'sl-b'],
+    targets: ['proposed-formula-heading', 'sl-b'],
     actions: [
       { kind: 'slider', id: 'sl-b', value: 0, ms: 1200 },
       { kind: 'slider', id: 'sl-b', value: 1, ms: 1800 },
@@ -2225,22 +2225,22 @@ TOUR_SCRIPTS.mpo = [
   {
     title: 'The numbers — 50 M ADA holder',
     body: `<p>Total pledge bonus under each strategy for an entity with 50 M ADA of pledge
-      (<code>r = 0.000548</code>, <code>a₀ = 0.3</code>, <code>S<sub>sat</sub> = 75 M</code>),
+      (<code>r = 0.000400</code>, <code>a₀ = 0.3</code>, <code>S<sub>sat</sub> = 75 M</code>),
       assuming each split pool is funded only by the operator's own share:</p>
       <table style="font-family:monospace;font-size:0.78rem;margin:0.4rem 0;border-collapse:collapse">
         <tr><td style="padding:0.1rem 0.6rem 0.1rem 0">Today (any N):</td>
-            <td style="text-align:right">≈ 6,323 ADA/epoch · 462 K/yr</td></tr>
+            <td style="text-align:right">≈ 4,615 ADA/epoch · 337 K/yr</td></tr>
         <tr><td>Proposed, unsplit (N = 1):</td>
-            <td style="text-align:right">≈ 4,218 ADA/epoch · 308 K/yr</td></tr>
+            <td style="text-align:right">≈ 3,077 ADA/epoch · 225 K/yr</td></tr>
         <tr><td>Proposed, 2 self-funded pools:</td>
-            <td style="text-align:right">≈ 2,109 ADA/epoch · 154 K/yr</td></tr>
+            <td style="text-align:right">≈ 1,538 ADA/epoch · 112 K/yr</td></tr>
         <tr><td>Proposed, 10 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;422 ADA/epoch · &nbsp;31 K/yr</td></tr>
+            <td style="text-align:right">≈ &nbsp;&nbsp;308 ADA/epoch · &nbsp;22 K/yr</td></tr>
         <tr><td>Proposed, 100 self-funded pools:</td>
-            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;42 ADA/epoch · &nbsp;&nbsp;3 K/yr</td></tr>
+            <td style="text-align:right">≈ &nbsp;&nbsp;&nbsp;31 ADA/epoch · &nbsp;&nbsp;2 K/yr</td></tr>
       </table>
       <p>The cost of a 10-way self-funded split vs leaving the stake in one pool:
-      <strong>~277 K ADA/year of forgone bonus</strong>. The cost grows linearly with N.</p>`,
+      <strong>~202 K ADA/year of forgone bonus</strong>. The cost grows linearly with N.</p>`,
     targets: [],
     actions: [],
     holdMs: 13000,
@@ -2478,7 +2478,7 @@ TOUR_SCRIPTS.cerkoryn = [
           giving SPOs a continuous incentive to <em>retain</em> large
           delegators.</li>
         <li><strong>MPO deterrence at the formula level.</strong> A 10-way
-          self-funded split costs roughly <strong>277 K ADA/year</strong> in
+          self-funded split costs roughly <strong>202 K ADA/year</strong> in
           forgone bonus under the proposal; today it costs zero.
           <code>a<sub>0</sub></code> is untouched, so Sybil resistance via
           delegator preference is preserved exactly. The new cost stacks on
