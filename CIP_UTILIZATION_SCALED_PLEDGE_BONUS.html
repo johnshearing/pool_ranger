@@ -1625,10 +1625,13 @@ document.addEventListener('keydown', e => {
 });
 
 // ──────────────────── Guided CIP Tours ────────────────────
-// Two tutorials live on the page:
-//   "explain" — the main pitch: red zone, formula change, equilibrium preserved.
-//   "why"     — addresses the natural objection that proposed curves sit lower.
-// Both share the same engine; the active script is the one referenced by TOUR_STEPS.
+// Five walkthroughs live on the page:
+//   "explain"  — the main pitch: red zone, formula change, equilibrium preserved.
+//   "why"      — addresses the natural objection that proposed curves sit lower.
+//   "benefits" — who gains, who loses, and by how much, stakeholder by stakeholder.
+//   "mpo"      — the Multi-Pool Operator problem and how the CIP closes the gap.
+//   "cerkoryn" — answers the two questions a CIP reviewer posted on the PR thread.
+// All share the same engine; the active script is the one referenced by TOUR_STEPS.
 
 const TOUR_SCRIPTS = {
   explain: [
@@ -1799,7 +1802,7 @@ const TOUR_SCRIPTS = {
         committing further.</p>
         <p style="margin-top: 0.5rem; color: var(--muted)">
         End of tour. Press <strong style="color:var(--accent)">Exit</strong> (or Esc) to return
-        to free exploration. Or click the second tutorial button at the top of the page to
+        to free exploration. Or click the second walkthrough button at the top of the page to
         see why the new curves look "lower" — and why that's still a win.</p>`,
       targets: [
         'sl-b',
@@ -1937,14 +1940,14 @@ const TOUR_SCRIPTS = {
   ],
 };
 
-// "benefits" — third tutorial drawn from §5 of utilization_scaled_pledge_bonus.md.
+// "benefits" — third walkthrough drawn from §5 of utilization_scaled_pledge_bonus.md.
 // One card per stakeholder class: SPOs (saturated), SPOs (below saturation), small
 // honest operators, delegators, cooperatives, decentralization, treasury, summary.
 TOUR_SCRIPTS.benefits = [
   {
     title: 'Who benefits, and by how much',
     body: `<p>The CIP redistributes some emission and reshapes incentives. This 9-step
-      tutorial walks through who gains, who loses, and by how much — stakeholder by
+      walkthrough walks through who gains, who loses, and by how much — stakeholder by
       stakeholder.</p>
       <p>The source material is <a href="https://github.com/johnshearing/CIPs/tree/utilization-scaled-pledge-bonus/CIP-XXXX#a4-extended-stakeholder-analysis"
       style="color:var(--accent)">("A.4 Extended stakeholder analysis") of CIP-187? | Utilization-Scaled Pledge Bonus #1193</a>. Press
@@ -2121,7 +2124,7 @@ TOUR_SCRIPTS.benefits = [
   },
 ];
 
-// "mpo" — fourth tutorial. Walks through the Multi-Pool Operator problem
+// "mpo" — fourth walkthrough. Walks through the Multi-Pool Operator problem
 // (one entity running many pools) and how the CIP closes the formula-level gap
 // in today's defense. Quantitative throughout — anchored to the 50 M ADA example.
 TOUR_SCRIPTS.mpo = [
@@ -2132,7 +2135,7 @@ TOUR_SCRIPTS.mpo = [
       production and fixed-fee revenue than a single operator would, and appears as many
       independent voices in governance — undermining <strong>real decentralization</strong>
       while preserving its appearance.</p>
-      <p>Decentralization is the stakeholder this tutorial speaks for. The 8 steps below
+      <p>Decentralization is the stakeholder this walkthrough speaks for. The 8 steps below
       show why today's formula does not fully deter splitting, and how the CIP closes that
       gap <em>without lowering Sybil resistance</em> — <code>a₀</code> stays exactly as it
       is today.</p>`,
@@ -2281,7 +2284,7 @@ TOUR_SCRIPTS.mpo = [
   },
 ];
 
-// "cerkoryn" — fifth tutorial. Walks through the two specific questions a CIP
+// "cerkoryn" — fifth walkthrough. Walks through the two specific questions a CIP
 // reviewer (Cerkoryn) posted on the PR thread and answers each one directly.
 // Loads his Pool 3 (P = 50%, S = 50% of S_sat) into the simulator so the
 // halved pledge bonus is visible on the metric cards, then pivots to where
@@ -2533,7 +2536,82 @@ const tour = {
   rafId: null,
   autoTimerId: null,
   renderGuard: 0,   // bumped on each renderStep — async actions abort if stale
+  muted: false,
+  _utterance: null,
+  _narrationResolve: null,
 };
+
+// ---- Narration (Web Speech API) -------------------------------------------
+// Voice plays only while autoplay ("▶ Play") is running. It is 100% client-side
+// (window.speechSynthesis) — no server, no API key, nothing leaves the browser.
+// A 🔊/🔇 toggle lets the viewer silence it; muting takes effect immediately,
+// unmuting from the next card.
+const speechSupported = typeof window !== 'undefined'
+  && 'speechSynthesis' in window && 'SpeechSynthesisUtterance' in window;
+
+let _voiceCache = null;
+function pickVoice() {
+  if (!speechSupported) return null;
+  const voices = window.speechSynthesis.getVoices();
+  if (!voices.length) return null;
+  if (_voiceCache && voices.includes(_voiceCache)) return _voiceCache;
+  // Prefer the natural-sounding English voices that ship with common browsers/OSes,
+  // falling back to any en-* voice, then to whatever the platform offers.
+  const prefer = [
+    /Google US English/i, /Microsoft (Aria|Jenny|Guy|Michelle|Zira|David)/i,
+    /Samantha/i, /English \(United States\)/i,
+  ];
+  for (const re of prefer) {
+    const m = voices.find(v => re.test(v.name) || re.test(v.voiceURI || ''));
+    if (m) { _voiceCache = m; return m; }
+  }
+  _voiceCache = voices.find(v => /^en[-_]/i.test(v.lang)) || voices[0];
+  return _voiceCache;
+}
+if (speechSupported) {
+  // Voice lists load asynchronously in most browsers; reset the cache when they arrive.
+  window.speechSynthesis.onvoiceschanged = () => { _voiceCache = null; pickVoice(); };
+  pickVoice();
+}
+
+// Flatten a step's HTML body to plain prose the synthesizer can read.
+function stepNarrationText(step) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = step.body || '';
+  const body = (tmp.textContent || '').replace(/\s+/g, ' ').trim();
+  return body ? `${step.title}. ${body}` : String(step.title || '');
+}
+
+function stopSpeaking() {
+  if (speechSupported) window.speechSynthesis.cancel();
+  tour._utterance = null;
+}
+
+// Narrate one step and resolve when narration is "done": when speech ends, or —
+// if muted / unsupported — after the step's fallback hold (the old fixed timing).
+function narrateStep(step) {
+  return new Promise(resolve => {
+    tour._narrationResolve = resolve;
+    const finish = () => {
+      if (tour._narrationResolve !== resolve) return;  // a newer step superseded us
+      tour._narrationResolve = null;
+      resolve();
+    };
+    const fallback = () => { tour.autoTimerId = setTimeout(finish, step.holdMs ?? 5500); };
+
+    if (tour.muted || !speechSupported) { fallback(); return; }
+
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(stepNarrationText(step));
+    const v = pickVoice();
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = 1.0; u.pitch = 1.0;
+    u.onend = finish;
+    u.onerror = finish;   // e.g. cancel() — let the loop move on rather than hang
+    tour._utterance = u;
+    window.speechSynthesis.speak(u);
+  });
+}
 
 function tourClamp(min, max, v) { return Math.max(min, Math.min(max, v)); }
 
@@ -2782,12 +2860,15 @@ async function autoPlay() {
   tour.playing = true;
   setAutoplayButton(true);
   while (tour.playing) {
-    const step = TOUR_STEPS[tour.i];
-    const hold = step.holdMs ?? 5500;
-    await new Promise(res => { tour.autoTimerId = setTimeout(res, hold); });
+    // The card stays up for as long as its narration takes to read aloud (or the
+    // step's fallback hold when muted / speech is unavailable).
+    await narrateStep(TOUR_STEPS[tour.i]);
     tour.autoTimerId = null;
     if (!tour.playing) break;
     if (tour.i >= TOUR_STEPS.length - 1) break;
+    await new Promise(res => { tour.autoTimerId = setTimeout(res, 450); });   // a short breath between cards
+    tour.autoTimerId = null;
+    if (!tour.playing) break;
     await nextStep();
   }
   tour.playing = false;
@@ -2797,12 +2878,40 @@ async function autoPlay() {
 function pauseAutoplay() {
   tour.playing = false;
   if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+  stopSpeaking();
+  if (tour._narrationResolve) { const r = tour._narrationResolve; tour._narrationResolve = null; r(); }
   setAutoplayButton(false);
 }
 
 function toggleAutoplay() {
   if (tour.playing) pauseAutoplay();
   else              autoPlay();
+}
+
+function setMuteButton() {
+  const btn = document.getElementById('tour-mute');
+  if (!btn) return;
+  btn.textContent = tour.muted ? '🔇' : '🔊';
+  btn.title = tour.muted ? 'Narration muted — click to unmute' : 'Mute narration';
+  btn.setAttribute('aria-pressed', String(tour.muted));
+}
+
+function toggleMute() {
+  tour.muted = !tour.muted;
+  setMuteButton();
+  if (!tour.muted) return;   // unmuting takes effect on the next card
+
+  // Muting: silence the current voice immediately without letting the cancelled
+  // utterance's onend yank us to the next card — keep this card up for its
+  // fallback hold instead, so the pacing stays sane.
+  if (tour._utterance) { tour._utterance.onend = null; tour._utterance.onerror = null; }
+  stopSpeaking();
+  if (tour.playing && tour._narrationResolve) {
+    if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+    tour.autoTimerId = setTimeout(() => {
+      if (tour._narrationResolve) { const r = tour._narrationResolve; tour._narrationResolve = null; r(); }
+    }, TOUR_STEPS[tour.i]?.holdMs ?? 5500);
+  }
 }
 
 function buildTourDom() {
@@ -2826,6 +2935,7 @@ function buildTourDom() {
       <button id="tour-prev">‹ Prev</button>
       <button id="tour-next">Next ›</button>
       <button id="tour-autoplay">▶ Play</button>
+      <button id="tour-mute" title="Mute narration" aria-pressed="false">🔊</button>
       <button id="tour-exit">Exit (Esc)</button>
     </div>`;
   document.body.appendChild(card);
@@ -2833,7 +2943,11 @@ function buildTourDom() {
   document.getElementById('tour-prev').addEventListener('click',     () => { pauseAutoplay(); prevStep(); });
   document.getElementById('tour-next').addEventListener('click',     () => { pauseAutoplay(); nextStep(); });
   document.getElementById('tour-autoplay').addEventListener('click', toggleAutoplay);
+  document.getElementById('tour-mute').addEventListener('click',     toggleMute);
   document.getElementById('tour-exit').addEventListener('click',     exitTour);
+  // Hide the mute toggle entirely when the browser has no speech synthesis.
+  if (!speechSupported) document.getElementById('tour-mute').style.display = 'none';
+  setMuteButton();
 }
 
 function startTour(scriptName = 'explain') {
