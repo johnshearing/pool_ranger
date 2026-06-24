@@ -316,6 +316,11 @@ input[type=range] {
   font-size: 0.88rem;
   line-height: 1.5;
   color: var(--text);
+  /* Long cards (e.g. the MPO "50 M ADA holder" step) can exceed the viewport
+     height. Cap the card to the visible area and let it scroll internally
+     rather than spilling off-screen. */
+  max-height: calc(100vh - 2.4rem);
+  overflow-y: auto;
 }
 .tour-step-counter {
   font-size: 0.68rem;
@@ -666,7 +671,7 @@ input[type=range] {
     <span class="hl">Delegator ROA/yr</span>
       = (1−m)·(gross_eff − F) / S × 73 epochs × 100%<br>
 
-    <span class="hl">A_eff</span> = p·r·a₀·P / (1+a₀)
+    <span id="formula-A-eff"><span class="hl">A_eff</span> = p·r·a₀·P / (1+a₀)</span>
       &nbsp;|&nbsp;
     <span class="hl">m<sub>min</sub></span> = (A_eff − F) / (p·r·P − F) &nbsp; when A_eff &gt; F, else 0%
       &nbsp;|&nbsp; Ceiling: a₀/(1+a₀) ≈ 23.1%<br>
@@ -689,7 +694,7 @@ input[type=range] {
     <span class="hl-prop">gross_proposed(S, P, p, b)</span>
       = p × r × (S + a₀·P·blend(b)) / (1 + a₀)<br>
 
-    <span class="hl-prop">A_new</span> = A_eff · blend(b)
+    <span id="formula-A-new"><span class="hl-prop">A_new</span> = A_eff · blend(b)</span>
       &nbsp;|&nbsp;
     <span class="hl-prop">SPO income (proposed)</span> and
     <span class="hl-prop">ROA (proposed)</span>
@@ -1727,17 +1732,18 @@ const TOUR_SCRIPTS = {
       title: 'The CIP as a formula',
       body: `<p>Concretely, the pledge bonus formula changes from:</p>
         <p style="font-family:monospace;color:var(--accent);margin:0.3rem 0">
-          A = r · a₀ · P / (1 + a₀)
+          A<sub>eff</sub> = p · r · a₀ · P / (1 + a₀)
         </p>
-        <p>to:</p>
+        <p>to (full proposal, b = 1):</p>
         <p style="font-family:monospace;color:#4ecdc4;margin:0.3rem 0">
-          A<sub>new</sub> = A · u, &nbsp;&nbsp; u = S / S<sub>sat</sub>
+          A<sub>new</sub> = A<sub>eff</sub> · u, &nbsp;&nbsp; u = min(S, S<sub>sat</sub>) / S<sub>sat</sub>
         </p>
         <p>where <strong>u</strong> is the pool's <em>utilization</em> — the fraction of
-        saturation it has reached. The blending coefficient <strong>b</strong> in the controls
-        below the chart slides smoothly between 0 (today) and 1 (full proposal), so we can
-        watch the transition continuously.</p>`,
-      targets: ['formula-panel'],
+        saturation it has reached, capped at 1. The blending coefficient <strong>b</strong> in
+        the controls below the chart slides smoothly between 0 (today) and 1 (full proposal) —
+        A<sub>new</sub> = A<sub>eff</sub> · [(1 − b) + b · u] — so we can watch the transition
+        continuously. These are exactly the formulas in the reference panel below.</p>`,
+      targets: ['formula-A-eff', 'formula-A-new'],
       actions: [],
       holdMs: 10000,
     },
@@ -1819,6 +1825,11 @@ const TOUR_SCRIPTS = {
       // Top-right anchor keeps the card out of the way of the slider's
       // right-side thumb travel during the b sweep.
       cardPosition: 'top-right',
+      // When narrated (autoplay + voice), hold the b-sweep back by 20 s so the
+      // slider starts moving only once the narration reaches the part that
+      // describes it — keeping voice and slider movement in sync. With no voice
+      // (muted / manual), the sweep runs immediately as before.
+      actionDelayMs: 20000,
       holdMs: 8000,
     },
   ],
@@ -2260,11 +2271,11 @@ TOUR_SCRIPTS.mpo = [
       delegators as just described); the <strong>forgone</strong> bonus is the gap versus not
       splitting — <code>337 K − 34 K ≈ 303 K ADA/year</code> left on the table. The more pools
       they split into, the more they forgo (total bonus scales as <code>1 / N</code>).</p>
-      <p><strong>The two live panels confirm both sides lose.</strong> The cursor now sits on a
+      <p><strong>The four live panels confirm both sides lose.</strong> The cursor now sits on a
       <em>single</em> split pool (5 M pledge, 2.5 M delegation, so <code>u = 0.1</code>). Compare
       the metric cards highlighted below: <em>SPO Income</em> drops from
-      <strong>1,968 → 1,689 ADA/epoch</strong> and <em>Delegator ROA</em> drops from
-      <strong>2.34% → 1.94% per year</strong> under the proposal. Because shrinking the pledge
+      <strong>1,968 to 1,689 ADA/epoch</strong> and <em>Delegator ROA</em> drops from
+      <strong>2.34% to 1.94% per year</strong> under the proposal. Because shrinking the pledge
       bonus shrinks the <em>whole pot</em>, the operator <strong>and</strong> their delegators both
       earn less in an under-utilized pool. That delegator-side drop is what makes the deterrent
       self-reinforcing — a split pool is now a worse deal for delegators too, so it becomes harder
@@ -2570,6 +2581,7 @@ const tour = {
   muted: false,
   _utterance: null,
   _narrationResolve: null,
+  _delayTimerId: null,   // pending deferred-action timer (see actionDelayMs)
 };
 
 // ---- Narration (Web Speech API) -------------------------------------------
@@ -2843,6 +2855,8 @@ function applyCardPosition(pos) {
 async function renderStep(i) {
   tour.renderGuard++;
   const myGuard = tour.renderGuard;
+  // Any deferred action from a previous step is now stale — cancel it.
+  if (tour._delayTimerId) { clearTimeout(tour._delayTimerId); tour._delayTimerId = null; }
   tour.i = Math.max(0, Math.min(TOUR_STEPS.length - 1, i));
   const step = TOUR_STEPS[tour.i];
 
@@ -2869,6 +2883,23 @@ async function renderStep(i) {
   // Brief pause so the smooth-scroll has a head start before action tweens fire.
   await new Promise(r => setTimeout(r, 280));
   if (myGuard !== tour.renderGuard) return;
+
+  // When this step requests a delayed sweep AND narration will play (autoplay +
+  // voice, not muted), defer the actions instead of blocking renderStep on them.
+  // That lets the autoplay loop start narrating immediately; the slider then
+  // begins moving step.actionDelayMs later, in sync with the spoken description.
+  const voiceActive = tour.playing && !tour.muted && speechSupported;
+  if (step.actionDelayMs && voiceActive) {
+    tour._delayTimerId = setTimeout(() => {
+      tour._delayTimerId = null;
+      if (myGuard !== tour.renderGuard) return;
+      applyStepActions(step);
+    }, step.actionDelayMs);
+    await nextFrame(); await nextFrame();
+    if (myGuard !== tour.renderGuard) return;
+    drawArrowsForStep(step);
+    return;
+  }
 
   await applyStepActions(step);
   if (myGuard !== tour.renderGuard) return;
@@ -2909,6 +2940,7 @@ async function autoPlay() {
 function pauseAutoplay() {
   tour.playing = false;
   if (tour.autoTimerId) { clearTimeout(tour.autoTimerId); tour.autoTimerId = null; }
+  if (tour._delayTimerId) { clearTimeout(tour._delayTimerId); tour._delayTimerId = null; }
   stopSpeaking();
   if (tour._narrationResolve) { const r = tour._narrationResolve; tour._narrationResolve = null; r(); }
   setAutoplayButton(false);
