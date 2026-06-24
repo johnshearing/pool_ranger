@@ -286,9 +286,12 @@ input[type=range] {
 #tour-launcher-hint { font-size: 0.82rem; color: var(--muted); }
 
 /* ── tour overlay / card / arrows ───────────────────── */
+/* The overlay is kept (so arrows and card sit cleanly above the page) but is
+   fully transparent — the screen no longer dims while a walkthrough runs.
+   Restore a faint dim by setting e.g. background: rgba(0,0,0,0.30) if wanted. */
 #tour-dim {
   position: fixed; inset: 0;
-  background: rgba(0,0,0,0.45);
+  background: transparent;
   z-index: 9000;
   pointer-events: none;
   opacity: 0;
@@ -406,7 +409,7 @@ input[type=range] {
 </div>
 <p class="sub">
   Interactive simulation of the parameter change proposed in
-  <a href="https://github.com/johnshearing/CIPs/tree/utilization-scaled-pledge-bonus/CIP-0187"
+  <a href="https://github.com/cardano-foundation/CIPs/tree/master/CIP-0187"
      style="color:var(--accent)">CIP-187 | Utilization-Scaled Pledge Bonus #1193</a>:
   multiply the pledge bonus <code>A</code> by pool utilization <code>u = S/S<sub>sat</sub></code>.
   Every <strong>current-formula</strong> curve is in red/green/blue (same colors as
@@ -427,6 +430,9 @@ input[type=range] {
     <button id="tour-start-btn-benefits" class="secondary">▶  Who benefits, and by how much</button>
     <button id="tour-start-btn-why"      class="secondary">▶  Why the proposed curves sit lower — and why the CIP still wins</button>
     <button id="tour-start-btn-cerkoryn" class="secondary">▶  A reviewer's questions about Pool 3 — answered card by card</button>
+  </div>
+  <div class="tour-launcher-row">
+    <button id="tour-start-btn-multicip" class="secondary"><strong>The Multi-CIP Simulator:</strong><br>MRI imaging techniques are used to show how CIPs 23, 50, 74, 75, and 187 can all work together in order to close the parameter space where it is possible for multipools to exist.</button>
   </div>
   <span id="tour-launcher-hint">
     — Guided walkthroughs. Cards appear bottom-right; arrows point at the relevant
@@ -1960,7 +1966,7 @@ TOUR_SCRIPTS.benefits = [
     body: `<p>The CIP redistributes some emission and reshapes incentives. This 9-step
       walkthrough walks through who gains, who loses, and by how much — stakeholder by
       stakeholder.</p>
-      <p>The source material is <a href="https://github.com/johnshearing/CIPs/tree/utilization-scaled-pledge-bonus/CIP-XXXX#a4-extended-stakeholder-analysis"
+      <p>The source material is <a href="https://github.com/cardano-foundation/CIPs/tree/master/CIP-0187#4-extended-stakeholder-analysis"
       style="color:var(--accent)">("A.4 Extended stakeholder analysis") of CIP-187? | Utilization-Scaled Pledge Bonus #1193</a>. Press
       <strong>▶ Play</strong> to let it run on its own.</p>`,
     targets: [],
@@ -3074,6 +3080,7 @@ document.getElementById('tour-start-btn-why').addEventListener('click',      () 
 document.getElementById('tour-start-btn-benefits').addEventListener('click', () => startTour('benefits'));
 document.getElementById('tour-start-btn-mpo').addEventListener('click',      () => startTour('mpo'));
 document.getElementById('tour-start-btn-cerkoryn').addEventListener('click', () => startTour('cerkoryn'));
+document.getElementById('tour-start-btn-multicip').addEventListener('click',  () => window.open('https://johnshearing.github.io/pool_ranger/Multi_CIP_Simulator.html', '_blank', 'noopener'));
 
 update(); // initial render
 
