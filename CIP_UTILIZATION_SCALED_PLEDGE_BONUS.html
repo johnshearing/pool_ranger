@@ -2247,16 +2247,33 @@ TOUR_SCRIPTS.mpo = [
       <p>The unsplit pool holds 50 M + 25 M = 75 M = <code>S<sub>sat</sub></code> exactly, so
       <code>u = 1</code> and the proposed formula returns the <em>full</em> bonus — a
       fully-utilized honest pool is never penalised. That is why the first two rows match.</p>
-      <p>Two figures, two meanings: the <strong>34 K/yr</strong> on the 10-pool row is the bonus
-      the operator <em>still earns</em> after splitting; the <strong>forgone</strong> bonus is the
-      gap versus not splitting — <code>337 K − 34 K ≈ 303 K ADA/year</code> left on the table.
-      The more pools they split into, the more they forgo (total earned bonus scales as
-      <code>1 / N</code>).</p>`,
-    targets: [],
+      <p><strong>Who actually receives this bonus?</strong> The pledge bonus is <em>not</em> money
+      the operator pockets directly. It is added to the pool's <strong>total reward pot</strong>,
+      which is then shared by everyone in the pool in proportion to their stake — after the
+      operator first takes the fixed fee and margin. So the bonus is <em>split between the operator
+      and the delegators</em>; the operator's share is large only because their pledge is a large
+      share of the pool's stake. In one of these split pools (5 M pledge + 2.5 M delegation) the
+      operator captures roughly <strong>⅔</strong> of the bonus and the delegators the remaining
+      <strong>⅓</strong>.</p>
+      <p>Two figures, two meanings: the <strong>34 K/yr</strong> on the 10-pool row is the total
+      pledge bonus the operator's ten pools still <em>generate</em> after splitting (shared with
+      delegators as just described); the <strong>forgone</strong> bonus is the gap versus not
+      splitting — <code>337 K − 34 K ≈ 303 K ADA/year</code> left on the table. The more pools
+      they split into, the more they forgo (total bonus scales as <code>1 / N</code>).</p>
+      <p><strong>The two live panels confirm both sides lose.</strong> The cursor now sits on a
+      <em>single</em> split pool (5 M pledge, 2.5 M delegation, so <code>u = 0.1</code>). Compare
+      the metric cards highlighted below: <em>SPO Income</em> drops from
+      <strong>1,968 → 1,689 ADA/epoch</strong> and <em>Delegator ROA</em> drops from
+      <strong>2.34% → 1.94% per year</strong> under the proposal. Because shrinking the pledge
+      bonus shrinks the <em>whole pot</em>, the operator <strong>and</strong> their delegators both
+      earn less in an under-utilized pool. That delegator-side drop is what makes the deterrent
+      self-reinforcing — a split pool is now a worse deal for delegators too, so it becomes harder
+      to attract the very delegation that would lift utilization back up (the next step).</p>`,
+    targets: ['m-spo', 'm-spo-prop', 'm-roa', 'm-roa-prop'],
     actions: [
       { kind: 'slider', id: 'sl-d', value: 2.5, ms: 600 },
     ],
-    holdMs: 13000,
+    holdMs: 17000,
   },
   {
     title: 'Can the MPO recover by attracting delegators?',
