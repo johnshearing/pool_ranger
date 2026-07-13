@@ -1,9 +1,7 @@
 # CLAUDE.md — Pool Ranger (ranger)    
-Always read /home/js/aiken/ranger/CIP_UTILIZATION_SCALED_PLEDGE_BONUS.html at the start of each session.  
-Please pay particular attention to the the walkthroughs which are activated by the five buttons at the top of the webpage.  
-
-Always read /home/js/aiken/ranger/Multi_CIP_Simulator.html at the start of each session.  
-Please pay particular attention to the the walkthroughs which are activated by the five buttons at the top of the webpage. 
+Always read /home/js/aiken/ranger/web/sign_tx.html at the start of each session.  
+Always read /home/js/aiken/ranger/web/sign_tx.js at the start of each session.
+Always read /home/js/aiken/ranger/web/HOW_TO_SIGN.md at the start of each session.  
 
 ---
 
